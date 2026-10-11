@@ -1,0 +1,20 @@
+{
+  "posts": [
+    {
+      "id": "post001",
+      "title": "第一篇帖子",
+      "author": "admin",
+      "date": "2026-10-11",
+      "summary": "欢迎来到github.io静态发帖网站，支持Markdown",
+      "content": "# 欢迎\n这是**第一篇帖子**\n- 列表项1\n- 列表项2\n\n> 引用文本\n\n代码：\n```js\nconsole.log('hello')\n```\n\n[返回首页](index.html)"
+    },
+    {
+      "id": "post002",
+      "title": "功能说明",
+      "author": "admin",
+      "date": "2026-10-11",
+      "summary": "网站包含搜索、markdown渲染、评论",
+      "content": "## 功能清单\n1. ✅ Markdown渲染（标题、代码块、引用、粗体）\n2. ✅ 本地搜索，不用服务器\n3. ✅ Utterances评论，使用Github账号留言\n\n> 静态站点限制：不能网页直接新建帖子，新增帖子需要修改posts.json提交github"
+    }
+  ]
+}
