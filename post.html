@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>帖子详情</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <h1>帖子详情</h1>
+  <a href="index.html">← 返回首页</a>
+</header>
+<main id="post-detail">加载中...</main>
+
+<div id="comment-area"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="js/main.js"></script>
+<script>
+function getUrlParam(name){
+  const u = new URLSearchParams(window.location.search);
+  return u.get(name);
+}
+const pid = getUrlParam("id");
+
+fetch("posts.json")
+.then(res=>res.json())
+.then(data=>{
+  const post = data.posts.find(p=>p.id === pid);
+  if(!post){
+    document.getElementById("post-detail").innerText="帖子不存在";
+    return;
+  }
+  // Markdown转HTML
+  const mdHtml = marked.parse(post.content);
+  document.getElementById("post-detail").innerHTML = `
+    <h2>${post.title}</h2>
+    <div class="meta">${post.date} | 作者：${post.author}</div>
+    <div class="content">${mdHtml}</div>
+  `
+  // 加载utterances评论
+  const s = document.createElement("script");
+  s.src="https://utteranc.es/client.js";
+  s.setAttribute("repo","SYC111SYC/SYC111SYC.github.io");
+  s.setAttribute("issue-term","pathname");
+  s.setAttribute("theme","github-light");
+  s.setAttribute("crossorigin","anonymous");
+  s.async = true;
+  document.getElementById("comment-area").appendChild(s);
+})
+</script>
+</body>
+</html>
