@@ -1,8 +1,445 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>SYC的小站</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>静墨 · 个人博客</title>
+  <style>
+    /* 全局重置与字体 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #f4f7fb;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* 主容器 */
+    .blog-container {
+      max-width: 840px;
+      width: 100%;
+    }
+
+    /* 顶部标识 / 站主信息 */
+    .blog-header {
+      margin-bottom: 3rem;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 1.5rem;
+    }
+
+    .blog-header h1 {
+      font-size: 2.2rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .blog-header h1::before {
+      content: "📘";
+      font-size: 2rem;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05));
+    }
+
+    .blog-header .subhead {
+      margin-top: 0.5rem;
+      color: #64748b;
+      font-size: 1.05rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+    }
+
+    .blog-header .subhead span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* 帖子卡片样式 —— 供用户之后使用 */
+    .post-card {
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 2rem 2rem 1.8rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02), 0 8px 24px rgba(0, 0, 0, 0.02);
+      border: 1px solid #eef2f6;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s;
+    }
+
+    .post-card:hover {
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.02);
+      border-color: #d9e2ec;
+      transform: translateY(-2px);
+    }
+
+    .post-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-bottom: 0.9rem;
+    }
+
+    .post-date {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      padding: 0.25rem 0.75rem;
+      border-radius: 30px;
+      font-weight: 500;
+      color: #334155;
+    }
+
+    .post-tag {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 0.2rem 0.75rem;
+      border-radius: 30px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #475569;
+      letter-spacing: 0.01em;
+    }
+
+    .post-title {
+      font-size: 1.8rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      margin: 0.25rem 0 1rem 0;
+      color: #0b1b2f;
+    }
+
+    .post-title a {
+      text-decoration: none;
+      color: inherit;
+      transition: color 0.15s;
+    }
+
+    .post-title a:hover {
+      color: #2563eb;
+    }
+
+    .post-excerpt {
+      font-size: 1.05rem;
+      color: #334155;
+      margin-bottom: 1.5rem;
+      border-left: 3px solid #cbd5e1;
+      padding-left: 1.25rem;
+      line-height: 1.7;
+    }
+
+    .post-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid #f0f4f9;
+      padding-top: 1.2rem;
+      font-size: 0.95rem;
+    }
+
+    .read-more {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      color: #2563eb;
+      text-decoration: none;
+      transition: gap 0.15s, color 0.15s;
+    }
+
+    .read-more:hover {
+      gap: 12px;
+      color: #1d4ed8;
+    }
+
+    .read-more::after {
+      content: "→";
+      font-size: 1.1rem;
+      transition: transform 0.15s;
+    }
+
+    .read-more:hover::after {
+      transform: translateX(3px);
+    }
+
+    /* ===== 空状态——仅当没有任何帖子时显示 ===== */
+    .empty-state {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 3.5rem 2rem;
+      margin: 2rem 0 1rem;
+      text-align: center;
+      border: 1px dashed #cbd5e1;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.02);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .empty-state .icon {
+      font-size: 3.5rem;
+      line-height: 1;
+      margin-bottom: 0.5rem;
+      opacity: 0.6;
+      filter: grayscale(0.3);
+    }
+
+    .empty-state h2 {
+      font-size: 1.6rem;
+      font-weight: 500;
+      color: #1e293b;
+      letter-spacing: -0.01em;
+    }
+
+    .empty-state p {
+      color: #64748b;
+      max-width: 380px;
+      font-size: 1rem;
+    }
+
+    .empty-state .hint {
+      font-size: 0.9rem;
+      background: #f1f5f9;
+      padding: 0.4rem 1rem;
+      border-radius: 30px;
+      color: #475569;
+      margin-top: 0.5rem;
+      display: inline-block;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      border: 1px solid #e2e8f0;
+    }
+
+    /* 博客底部 */
+    .blog-footer {
+      text-align: center;
+      margin-top: 3.5rem;
+      padding: 2rem 0 1rem;
+      border-top: 1px solid #e2e8f0;
+      font-size: 0.9rem;
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .blog-footer .heart {
+      color: #f43f5e;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    /* 暗色模式支持 */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+
+      .blog-header h1 {
+        color: #f1f5f9;
+      }
+
+      .blog-header {
+        border-bottom-color: #1e293b;
+      }
+
+      .post-card {
+        background: #1e293b;
+        border-color: #2d3a4e;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .post-card:hover {
+        border-color: #3b4b62;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+      }
+
+      .post-title {
+        color: #f1f5f9;
+      }
+
+      .post-excerpt {
+        color: #cbd5e1;
+        border-left-color: #475569;
+      }
+
+      .post-date {
+        background: #2d3a4e;
+        color: #cbd5e1;
+      }
+
+      .post-tag {
+        background: #1e293b;
+        border-color: #334155;
+        color: #94a3b8;
+      }
+
+      .post-footer {
+        border-top-color: #2d3a4e;
+      }
+
+      .blog-footer {
+        border-top-color: #1e293b;
+        color: #64748b;
+      }
+
+      .read-more {
+        color: #60a5fa;
+      }
+
+      .read-more:hover {
+        color: #93c5fd;
+      }
+
+      .subhead {
+        color: #94a3b8;
+      }
+
+      .empty-state {
+        background: #1e293b;
+        border-color: #334155;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      .empty-state h2 {
+        color: #f1f5f9;
+      }
+
+      .empty-state p {
+        color: #94a3b8;
+      }
+
+      .empty-state .hint {
+        background: #2d3a4e;
+        color: #cbd5e1;
+        border-color: #475569;
+      }
+    }
+
+    /* 手机端优化 */
+    @media (max-width: 600px) {
+      body {
+        padding: 1.25rem 0.75rem;
+      }
+
+      .blog-header h1 {
+        font-size: 1.8rem;
+      }
+
+      .post-card {
+        padding: 1.5rem 1.25rem;
+        border-radius: 16px;
+      }
+
+      .post-title {
+        font-size: 1.5rem;
+      }
+
+      .post-excerpt {
+        font-size: 1rem;
+        padding-left: 1rem;
+      }
+
+      .post-meta {
+        gap: 0.6rem;
+      }
+
+      .empty-state {
+        padding: 2.5rem 1.5rem;
+      }
+
+      .empty-state h2 {
+        font-size: 1.4rem;
+      }
+    }
+
+    .no-interaction-note {
+      text-align: center;
+      font-size: 0.8rem;
+      letter-spacing: 0.02em;
+      color: #b9c7d9;
+      margin-top: 1rem;
+      font-weight: 400;
+    }
+
+    /* 工具类：隐藏 */
+    .hidden {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>WELCOME</h1>
+  <div class="blog-container">
+    <!-- 博客头部 -->
+    <header class="blog-header">
+      <h1>静墨 · 博客</h1>
+      <div class="subhead">
+        <span>📌 站主：Jingmo</span>
+        <span>📅 更新于 2025</span>
+        <span>🌿 只记录，不打扰</span>
+      </div>
+      <p style="margin-top: 1rem; color: #475569; font-size: 1rem; max-width: 600px;">
+        这里只有站主写下的文章。没有评论区，没有喧闹，只有安静的阅读。
+      </p>
+    </header>
+
+    <!-- 帖子列表区域 — 没有任何预置帖子，仅展示空状态 -->
+    <main id="post-list">
+      <!-- 空状态：显示给还没有任何帖子的博客 -->
+      <div class="empty-state" id="empty-state">
+        <div class="icon">📭</div>
+        <h2>还没有文章</h2>
+        <p>站主正在构思下一篇笔记。不久后，这里会出现他亲手写下的文字。</p>
+        <div class="hint">&lt;article class="post-card"&gt; ... &lt;/article&gt;</div>
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.75rem;">
+          ✦ 把你的帖子放在 &lt;main&gt; 里，删除这个空状态即可 ✦
+        </p>
+      </div>
+
+      <!-- 
+        未来添加帖子时，将下面的注释取消并填入内容。
+        同时删除或者隐藏上面的空状态。
+        示例结构：
+        
+        <article class="post-card">
+          <div class="post-meta">
+            <span class="post-date">📅 2025年X月X日</span>
+            <span class="post-tag">#标签</span>
+          </div>
+          <h2 class="post-title"><a href="#">文章标题</a></h2>
+          <div class="post-excerpt">摘要……</div>
+          <div class="post-footer">
+            <a href="#" class="read-more">阅读全文</a>
+            <span>X 分钟阅读</span>
+          </div>
+        </article>
+      -->
+    </main>
+
+    <!-- 底部 -->
+    <footer class="blog-footer">
+      <div>© 2025 静墨 · 仅展示站主个人文章</div>
+      <div class="heart">✦ 没有留言板，没有数据库，只有安静的阅读 ✦</div>
+      <div class="no-interaction-note">— 此站点托管于 GitHub Pages · 纯静态 —</div>
+    </footer>
+  </div>
 </body>
+</html>
