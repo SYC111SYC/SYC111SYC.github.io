@@ -1,56 +1,88 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>帖子详情</title>
-<link rel="stylesheet" href="css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>帖子详情</title>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header>
-  <h1>帖子详情</h1>
-  <a href="index.html">← 返回首页</a>
-</header>
-<main id="post-detail">加载中...</main>
+    <header>
+        <h1>帖子详情</h1>
+        <nav>
+            <a href="index.html">← 返回首页</a>
+        </nav>
+    </header>
 
-<div id="comment-area"></div>
+    <main id="postDetail">加载中...</main>
 
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="js/main.js"></script>
-<script>
-function getUrlParam(name){
-  const u = new URLSearchParams(window.location.search);
-  return u.get(name);
-}
-const pid = getUrlParam("id");
+    <div id="commentSection" class="comment-area">
+        <!-- Giscus 评论区将在这里加载 -->
+    </div>
 
-fetch("posts.json")
-.then(res=>res.json())
-.then(data=>{
-  const post = data.posts.find(p=>p.id === pid);
-  if(!post){
-    document.getElementById("post-detail").innerText="帖子不存在";
-    return;
-  }
-  // Markdown转HTML
-  const mdHtml = marked.parse(post.content);
-  document.getElementById("post-detail").innerHTML = `
-    <h2>${post.title}</h2>
-    <div class="meta">${post.date} | 作者：${post.author}</div>
-    <div class="content">${mdHtml}</div>
-  `
-  // 加载utterances评论
-    const s = document.createElement("script");
-  s.src="https://utteranc.es/client.js";
-  s.setAttribute("repo","SYC111SYC/SYC111SYC.github.io");
-  s.setAttribute("issue-term","pathname");
-  s.setAttribute("label","评论");
-  s.setAttribute("theme","github-light");
-  s.setAttribute("crossorigin","anonymous");
-  s.async = true;
-  document.getElementById("comment-area").appendChild(s);
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        // 获取URL中的帖子ID
+        function getPostId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
 
-})
-</script>
+        const postId = getPostId();
+
+        fetch('posts.json')
+            .then(res => res.json())
+            .then(data => {
+                const post = data.posts.find(p => p.id === postId);
+                const container = document.getElementById('postDetail');
+                
+                if (!post) {
+                    container.innerHTML = '<p class="error">帖子不存在</p>';
+                    return;
+                }
+
+                // Markdown 渲染为 HTML
+                const contentHtml = marked.parse(post.content);
+                
+                container.innerHTML = `
+                    <article class="post-full">
+                        <h1 class="post-title">${post.title}</h1>
+                        <div class="post-meta">${post.date} · 作者：${post.author}</div>
+                        <div class="post-content">${contentHtml}</div>
+                    </article>
+                `;
+
+                // 加载 Giscus 评论
+                loadGiscus();
+            })
+            .catch(err => {
+                document.getElementById('postDetail').innerHTML = '<p class="error">加载失败</p>';
+                console.error(err);
+            });
+
+        // Giscus 评论加载函数
+        // 加载 Giscus 评论函数（已经填好你的全部参数）
+        function loadGiscus() {
+            const script = document.createElement('script');
+            script.src = "https://giscus.app/client.js";
+            script.setAttribute('data-repo', "SYC111SYC/SYC111SYC.github.io");
+            script.setAttribute('data-repo-id', "R_kgDOVDpBrA");
+            script.setAttribute('data-category', "Announcements");
+            script.setAttribute('data-category-id', "DIC_kwDOVDpBrM4DIUKB");
+            script.setAttribute('data-mapping', "pathname");
+            script.setAttribute('data-strict', "0");
+            script.setAttribute('data-reactions-enabled', "1");
+            script.setAttribute('data-emit-metadata', "0");
+            script.setAttribute('data-input-position', "bottom");
+            script.setAttribute('data-theme', "noborder_light");
+            script.setAttribute('data-lang', "zh-CN");
+            script.setAttribute('crossorigin', "anonymous");
+            script.async = true;
+            
+            document.getElementById('commentSection').appendChild(script);
+        }
+
+    </script>
 </body>
 </html>

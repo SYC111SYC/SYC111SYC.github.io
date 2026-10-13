@@ -1,20 +1,20 @@
 ﻿{
-  "posts": [
-    {
-      "id": "post001",
-      "title": "第一篇帖子",
-      "author": "admin",
-      "date": "2026-10-11",
-      "summary": "欢迎来到github.io静态发帖网站，支持Markdown",
-      "content": "# 欢迎\n这是**第一篇帖子**\n- 列表项1\n- 列表项2\n\n> 引用文本\n\n代码：\n```js\nconsole.log('hello')\n```\n\n[返回首页](index.html)"
-    },
-    {
-      "id": "post002",
-      "title": "功能说明",
-      "author": "admin",
-      "date": "2026-10-11",
-      "summary": "网站包含搜索、markdown渲染、评论",
-      "content": "## 功能清单\n1. ✅ Markdown渲染（标题、代码块、引用、粗体）\n2. ✅ 本地搜索，不用服务器\n3. ✅ Utterances评论，使用Github账号留言\n\n> 静态站点限制：不能网页直接新建帖子，新增帖子需要修改posts.json提交github"
-    }
-  ]
+    "posts": [
+        {
+            "id": "post-001",
+            "title": "欢迎来到我的发帖站",
+            "author": "管理员",
+            "date": "2026-10-13",
+            "summary": "这是网站的第一篇帖子，介绍网站功能和使用方法。",
+            "content": "# 欢迎来到我的发帖站\n\n这是一个基于 GitHub Pages 搭建的静态发帖网站。\n\n## 功能一览\n- ✅ 支持 Markdown 格式发帖\n- ✅ 首页关键词搜索\n- ✅ Giscus 评论系统，支持 GitHub 账号留言\n- ✅ 完全免费托管，稳定可靠\n\n## 如何发帖\n1. 编辑仓库中的 posts.json 文件\n2. 按照格式新增一条帖子数据\n3. 提交到 GitHub 仓库，等待自动部署\n\n> 提示：所有评论会保存在 GitHub Discussions 中。"
+        },
+        {
+            "id": "post-002",
+            "title": "Markdown 使用指南",
+            "author": "管理员",
+            "date": "2026-10-13",
+            "summary": "常用 Markdown 语法示例，快速上手排版。",
+            "content": "## 标题\n# 一级标题\n## 二级标题\n### 三级标题\n\n## 文本格式\n**粗体文字**\n*斜体文字*\n~~删除线~~\n\n## 列表\n- 无序列表项1\n- 无序列表项2\n\n1. 有序列表项1\n2. 有序列表项2\n\n## 引用\n> 这是一段引用文本\n\n## 代码\n行内代码：`console.log('hello')`\n\n代码块：\n```javascript\nfunction hello() {\n    console.log('Hello World');\n}\n```"
+        }
+    ]
 }
