@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -53,6 +53,9 @@
                     </article>
                 `;
 
+                // 动态修改页面标题，确保每篇帖子对应独立评论区
+                document.title = post.title + " - 我的发帖站";
+
                 // 加载 Giscus 评论
                 loadGiscus();
             })
@@ -61,8 +64,7 @@
                 console.error(err);
             });
 
-        // Giscus 评论加载函数
-        // 加载 Giscus 评论函数（已经填好你的全部参数）
+        // Giscus 评论加载函数（已填好你的全部参数 + 按标题映射）
         function loadGiscus() {
             const script = document.createElement('script');
             script.src = "https://giscus.app/client.js";
@@ -70,7 +72,7 @@
             script.setAttribute('data-repo-id', "R_kgDOVDpBrA");
             script.setAttribute('data-category', "Announcements");
             script.setAttribute('data-category-id', "DIC_kwDOVDpBrM4DIUKB");
-            script.setAttribute('data-mapping', "pathname");
+            script.setAttribute('data-mapping', "title");
             script.setAttribute('data-strict', "0");
             script.setAttribute('data-reactions-enabled', "1");
             script.setAttribute('data-emit-metadata', "0");
@@ -82,7 +84,6 @@
             
             document.getElementById('commentSection').appendChild(script);
         }
-
     </script>
 </body>
 </html>
