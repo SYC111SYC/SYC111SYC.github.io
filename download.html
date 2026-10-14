@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件分享</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>文件分享</h1>
+        <nav>
+            <a href="index.html">首页</a>
+            <a href="download.html" class="nav-active">文件分享</a>
+        </nav>
+    </header>
+
+    <main id="fileList">加载中...</main>
+
+    <script>
+        // 加载文件列表
+        fetch('files.json')
+            .then(res => res.json())
+            .then(data => {
+                renderFiles(data.files);
+            })
+            .catch(err => {
+                document.getElementById('fileList').innerHTML = '<p class="error">加载失败，请检查 files.json</p>';
+                console.error(err);
+            });
+
+        function renderFiles(files) {
+            const container = document.getElementById('fileList');
+            if (files.length === 0) {
+                container.innerHTML = '<p>暂无分享文件</p>';
+                return;
+            }
+            let html = '';
+            files.forEach(file => {
+                html += `
+                <div class="post-card file-card">
+                    <div class="file-info">
+                        <div class="file-header">
+                            <span class="file-type-tag">${file.type}</span>
+                            <h3 class="file-name">${file.name}</h3>
+                        </div>
+                        <p class="file-desc">${file.description}</p>
+                        <div class="file-meta">
+                            <span>${file.size}</span>
+                            <span>·</span>
+                            <span>${file.date}</span>
+                        </div>
+                    </div>
+                    <a class="download-btn" href="files/${file.filename}" download="${file.name}">下载</a>
+                </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
