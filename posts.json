@@ -23,6 +23,14 @@
             "date": "2026-10-13",
             "summary": "数字表述方法",
             "content": "# 意大利语数字大全\n\n## 一、基数词（0～100，最常用）\n\n### 0–10\n0 zero  1 uno（阳性）/una（阴性）  2 due  3 tre  4 quattro  5 cinque  6 sei  7 sette  8 otto  9 nove  10 dieci\n\n### 11–19\n11 undici  12 dodici  13 tredici  14 quattordici  15 quindici  16 sedici  17 diciassette  18 diciotto  19 diciannove\n\n### 20–99\n20 venti  21 ventuno  22 ventidue  23 ventitré  24 ventiquattro  25 venticinque  26 ventisei  27 ventisette  28 ventotto  29 ventinove\n\n30 trenta  31 trentuno  32 trentadue  33 trentatré ……\n👉规律：几十 + 个位，3、8 结尾去掉词尾 a：trenta + tré → trentatré；trenta+otto → trentotto\n\n40 quaranta  50 cinquanta  60 sessanta  70 settanta  80 ottanta  90 novanta  100 cento\n\n✅小规则：\nventi/trenta/quaranta… 后面接 1、8，末尾元音去掉： venti + uno → ventuno；venti + otto → ventotto\n接 3：保留 é，如 ventitré\n\n## 二、百、千、百万、十亿\n\n100 cento  101 centouno  150 centocinquanta  \n200 duecento  300 trecento  400 quattrocento  500 cinquecento  \n600 seicento  700 settecento  800 ottocento  900 novecento\n\n1000 mille（单数）  2000 duemila（复数 mila）  3000 tremila  10000 diecimila  100000 centomila\n\n1 000 000 un milione 一百万  \n2 000 000 due milioni  \n1 000 000 000 un miliardo 十亿\n\n> 注意：milione /miliardo 后面加名词要加 di： un milione di persone 一百万人"
+        },
+        {
+            "id": "post-004",
+            "title": "代码框架写入器",
+            "author": "Syc",
+            "date": "2026-10-14",
+            "summary": "快速写入多文件C++代码框架的小工具，适合算法竞赛练习，支持自定义宏和加速IO",
+            "content": "# 代码框架写入器\n\n一款用于快速生成多文件 C++ 代码框架的小工具，适合算法竞赛日常练习使用，操作便捷高效。\n\n## 核心功能\n- 可自由选择是否开启 `#define int long long` 宏定义\n- 可自由选择是否开启输入输出加速\n- 内置 `freopen` 文件读写配置\n\n## 下载\n👉 [点击下载 代码框架写入器.exe](files/代码框架写入器.exe)\n\n> 提示：文件存放在本站 files 目录下，点击即可直接下载。"
         }
     ]
 }
