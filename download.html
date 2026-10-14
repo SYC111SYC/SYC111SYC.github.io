@@ -18,14 +18,37 @@
     <main id="fileList">加载中...</main>
 
     <script>
-        // 加载文件列表
-        fetch('files.json')
-            .then(res => res.json())
+        // 配置：你的仓库地址
+        const GITHUB_REPO = "SYC111SYC/SYC111SYC.github.io";
+        const FILE_DIR = "files";
+
+        // 格式化文件大小
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+            return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+        }
+
+        // 提取文件类型
+        function getFileType(filename) {
+            const ext = filename.split('.').pop().toUpperCase();
+            return ext || "文件";
+        }
+
+        // 调用GitHub API获取文件列表
+        fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_DIR}`)
+            .then(res => {
+                if (!res.ok) throw new Error("获取文件列表失败");
+                return res.json();
+            })
             .then(data => {
-                renderFiles(data.files);
+                // 只保留文件，过滤文件夹
+                const files = data.filter(item => item.type === "file");
+                renderFiles(files);
             })
             .catch(err => {
-                document.getElementById('fileList').innerHTML = '<p class="error">加载失败，请检查 files.json</p>';
+                document.getElementById('fileList').innerHTML = 
+                    '<p class="error">加载失败，请检查仓库是否公开或网络</p>';
                 console.error(err);
             });
 
@@ -35,23 +58,24 @@
                 container.innerHTML = '<p>暂无分享文件</p>';
                 return;
             }
+
             let html = '';
             files.forEach(file => {
+                const fileType = getFileType(file.name);
+                const fileSize = formatSize(file.size);
+                
                 html += `
                 <div class="post-card file-card">
                     <div class="file-info">
                         <div class="file-header">
-                            <span class="file-type-tag">${file.type}</span>
+                            <span class="file-type-tag">${fileType}</span>
                             <h3 class="file-name">${file.name}</h3>
                         </div>
-                        <p class="file-desc">${file.description}</p>
                         <div class="file-meta">
-                            <span>${file.size}</span>
-                            <span>·</span>
-                            <span>${file.date}</span>
+                            <span>${fileSize}</span>
                         </div>
                     </div>
-                    <a class="download-btn" href="files/${file.filename}" download="${file.name}">下载</a>
+                    <a class="download-btn" href="${FILE_DIR}/${file.name}" download="${file.name}">下载</a>
                 </div>
                 `;
             });
