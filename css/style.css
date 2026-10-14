@@ -140,3 +140,63 @@ header nav a {
     text-align: center;
     padding: 40px;
 }
+/* 文件分享页样式 */
+.nav-active{
+    font-weight: 600;
+    margin-left: 16px;
+}
+
+.file-card{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.file-header{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.file-type-tag{
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #e8f0fe;
+    color: #0969da;
+    font-weight: 500;
+}
+
+.file-name{
+    font-size: 17px;
+    margin: 0;
+}
+
+.file-desc{
+    color: #57606a;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.file-meta{
+    font-size: 13px;
+    color: #656d76;
+    display: flex;
+    gap: 8px;
+}
+
+.download-btn{
+    flex-shrink: 0;
+    padding: 8px 20px;
+    background: #0969da;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.download-btn:hover{
+    background: #0860c7;
+}
