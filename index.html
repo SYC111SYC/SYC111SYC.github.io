@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -10,14 +10,27 @@
     <header>
         <h1>我的发帖站</h1>
         <nav>
-    <a href="index.html">首页</a>
-    <a href="download.html">文件分享</a>
-</nav>
+            <a href="index.html">首页</a>
+            <a href="download.html">文件分享</a>
+        </nav>
     </header>
 
     <div class="search-container">
         <input type="text" id="searchInput" placeholder="搜索帖子标题或内容...">
         <p id="searchTip"></p>
+    </div>
+
+    <!-- 谷歌小恐龙游戏 -->
+    <div class="post-card game-card">
+        <h3 class="game-title">🦖 小恐龙游戏</h3>
+        <p class="game-tip">按空格键开始，躲避仙人掌和翼龙</p>
+        <iframe 
+            src="https://trex-runner.com/" 
+            frameborder="0"
+            scrolling="no"
+            class="game-iframe"
+            title="Chrome小恐龙游戏">
+        </iframe>
     </div>
 
     <main id="postList">加载中...</main>
