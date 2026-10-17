@@ -22,19 +22,46 @@
     </div>
 
     <!-- 官方复刻版小恐龙（裁剪后纯游戏画面） -->
-    <div class="post-card game-card">
-        <h3 class="game-title">🦖 小恐龙游戏</h3>
-        <p class="game-tip">按 <kbd>空格</kbd> 跳跃，<kbd>↓</kbd> 下蹲，躲避障碍物</p>
-        <div class="game-viewport">
-            <iframe 
-                src="https://chromedino.com/embed/" 
-                frameborder="0"
-                scrolling="no"
-                class="game-iframe"
-                title="Chrome官方小恐龙">
-            </iframe>
+        <!-- 可折叠游戏中心（默认收起） -->
+    <div class="post-card foldable-game">
+        <div class="fold-header" id="foldToggle">
+            <span>🎮 游戏中心</span>
+            <span class="fold-arrow">▼</span>
+        </div>
+        <div class="fold-content" id="foldContent">
+            <!-- 小恐龙游戏 -->
+            <div class="game-item">
+                <h4>🦖 小恐龙</h4>
+                <p class="game-tip">按 <kbd>空格</kbd> 跳跃，<kbd>↓</kbd> 下蹲</p>
+                <div class="game-viewport">
+                    <iframe 
+                        src="https://chromedino.com/embed/" 
+                        frameborder="0"
+                        scrolling="no"
+                        class="game-iframe"
+                        title="Chrome小恐龙游戏">
+                    </iframe>
+                </div>
+            </div>
+
+            <!-- Super Mona 跑酷 -->
+            <div class="game-item">
+                <h4>🎨 Super Mona 跑酷</h4>
+                <p class="game-tip"><kbd>←→</kbd> / <kbd>A</kbd><kbd>D</kbd> 移动，<kbd>空格</kbd> 二段跳</p>
+                <div class="game-viewport mona-viewport">
+                    <iframe 
+                        src="https://super-mona.pages.dev/demo-preview.html" 
+                        frameborder="0"
+                        scrolling="no"
+                        allow="autoplay"
+                        class="game-iframe mona-iframe"
+                        title="Super Mona跑酷">
+                    </iframe>
+                </div>
+            </div>
         </div>
     </div>
+
 
     <main id="postList">加载中...</main>
 
