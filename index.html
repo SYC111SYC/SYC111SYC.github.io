@@ -120,6 +120,16 @@
             renderPosts(filtered);
             searchTip.textContent = `找到 ${filtered.length} 篇相关帖子`;
         });
+                // 游戏中心折叠切换
+        const foldToggle = document.getElementById('foldToggle');
+        const foldContent = document.getElementById('foldContent');
+        const foldArrow = foldToggle.querySelector('.fold-arrow');
+
+        foldToggle.addEventListener('click', function() {
+            const isOpen = foldContent.classList.toggle('open');
+            foldArrow.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
+
     </script>
 </body>
 </html>
