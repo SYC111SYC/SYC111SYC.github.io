@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>随机数抽取器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            max-width: 420px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        .box {
+            background: #f7f8fa;
+            padding:24px;
+            border-radius:16px;
+        }
+        .result {
+            font-size:48px;
+            font-weight:bold;
+            text-align:center;
+            color:#2563eb;
+            margin:20px 0;
+        }
+        .row {
+            display:flex;
+            gap:12px;
+            margin-bottom:16px;
+        }
+        input {
+            flex:1;
+            padding:12px;
+            border:1px solid #d1d5db;
+            border-radius:8px;
+            font-size:16px;
+        }
+        button {
+            width:100%;
+            padding:14px;
+            border:none;
+            border-radius:8px;
+            background:#2563eb;
+            color:white;
+            font-size:18px;
+            cursor:pointer;
+        }
+        button:active{
+            background:#1d4ed8;
+        }
+        .history{
+            margin-top:20px;
+        }
+        .history-title{
+            font-weight:bold;
+            margin-bottom:8px;
+        }
+        #historyList{
+            line-height:1.6;
+            color:#444;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="row">
+            <input id="minInput" type="number" placeholder="最小值" value="1">
+            <input id="maxInput" type="number" placeholder="最大值" value="100">
+        </div>
+        <div class="result" id="numResult">--</div>
+        <button onclick="getRandom()">抽取随机数</button>
+        <div class="history">
+            <div class="history-title">抽取记录：</div>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+<script>
+    const historyArr = [];
+    function getRandom(){
+        const min = parseInt(document.getElementById('minInput').value);
+        const max = parseInt(document.getElementById('maxInput').value);
+
+        if(isNaN(min) || isNaN(max)){
+            alert("请输入有效的数字！");
+            return;
+        }
+        if(min > max){
+            alert("最小值不能大于最大值！");
+            return;
+        }
+        // 生成 [min,max] 的整数随机数
+        const randomNum = Math.floor(Math.random() * (max - min + 1)) + min;
+        document.getElementById('numResult').innerText = randomNum;
+        historyArr.push(randomNum);
+        document.getElementById('historyList').innerText = historyArr.join("，");
+    }
+</script>
+</body>
+</html>
