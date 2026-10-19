@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>大字日历 · 农历与倒数日</title>
+<title>日历与倒数日</title>
 <script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.4/lunar.min.js"></script>
 <style>
   :root {
@@ -34,10 +34,7 @@
   .app { width: 100%; max-width: 760px; }
 
   /* ---------- 顶部大字日期 ---------- */
-  .hero {
-    text-align: center;
-    padding: 12px 0 34px;
-  }
+  .hero { text-align: center; padding: 12px 0 34px; }
 
   .hero-weekday {
     color: var(--muted);
@@ -86,7 +83,7 @@
     letter-spacing: 2px;
   }
 
-  /* ---------- 固定倒数日 ---------- */
+  /* ---------- 区块标题 ---------- */
   .section-title {
     font-size: 14px;
     color: var(--muted);
@@ -103,6 +100,7 @@
     letter-spacing: 0;
   }
 
+  /* ---------- 固定倒数日 ---------- */
   .fixed-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -128,6 +126,7 @@
     height: 120px;
     border-radius: 50%;
     background: rgba(246, 196, 83, 0.06);
+    pointer-events: none;
   }
 
   .fixed-label {
@@ -142,6 +141,8 @@
     color: var(--accent-soft);
     font-variant-numeric: tabular-nums;
     line-height: 1.1;
+    position: relative;
+    z-index: 1;
   }
 
   .fixed-days small {
@@ -194,10 +195,11 @@
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, transform 0.2s;
   }
 
   .custom-form button:hover { opacity: 0.85; }
+  .custom-form button:active { transform: scale(0.97); }
 
   .custom-list {
     display: flex;
@@ -237,6 +239,7 @@
     color: var(--accent-soft);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .custom-item-days small {
@@ -246,8 +249,38 @@
     margin-left: 2px;
   }
 
-  .custom-item-days.past { color: #6b7280; }
+  /* ---------- 可点击天数的公共样式 ---------- */
+  .fixed-days,
+  .custom-item-days {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    display: inline-block;
+    padding: 3px 7px;
+    margin: -3px -7px;
+    border-radius: 10px;
+    transform-origin: center;
+    will-change: transform, opacity;
+    transition: background 0.25s ease, filter 0.25s ease;
+  }
 
+  .fixed-days:hover,
+  .custom-item-days:hover {
+    background: rgba(255, 255, 255, 0.055);
+  }
+
+  .fixed-days.past,
+  .custom-item-days.past {
+    color: #6b7280;
+  }
+
+  .num-text {
+    font-size: 0.72em;
+    letter-spacing: 3px;
+  }
+
+  /* ---------- 删除按钮 ---------- */
   .delete-btn {
     background: transparent;
     border: 1px solid var(--line);
@@ -301,17 +334,17 @@
   <!-- 固定倒数日 -->
   <div class="section-title">
     <span>固定倒数日</span>
-    <span>每日自动更新</span>
+    <span>点击天数切换单位</span>
   </div>
   <div class="fixed-grid">
     <div class="fixed-card">
       <div class="fixed-label">元旦 · 2027</div>
-      <div class="fixed-days" id="daysToNewYear">—</div>
+      <div class="fixed-days" id="daysToNewYear" data-key="newYear" title="点击切换单位：天 / 周 / 月 / 年">—</div>
       <div class="fixed-date">2027 年 1 月 1 日</div>
     </div>
     <div class="fixed-card">
       <div class="fixed-label">除夕 · 2027</div>
-      <div class="fixed-days" id="daysToEve">—</div>
+      <div class="fixed-days" id="daysToEve" data-key="eve" title="点击切换单位：天 / 周 / 月 / 年">—</div>
       <div class="fixed-date">2027 年 2 月 5 日（腊月二十九）</div>
     </div>
   </div>
@@ -336,8 +369,25 @@
 (function () {
   "use strict";
 
-  // ---------- 工具 ----------
+  // ============================================================
+  // 基础工具
+  // ============================================================
   var MS_PER_DAY = 86400000;
+  var DAYS_PER_MONTH = 30.436875; // 平均月长
+  var DAYS_PER_YEAR = 365.2425;   // 平均年长
+
+  // 单位循环：天 → 周 → 月 → 年 → 天
+  var UNIT_CYCLE = ["day", "week", "month", "year"];
+  var UNIT_LABEL = { day: "天", week: "周", month: "月", year: "年" };
+
+  function normalizeUnit(u) {
+    return UNIT_CYCLE.indexOf(u) >= 0 ? u : "day";
+  }
+
+  function nextUnit(u) {
+    u = normalizeUnit(u);
+    return UNIT_CYCLE[(UNIT_CYCLE.indexOf(u) + 1) % UNIT_CYCLE.length];
+  }
 
   function todayStart() {
     var d = new Date();
@@ -345,9 +395,9 @@
     return d;
   }
 
-  /** 计算从今天到目标日期的天数差（目标 - 今天），当天为 0 */
+  /** 目标日期 - 今天 的天数差（当天为 0，过去为负） */
   function daysUntil(targetDate) {
-    var t = new Date(targetDate);
+    var t = new Date(targetDate + "T00:00:00");
     t.setHours(0, 0, 0, 0);
     return Math.round((t - todayStart()) / MS_PER_DAY);
   }
@@ -357,73 +407,9 @@
     return d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
   }
 
-  // ---------- 农历日期渲染 ----------
-  function renderLunar() {
-    var now = new Date();
-    var solar = Solar.fromDate(now);
-    var lunar = solar.getLunar();
-
-    // 公历大字
-    document.getElementById("year").textContent = now.getFullYear() + " 年";
-    document.getElementById("monthDay").textContent =
-      (now.getMonth() + 1) + " 月 " + now.getDate() + " 日";
-
-    // 星期
-    var weekdays = ["日", "一", "二", "三", "四", "五", "六"];
-    document.getElementById("weekday").textContent =
-      "星期" + weekdays[now.getDay()];
-
-    // 农历大字：如“腊月廿九”
-    var lunarMonth = lunar.getMonthInChinese(); // 如“腊”
-    var lunarDay = lunar.getDayInChinese();     // 如“廿九”
-    var lunarYear = lunar.getYearInGanZhi();    // 干支年，如“丙午”
-
-    document.getElementById("lunar").textContent =
-      lunarMonth + "月" + lunarDay;
-
-    document.getElementById("ganzhi").textContent =
-      lunarYear + "年 · " + lunar.getYearShengXiao() + "年";
-  }
-
-  // ---------- 固定倒数日 ----------
-  function renderFixedCountdowns() {
-    var newYear = "2027-01-01";
-    var eve = "2027-02-05"; // 除夕（腊月二十九）
-
-    renderCountdown(document.getElementById("daysToNewYear"), newYear);
-    renderCountdown(document.getElementById("daysToEve"), eve);
-  }
-
-  function renderCountdown(el, dateStr) {
-    var diff = daysUntil(dateStr);
-    if (diff > 0) {
-      el.innerHTML = diff + "<small>天</small>";
-    } else if (diff === 0) {
-      el.innerHTML = "就是<small>今天</small>";
-    } else {
-      el.innerHTML = Math.abs(diff) + "<small>天前</small>";
-      el.style.color = "#6b7280";
-    }
-  }
-
-  // ---------- 自定义倒数日（localStorage 持久化） ----------
-  var STORAGE_KEY = "big_calendar_custom_events_v1";
-
-  function loadCustomEvents() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function saveCustomEvents(events) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
-    } catch (e) {
-      // localStorage 不可用时静默降级
-    }
+  /** 保留 1 位小数，整数时去掉 .0 */
+  function trimNum(n) {
+    return n.toFixed(1).replace(/\.0$/, "");
   }
 
   function escapeHtml(str) {
@@ -435,13 +421,225 @@
       .replace(/'/g, "&#39;");
   }
 
-  function renderCustomEvents() {
-    var events = loadCustomEvents();
-    var list = document.getElementById("customList");
-    var countEl = document.getElementById("customCount");
+  function genId() {
+    return "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
 
-    // 按剩余天数升序排列（已过去的排在后面）
-    events.sort(function (a, b) {
+  // ============================================================
+  // 数值 → HTML（含单位切换）
+  // ============================================================
+  function buildDaysHTML(diff, unit) {
+    if (diff === 0) {
+      return '<span class="num-text">今天</span>';
+    }
+
+    var abs = Math.abs(diff);
+    var suffix = diff < 0 ? "前" : "";
+    var num, label;
+
+    unit = normalizeUnit(unit);
+
+    if (unit === "week") {
+      num = trimNum(abs / 7);
+      label = UNIT_LABEL.week + suffix;
+    } else if (unit === "month") {
+      num = trimNum(abs / DAYS_PER_MONTH);
+      label = UNIT_LABEL.month + suffix;
+    } else if (unit === "year") {
+      num = trimNum(abs / DAYS_PER_YEAR);
+      label = UNIT_LABEL.year + suffix;
+    } else {
+      num = String(abs);
+      label = UNIT_LABEL.day + suffix;
+    }
+
+    return num + "<small>" + label + "</small>";
+  }
+
+  // ============================================================
+  // 丝滑的数字切换动画
+  // ============================================================
+  function animateSwap(el, newHTML) {
+    // 不支持 Web Animations 时直接替换
+    if (!el.animate) {
+      el.innerHTML = newHTML;
+      return;
+    }
+
+    var token = (el._swapToken || 0) + 1;
+    el._swapToken = token;
+
+    // 快速连续点击：取消当前动画，直接更新内容并做一个轻微弹跳
+    if (el._swapAnim) {
+      el._swapAnim.cancel();
+      el._swapAnim = null;
+      el.innerHTML = newHTML;
+      el.animate(
+        [
+          { transform: "scale(0.92)" },
+          { transform: "scale(1)" }
+        ],
+        { duration: 200, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      );
+      return;
+    }
+
+    // 第一阶段：旧数字上滑淡出
+    var out = el.animate(
+      [
+        { transform: "translateY(0) scale(1)", opacity: 1 },
+        { transform: "translateY(-45%) scale(0.9)", opacity: 0 }
+      ],
+      { duration: 150, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" }
+    );
+    el._swapAnim = out;
+
+    out.onfinish = function () {
+      if (el._swapToken !== token) return;
+
+      out.cancel();
+      el._swapAnim = null;
+      el.innerHTML = newHTML;
+
+      // 第二阶段：新数字从下方滑入
+      var inn = el.animate(
+        [
+          { transform: "translateY(45%) scale(0.9)", opacity: 0 },
+          { transform: "translateY(0) scale(1)", opacity: 1 }
+        ],
+        { duration: 280, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      );
+      el._swapAnim = inn;
+
+      inn.onfinish = function () {
+        if (el._swapToken !== token) return;
+        inn.cancel();
+        el._swapAnim = null;
+      };
+    };
+  }
+
+  // ============================================================
+  // 农历渲染
+  // ============================================================
+  function renderLunar() {
+    var now = new Date();
+    var solar = Solar.fromDate(now);
+    var lunar = solar.getLunar();
+
+    document.getElementById("year").textContent = now.getFullYear() + " 年";
+    document.getElementById("monthDay").textContent =
+      (now.getMonth() + 1) + " 月 " + now.getDate() + " 日";
+
+    var weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+    document.getElementById("weekday").textContent = "星期" + weekdays[now.getDay()];
+
+    document.getElementById("lunar").textContent =
+      lunar.getMonthInChinese() + "月" + lunar.getDayInChinese();
+
+    document.getElementById("ganzhi").textContent =
+      lunar.getYearInGanZhi() + "年 · " + lunar.getYearShengXiao() + "年";
+  }
+
+  // ============================================================
+  // 固定倒数日
+  // ============================================================
+  var FIXED = {
+    newYear: { date: "2027-01-01", elId: "daysToNewYear" },
+    eve: { date: "2027-02-05", elId: "daysToEve" }
+  };
+
+  var FIXED_UNITS_KEY = "big_calendar_fixed_units_v1";
+
+  function loadFixedUnits() {
+    try {
+      var raw = localStorage.getItem(FIXED_UNITS_KEY);
+      var obj = raw ? JSON.parse(raw) : {};
+      return (obj && typeof obj === "object") ? obj : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveFixedUnits(units) {
+    try {
+      localStorage.setItem(FIXED_UNITS_KEY, JSON.stringify(units));
+    } catch (e) { /* 忽略 */ }
+  }
+
+  var fixedUnits = loadFixedUnits();
+
+  function renderFixedOne(key, animated) {
+    var conf = FIXED[key];
+    if (!conf) return;
+    var el = document.getElementById(conf.elId);
+    if (!el) return;
+
+    var diff = daysUntil(conf.date);
+    var unit = normalizeUnit(fixedUnits[key]);
+    var html = buildDaysHTML(diff, unit);
+
+    if (animated) {
+      animateSwap(el, html);
+    } else {
+      el.innerHTML = html;
+    }
+
+    el.classList.toggle("past", diff < 0);
+  }
+
+  function renderFixedCountdowns(animated) {
+    Object.keys(FIXED).forEach(function (key) {
+      renderFixedOne(key, animated);
+    });
+  }
+
+  function initFixedClicks() {
+    Object.keys(FIXED).forEach(function (key) {
+      var el = document.getElementById(FIXED[key].elId);
+      if (!el) return;
+      el.addEventListener("click", function () {
+        fixedUnits[key] = nextUnit(fixedUnits[key]);
+        saveFixedUnits(fixedUnits);
+        renderFixedOne(key, true);
+      });
+    });
+  }
+
+  // ============================================================
+  // 自定义倒数日
+  // ============================================================
+  var STORAGE_KEY = "big_calendar_custom_events_v1";
+
+  function loadCustomEvents() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCustomEvents(events) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    } catch (e) { /* 忽略 */ }
+  }
+
+  /** 兼容旧数据：补全 id 与 unit 字段 */
+  function ensureEventFields(events) {
+    var changed = false;
+    events.forEach(function (ev) {
+      if (!ev.id) { ev.id = genId(); changed = true; }
+      if (!ev.unit) { ev.unit = "day"; changed = true; }
+    });
+    if (changed) saveCustomEvents(events);
+    return events;
+  }
+
+  function sortEvents(events) {
+    return events.slice().sort(function (a, b) {
       var da = daysUntil(a.date);
       var db = daysUntil(b.date);
       var aPast = da < 0 ? 1 : 0;
@@ -449,6 +647,12 @@
       if (aPast !== bPast) return aPast - bPast;
       return da - db;
     });
+  }
+
+  function renderCustomEvents() {
+    var events = ensureEventFields(loadCustomEvents());
+    var list = document.getElementById("customList");
+    var countEl = document.getElementById("customCount");
 
     countEl.textContent = events.length + " 个事件";
 
@@ -457,56 +661,71 @@
       return;
     }
 
+    var sorted = sortEvents(events);
     var html = "";
-    events.forEach(function (ev, index) {
-      var diff = daysUntil(ev.date);
-      var past = diff < 0;
-      var daysHtml;
-      if (diff > 0) {
-        daysHtml = diff + "<small>天</small>";
-      } else if (diff === 0) {
-        daysHtml = "今天";
-      } else {
-        daysHtml = Math.abs(diff) + "<small>天前</small>";
-      }
 
+    sorted.forEach(function (ev) {
+      var diff = daysUntil(ev.date);
       html +=
         '<div class="custom-item">' +
           '<div class="custom-item-info">' +
             '<div class="custom-item-name">' + escapeHtml(ev.name) + '</div>' +
             '<div class="custom-item-date">' + formatDate(ev.date) + '</div>' +
           '</div>' +
-          '<div class="custom-item-days' + (past ? ' past' : '') + '">' + daysHtml + '</div>' +
-          '<button class="delete-btn" data-index="' + index + '" title="删除">&times;</button>' +
+          '<div class="custom-item-days' + (diff < 0 ? ' past' : '') + '"' +
+               ' data-id="' + ev.id + '"' +
+               ' title="点击切换单位：天 / 周 / 月 / 年">' +
+            buildDaysHTML(diff, ev.unit) +
+          '</div>' +
+          '<button class="delete-btn" data-id="' + ev.id + '" title="删除">&times;</button>' +
         '</div>';
     });
 
     list.innerHTML = html;
+  }
 
-    // 删除事件
-    list.querySelectorAll(".delete-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var idx = parseInt(this.getAttribute("data-index"), 10);
-        var evs = loadCustomEvents();
-        // 注意：渲染前已排序，需按排序后的数组删除；
-        // 但存储的是原始顺序，因此这里重新排序后再 splice 保持一致
-        evs.sort(function (a, b) {
-          var da = daysUntil(a.date);
-          var db = daysUntil(b.date);
-          var aPast = da < 0 ? 1 : 0;
-          var bPast = db < 0 ? 1 : 0;
-          if (aPast !== bPast) return aPast - bPast;
-          return da - db;
-        });
-        evs.splice(idx, 1);
-        saveCustomEvents(evs);
-        renderCustomEvents();
-      });
+  function deleteEvent(id) {
+    var events = loadCustomEvents().filter(function (x) { return x.id !== id; });
+    saveCustomEvents(events);
+    renderCustomEvents();
+  }
+
+  /** 事件委托：处理天数的点击切换 / 删除 */
+  function initCustomListDelegation() {
+    var list = document.getElementById("customList");
+
+    list.addEventListener("click", function (e) {
+      // 1) 点击天数 → 切换单位
+      var daysEl = e.target.closest ? e.target.closest(".custom-item-days") : null;
+      if (daysEl && daysEl.dataset.id) {
+        var id = daysEl.dataset.id;
+        var events = ensureEventFields(loadCustomEvents());
+        var ev = null;
+
+        for (var i = 0; i < events.length; i++) {
+          if (events[i].id === id) { ev = events[i]; break; }
+        }
+        if (!ev) return;
+
+        ev.unit = nextUnit(ev.unit);
+        saveCustomEvents(events);
+
+        var diff = daysUntil(ev.date);
+        animateSwap(daysEl, buildDaysHTML(diff, ev.unit));
+        daysEl.classList.toggle("past", diff < 0);
+        return;
+      }
+
+      // 2) 点击删除按钮
+      var btn = e.target.closest ? e.target.closest(".delete-btn") : null;
+      if (btn && btn.dataset.id) {
+        deleteEvent(btn.dataset.id);
+      }
     });
   }
 
-  // ---------- 添加自定义事件 ----------
-  document.getElementById("addBtn").addEventListener("click", function () {
+  // ---------- 添加事件 ----------
+  function addCustomEvent() {
     var nameInput = document.getElementById("eventName");
     var dateInput = document.getElementById("eventDate");
     var name = nameInput.value.trim();
@@ -525,30 +744,34 @@
       return;
     }
 
-    var events = loadCustomEvents();
-    events.push({ name: name, date: date });
+    var events = ensureEventFields(loadCustomEvents());
+    events.push({ id: genId(), name: name, date: date, unit: "day" });
     saveCustomEvents(events);
 
     nameInput.value = "";
     dateInput.value = "";
     renderCustomEvents();
-  });
+  }
 
-  // 按回车也可添加
+  document.getElementById("addBtn").addEventListener("click", addCustomEvent);
   document.getElementById("eventName").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") document.getElementById("addBtn").click();
+    if (e.key === "Enter") addCustomEvent();
   });
 
-  // ---------- 初始化 & 跨天刷新 ----------
+  // ============================================================
+  // 初始化 & 跨天刷新
+  // ============================================================
   function refreshAll() {
     renderLunar();
-    renderFixedCountdowns();
+    renderFixedCountdowns(false);
     renderCustomEvents();
   }
 
+  initFixedClicks();
+  initCustomListDelegation();
   refreshAll();
 
-  // 每 30 秒检查一次日期是否变化（跨天后自动重绘）
+  // 每 30 秒检测一次日期变化，跨天后自动重绘
   var lastDayKey = new Date().toDateString();
   setInterval(function () {
     var key = new Date().toDateString();
