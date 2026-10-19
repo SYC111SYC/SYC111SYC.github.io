@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大字日历 · 农历与倒数日</title>
+<script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.4/lunar.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --card-soft: #22262f;
+    --text: #f2f3f5;
+    --muted: #9aa0aa;
+    --accent: #ff6b6b;
+    --accent-soft: #ffb4b4;
+    --gold: #f6c453;
+    --line: #2e3340;
+    --radius: 20px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 0%, #1e2430 0%, var(--bg) 45%);
+    color: var(--text);
+    font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    padding: 28px 18px 64px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .app { width: 100%; max-width: 760px; }
+
+  /* ---------- 顶部大字日期 ---------- */
+  .hero {
+    text-align: center;
+    padding: 12px 0 34px;
+  }
+
+  .hero-weekday {
+    color: var(--muted);
+    font-size: 15px;
+    letter-spacing: 4px;
+    margin-bottom: 10px;
+  }
+
+  .hero-date {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    line-height: 1;
+  }
+
+  .hero-year {
+    font-size: clamp(24px, 6vw, 36px);
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  .hero-month-day {
+    font-size: clamp(76px, 22vw, 128px);
+    font-weight: 800;
+    letter-spacing: 2px;
+    background: linear-gradient(180deg, #ffffff 0%, #c9d2e3 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hero-lunar {
+    margin-top: 16px;
+    font-size: clamp(22px, 5.5vw, 32px);
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 2px;
+  }
+
+  .hero-ganzhi {
+    margin-top: 8px;
+    font-size: 15px;
+    color: var(--muted);
+    letter-spacing: 2px;
+  }
+
+  /* ---------- 固定倒数日 ---------- */
+  .section-title {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    margin: 0 0 14px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .section-title span:last-child {
+    font-size: 12px;
+    color: #6b7280;
+    letter-spacing: 0;
+  }
+
+  .fixed-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 34px;
+  }
+
+  .fixed-card {
+    background: linear-gradient(145deg, var(--card), var(--card-soft));
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .fixed-card::after {
+    content: "";
+    position: absolute;
+    right: -30px;
+    bottom: -40px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(246, 196, 83, 0.06);
+  }
+
+  .fixed-label {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .fixed-days {
+    font-size: 46px;
+    font-weight: 800;
+    color: var(--accent-soft);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .fixed-days small {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  .fixed-date {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  /* ---------- 自定义倒数日 ---------- */
+  .custom-form {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+
+  .custom-form input {
+    flex: 1 1 200px;
+    background: var(--card-soft);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    font-family: inherit;
+  }
+
+  .custom-form input:focus { border-color: var(--accent); }
+
+  .custom-form input[type="date"] {
+    flex: 0 1 180px;
+    color-scheme: dark;
+  }
+
+  .custom-form button {
+    background: var(--accent);
+    border: none;
+    border-radius: 14px;
+    padding: 14px 24px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.2s;
+  }
+
+  .custom-form button:hover { opacity: 0.85; }
+
+  .custom-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .custom-item {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .custom-item-info { flex: 1; min-width: 0; }
+
+  .custom-item-name {
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .custom-item-date {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .custom-item-days {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent-soft);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .custom-item-days small {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 2px;
+  }
+
+  .custom-item-days.past { color: #6b7280; }
+
+  .delete-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .delete-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .empty-tip {
+    text-align: center;
+    color: #5b6270;
+    font-size: 14px;
+    padding: 30px 0;
+    border: 1px dashed var(--line);
+    border-radius: 16px;
+  }
+
+  @media (max-width: 520px) {
+    .fixed-grid { grid-template-columns: 1fr; }
+    .custom-form input[type="date"] { flex: 1 1 100%; }
+    .custom-form button { flex: 1 1 100%; }
+    .custom-item-days { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 大字日期区 -->
+  <section class="hero">
+    <div class="hero-weekday" id="weekday">—</div>
+    <div class="hero-date">
+      <span class="hero-year" id="year">—</span>
+      <span class="hero-month-day" id="monthDay">—</span>
+    </div>
+    <div class="hero-lunar" id="lunar">—</div>
+    <div class="hero-ganzhi" id="ganzhi">—</div>
+  </section>
+
+  <!-- 固定倒数日 -->
+  <div class="section-title">
+    <span>固定倒数日</span>
+    <span>每日自动更新</span>
+  </div>
+  <div class="fixed-grid">
+    <div class="fixed-card">
+      <div class="fixed-label">元旦 · 2027</div>
+      <div class="fixed-days" id="daysToNewYear">—</div>
+      <div class="fixed-date">2027 年 1 月 1 日</div>
+    </div>
+    <div class="fixed-card">
+      <div class="fixed-label">除夕 · 2027</div>
+      <div class="fixed-days" id="daysToEve">—</div>
+      <div class="fixed-date">2027 年 2 月 5 日（腊月二十九）</div>
+    </div>
+  </div>
+
+  <!-- 自定义倒数日 -->
+  <div class="section-title">
+    <span>自定义倒数日</span>
+    <span id="customCount">0 个事件</span>
+  </div>
+
+  <div class="custom-form">
+    <input type="text" id="eventName" placeholder="事件名称，如：生日、旅行…" maxlength="40">
+    <input type="date" id="eventDate">
+    <button id="addBtn">添加</button>
+  </div>
+
+  <div class="custom-list" id="customList"></div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- 工具 ----------
+  var MS_PER_DAY = 86400000;
+
+  function todayStart() {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  /** 计算从今天到目标日期的天数差（目标 - 今天），当天为 0 */
+  function daysUntil(targetDate) {
+    var t = new Date(targetDate);
+    t.setHours(0, 0, 0, 0);
+    return Math.round((t - todayStart()) / MS_PER_DAY);
+  }
+
+  function formatDate(dateStr) {
+    var d = new Date(dateStr + "T00:00:00");
+    return d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
+  }
+
+  // ---------- 农历日期渲染 ----------
+  function renderLunar() {
+    var now = new Date();
+    var solar = Solar.fromDate(now);
+    var lunar = solar.getLunar();
+
+    // 公历大字
+    document.getElementById("year").textContent = now.getFullYear() + " 年";
+    document.getElementById("monthDay").textContent =
+      (now.getMonth() + 1) + " 月 " + now.getDate() + " 日";
+
+    // 星期
+    var weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+    document.getElementById("weekday").textContent =
+      "星期" + weekdays[now.getDay()];
+
+    // 农历大字：如“腊月廿九”
+    var lunarMonth = lunar.getMonthInChinese(); // 如“腊”
+    var lunarDay = lunar.getDayInChinese();     // 如“廿九”
+    var lunarYear = lunar.getYearInGanZhi();    // 干支年，如“丙午”
+
+    document.getElementById("lunar").textContent =
+      lunarMonth + "月" + lunarDay;
+
+    document.getElementById("ganzhi").textContent =
+      lunarYear + "年 · " + lunar.getYearShengXiao() + "年";
+  }
+
+  // ---------- 固定倒数日 ----------
+  function renderFixedCountdowns() {
+    var newYear = "2027-01-01";
+    var eve = "2027-02-05"; // 除夕（腊月二十九）
+
+    renderCountdown(document.getElementById("daysToNewYear"), newYear);
+    renderCountdown(document.getElementById("daysToEve"), eve);
+  }
+
+  function renderCountdown(el, dateStr) {
+    var diff = daysUntil(dateStr);
+    if (diff > 0) {
+      el.innerHTML = diff + "<small>天</small>";
+    } else if (diff === 0) {
+      el.innerHTML = "就是<small>今天</small>";
+    } else {
+      el.innerHTML = Math.abs(diff) + "<small>天前</small>";
+      el.style.color = "#6b7280";
+    }
+  }
+
+  // ---------- 自定义倒数日（localStorage 持久化） ----------
+  var STORAGE_KEY = "big_calendar_custom_events_v1";
+
+  function loadCustomEvents() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCustomEvents(events) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    } catch (e) {
+      // localStorage 不可用时静默降级
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function renderCustomEvents() {
+    var events = loadCustomEvents();
+    var list = document.getElementById("customList");
+    var countEl = document.getElementById("customCount");
+
+    // 按剩余天数升序排列（已过去的排在后面）
+    events.sort(function (a, b) {
+      var da = daysUntil(a.date);
+      var db = daysUntil(b.date);
+      var aPast = da < 0 ? 1 : 0;
+      var bPast = db < 0 ? 1 : 0;
+      if (aPast !== bPast) return aPast - bPast;
+      return da - db;
+    });
+
+    countEl.textContent = events.length + " 个事件";
+
+    if (!events.length) {
+      list.innerHTML = '<div class="empty-tip">还没有自定义倒数日，在上方添加一个吧</div>';
+      return;
+    }
+
+    var html = "";
+    events.forEach(function (ev, index) {
+      var diff = daysUntil(ev.date);
+      var past = diff < 0;
+      var daysHtml;
+      if (diff > 0) {
+        daysHtml = diff + "<small>天</small>";
+      } else if (diff === 0) {
+        daysHtml = "今天";
+      } else {
+        daysHtml = Math.abs(diff) + "<small>天前</small>";
+      }
+
+      html +=
+        '<div class="custom-item">' +
+          '<div class="custom-item-info">' +
+            '<div class="custom-item-name">' + escapeHtml(ev.name) + '</div>' +
+            '<div class="custom-item-date">' + formatDate(ev.date) + '</div>' +
+          '</div>' +
+          '<div class="custom-item-days' + (past ? ' past' : '') + '">' + daysHtml + '</div>' +
+          '<button class="delete-btn" data-index="' + index + '" title="删除">&times;</button>' +
+        '</div>';
+    });
+
+    list.innerHTML = html;
+
+    // 删除事件
+    list.querySelectorAll(".delete-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(this.getAttribute("data-index"), 10);
+        var evs = loadCustomEvents();
+        // 注意：渲染前已排序，需按排序后的数组删除；
+        // 但存储的是原始顺序，因此这里重新排序后再 splice 保持一致
+        evs.sort(function (a, b) {
+          var da = daysUntil(a.date);
+          var db = daysUntil(b.date);
+          var aPast = da < 0 ? 1 : 0;
+          var bPast = db < 0 ? 1 : 0;
+          if (aPast !== bPast) return aPast - bPast;
+          return da - db;
+        });
+        evs.splice(idx, 1);
+        saveCustomEvents(evs);
+        renderCustomEvents();
+      });
+    });
+  }
+
+  // ---------- 添加自定义事件 ----------
+  document.getElementById("addBtn").addEventListener("click", function () {
+    var nameInput = document.getElementById("eventName");
+    var dateInput = document.getElementById("eventDate");
+    var name = nameInput.value.trim();
+    var date = dateInput.value;
+
+    if (!name) {
+      nameInput.focus();
+      nameInput.style.borderColor = "#ff6b6b";
+      setTimeout(function () { nameInput.style.borderColor = ""; }, 1200);
+      return;
+    }
+    if (!date) {
+      dateInput.focus();
+      dateInput.style.borderColor = "#ff6b6b";
+      setTimeout(function () { dateInput.style.borderColor = ""; }, 1200);
+      return;
+    }
+
+    var events = loadCustomEvents();
+    events.push({ name: name, date: date });
+    saveCustomEvents(events);
+
+    nameInput.value = "";
+    dateInput.value = "";
+    renderCustomEvents();
+  });
+
+  // 按回车也可添加
+  document.getElementById("eventName").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") document.getElementById("addBtn").click();
+  });
+
+  // ---------- 初始化 & 跨天刷新 ----------
+  function refreshAll() {
+    renderLunar();
+    renderFixedCountdowns();
+    renderCustomEvents();
+  }
+
+  refreshAll();
+
+  // 每 30 秒检查一次日期是否变化（跨天后自动重绘）
+  var lastDayKey = new Date().toDateString();
+  setInterval(function () {
+    var key = new Date().toDateString();
+    if (key !== lastDayKey) {
+      lastDayKey = key;
+      refreshAll();
+    }
+  }, 30000);
+
+})();
+</script>
+</body>
+</html>
