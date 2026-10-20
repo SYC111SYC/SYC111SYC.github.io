@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C++ 代码编辑器</title>
+<style>
+  :root{
+    --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, "Courier New", monospace;
+    --bg: #1e1e1e;
+    --bg2: #252526;
+    --border: #2d2d2d;
+    --fg: #d4d4d4;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    background: radial-gradient(1200px 600px at 50% -10%, #2b2b33 0%, #131316 60%);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display:flex; padding:20px;
+  }
+  .app{
+    margin:auto;
+    width:min(1020px, 100%);
+    height:min(700px, 100%);
+    display:flex; flex-direction:column;
+    background: var(--bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow: 0 24px 70px rgba(0,0,0,.65);
+  }
+
+  /* ===== 标题栏 ===== */
+  .titlebar{
+    height:40px; flex:0 0 40px;
+    background: var(--bg2);
+    display:flex; align-items:center; gap:8px; padding:0 14px;
+    border-bottom:1px solid #1a1a1a;
+  }
+  .dot{ width:12px; height:12px; border-radius:50%; }
+  .dot.red{ background:#ff5f57; }
+  .dot.yellow{ background:#febc2e; }
+  .dot.green{ background:#28c840; }
+  .filename{ margin-left:12px; font-size:13px; color:#9d9d9d; letter-spacing:.3px; }
+  .filename b{ color:#c8c8c8; font-weight:500; }
+  .badge{
+    margin-left:auto; font-size:11px; color:#7a7a7a;
+    border:1px solid #3a3a3a; padding:2px 8px; border-radius:20px;
+  }
+
+  /* ===== 编辑区 ===== */
+  .editor-wrap{
+    position:relative;
+    flex:1 1 auto; min-height:0;
+    display:flex;
+  }
+  .gutter{
+    flex:0 0 58px; width:58px;
+    overflow:hidden;
+    background:#1b1b1b;
+    border-right:1px solid #262626;
+    position:relative;
+  }
+  #lineNumbers{
+    font-family:var(--mono);
+    font-size:14px; line-height:22px;
+    color:#4f4f4f;
+    text-align:right;
+    padding:8px 0;
+    will-change: transform;
+    user-select:none;
+  }
+  #lineNumbers div{ padding-right:12px; }
+
+  .code-area{ position:relative; flex:1 1 auto; min-width:0; }
+
+  .highlight, #code{
+    position:absolute; inset:0;
+    font-family:var(--mono);
+    font-size:14px;
+    line-height:22px;
+    letter-spacing:0;
+    padding:8px 14px;
+    margin:0; border:0;
+    white-space:pre;
+    tab-size:4;
+    word-wrap:normal;
+  }
+  .highlight{
+    z-index:1;
+    overflow:hidden;
+    pointer-events:none;
+    color:var(--fg);
+  }
+  #code{
+    z-index:2;
+    background:transparent;
+    color:transparent;
+    caret-color:#aeafad;
+    resize:none;
+    outline:none;
+    overflow:auto;
+  }
+  #code::selection{ background:rgba(38,79,120,.85); color:transparent; }
+  #code::-webkit-scrollbar{ width:11px; height:11px; }
+  #code::-webkit-scrollbar-thumb{ background:#3a3a3a; border-radius:6px; border:2px solid var(--bg); }
+  #code::-webkit-scrollbar-thumb:hover{ background:#4a4a4a; }
+  #code::-webkit-scrollbar-corner{ background:var(--bg); }
+
+  /* ===== 语法配色 ===== */
+  .kw   { color:#569cd6; }
+  .type { color:#4ec9b0; }
+  .std  { color:#4ec9b0; }
+  .fn   { color:#dcdcaa; }
+  .id   { color:#9cdcfe; }
+  .num  { color:#b5cea8; }
+  .str  { color:#ce9178; }
+  .com  { color:#6a9955; font-style:italic; }
+  .pre  { color:#c586c0; }
+
+  /* ===== 补全下拉框 ===== */
+  .autocomplete{
+    position:absolute; z-index:60;
+    display:none;
+    min-width:210px; max-width:340px;
+    max-height:224px; overflow-y:auto;
+    background:#252526;
+    border:1px solid #454545;
+    border-radius:6px;
+    box-shadow:0 10px 30px rgba(0,0,0,.55);
+    padding:4px;
+    font-family:var(--mono); font-size:13px;
+  }
+  .autocomplete::-webkit-scrollbar{ width:9px; }
+  .autocomplete::-webkit-scrollbar-thumb{ background:#484848; border-radius:5px; }
+  .ac-item{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:14px;
+    padding:4px 8px; border-radius:4px;
+    cursor:pointer; color:#d4d4d4;
+    white-space:nowrap;
+  }
+  .ac-item.active{ background:#094771; color:#fff; }
+  .ac-name{ overflow:hidden; text-overflow:ellipsis; }
+  .ac-name em{ font-style:normal; color:#4fc1ff; }
+  .ac-item.active .ac-name em{ color:#9ddcff; }
+  .ac-kind{
+    font-family:system-ui, sans-serif;
+    font-size:10px; padding:1px 6px; border-radius:9px;
+    background:#333; color:#9a9a9a; flex:0 0 auto;
+  }
+  .ac-kind.kw{ background:#26406b; color:#8ab4f8; }
+  .ac-kind.type, .ac-kind.std{ background:#1e4640; color:#7fd6c6; }
+  .ac-kind.fn{ background:#4a4220; color:#e3d78a; }
+  .ac-kind.var{ background:#2f3a4a; color:#9cdcfe; }
+  .ac-kind.class{ background:#3d2f4a; color:#c79cf0; }
+  .ac-kind.macro{ background:#4a2f2f; color:#e59c9c; }
+
+  /* ===== 状态栏 ===== */
+  .statusbar{
+    flex:0 0 30px; height:30px;
+    background:#007acc33;
+    border-top:1px solid #1a1a1a;
+    background:#181818;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px; font-size:12px; color:#8a8a8a;
+    font-family:var(--mono);
+  }
+  .hint{ color:#5f5f5f; font-family:system-ui, sans-serif; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="titlebar">
+    <span class="dot red"></span>
+    <span class="dot yellow"></span>
+    <span class="dot green"></span>
+    <span class="filename">📄 <b>main.cpp</b> — C++ 编辑器</span>
+    <span class="badge">高亮 · 缩进 · 补全</span>
+  </div>
+
+  <div class="editor-wrap" id="wrap">
+    <div class="gutter"><div id="lineNumbers"></div></div>
+    <div class="code-area">
+      <pre class="highlight" id="highlight"></pre>
+      <textarea id="code" spellcheck="false" autocomplete="off"
+                autocorrect="off" autocapitalize="off" wrap="off"></textarea>
+    </div>
+    <div class="autocomplete" id="ac"></div>
+  </div>
+
+  <div class="statusbar">
+    <span id="status">行 1，列 1</span>
+    <span class="hint">Tab 缩进 · Enter 自动缩进 · Ctrl+Space 手动补全 · Esc 关闭</span>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   1. 词法表
+   ========================================================= */
+const KW = new Set(`alignas alignof and and_eq asm auto bitand bitor break case catch
+char char8_t char16_t char32_t class co_await co_return co_yield compl concept const
+consteval constexpr constinit const_cast continue decltype default delete do double
+dynamic_cast else enum explicit export extern false float for friend goto if inline
+int long mutable namespace new noexcept not nullptr operator or private protected public
+register reinterpret_cast requires return short signed sizeof static static_assert
+static_cast struct switch template this throw true try typedef typeid typename union
+unsigned using virtual void volatile wchar_t while xor override final
+std string`.split(/\s+/).filter(Boolean));
+
+const TYPES = new Set(`int float double char bool void long short unsigned signed auto
+wchar_t char16_t char32_t char8_t size_t ptrdiff_t int8_t int16_t int32_t int64_t
+uint8_t uint16_t uint32_t uint64_t string wstring vector map set unordered_map
+unordered_set multimap pair tuple array deque list stack queue`.split(/\s+/).filter(Boolean));
+
+const STDLIB = new Set(`std cout cin cerr clog endl make_pair sort reverse find find_if
+count max_element min_element accumulate begin end rbegin rend push_back pop_back insert
+erase clear substr length c_str printf scanf malloc calloc realloc free memset memcpy
+strlen strcpy strcmp sqrt pow abs floor ceil round sin cos tan to_string stoi stod getline
+ifstream ofstream fstream stringstream ostringstream istringstream thread mutex unique_ptr
+shared_ptr make_unique make_shared move forward max min swap`.split(/\s+/).filter(Boolean));
+
+const CTRL = new Set(['if','for','while','switch','return','catch','sizeof','do','else','case']);
+
+/* =========================================================
+   2. 语法高亮
+   ========================================================= */
+const TOKEN_RE = new RegExp([
+  '\\/\\/[^\\n]*',                       // 行注释
+  '\\/\\*[\\s\\S]*?\\*\\/',              // 块注释
+  '^[ \\t]*#[^\\n]*',                    // 预处理指令
+  '"(?:\\\\.|[^"\\\\\\n])*"',            // 字符串
+  "'(?:\\\\.|[^'\\\\\\n])*'",            // 字符
+  '\\b(?:0[xX][0-9a-fA-F]+|\\d+\\.?\\d*(?:[eE][+-]?\\d+)?)[uUlLfF]*\\b', // 数字
+  '[A-Za-z_]\\w*'                        // 标识符
+].join('|'), 'gm');
+
+function esc(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function highlight(src){
+  let out = '', last = 0, m;
+  TOKEN_RE.lastIndex = 0;
+  while ((m = TOKEN_RE.exec(src)) !== null){
+    const tok = m[0];
+    const start = m.index;
+    out += esc(src.slice(last, start));
+    last = start + tok.length;
+
+    let cls;
+    if (tok.startsWith('//') || tok.startsWith('/*'))      cls = 'com';
+    else if (/^[ \t]*#/.test(tok))                          cls = 'pre';
+    else if (tok[0] === '"' || tok[0] === "'")              cls = 'str';
+    else if (/^\d/.test(tok))                               cls = 'num';
+    else if (TYPES.has(tok))                                cls = 'type';
+    else if (KW.has(tok))                                   cls = 'kw';
+    else if (STDLIB.has(tok))                               cls = 'std';
+    else {
+      cls = /^\s*\(/.test(src.slice(last)) ? 'fn' : 'id';
+    }
+    out += '<span class="' + cls + '">' + esc(tok) + '</span>';
+  }
+  out += esc(src.slice(last));
+  return out;
+}
+
+/* =========================================================
+   3. 提取用户符号（变量 / 函数 / 类 / 宏）
+   ========================================================= */
+function buildVocabulary(source){
+  const map = new Map();
+
+  // 内置
+  for (const k of KW)     if (!map.has(k)) map.set(k, 'kw');
+  for (const k of TYPES)  map.set(k, 'type');
+  for (const k of STDLIB) if (!map.has(k)) map.set(k, 'std');
+
+  let m;
+
+  // 由类型声明的变量 / 函数： int x;  double foo(
+  const reType = /\b(?:int|float|double|char|bool|void|long|short|unsigned|signed|auto|size_t|string|wchar_t)\b[\s&*]*([A-Za-z_]\w*)\s*(\()?/g;
+  while ((m = reType.exec(source))) map.set(m[1], m[2] ? 'fn' : 'var');
+
+  // 类 / 结构 / 枚举 / 命名空间
+  const reDecl = /\b(?:class|struct|enum|namespace|union)\s+([A-Za-z_]\w*)/g;
+  while ((m = reDecl.exec(source))) map.set(m[1], 'class');
+
+  // 宏定义
+  const reMacro = /^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)/gm;
+  while ((m = reMacro.exec(source))) map.set(m[1], 'macro');
+
+  // using 别名
+  const reAlias = /\busing\s+([A-Za-z_]\w*)\s*=/g;
+  while ((m = reAlias.exec(source))) map.set(m[1], 'type');
+
+  // 任何后接括号的标识符 → 视为函数
+  const reFn = /\b([A-Za-z_]\w*)\s*\(/g;
+  while ((m = reFn.exec(source))){
+    const n = m[1];
+    if (KW.has(n) || CTRL.has(n) || TYPES.has(n)) continue;
+    if (!map.has(n)) map.set(n, 'fn');
+  }
+
+  return map;
+}
+
+const KIND_LABEL = { kw:'关键字', type:'类型', std:'库', fn:'函数', var:'变量', class:'类', macro:'宏' };
+
+/* =========================================================
+   4. DOM 引用
+   ========================================================= */
+const wrap        = document.getElementById('wrap');
+const code        = document.getElementById('code');
+const highlightEl = document.getElementById('highlight');
+const lineNumbers = document.getElementById('lineNumbers');
+const acEl        = document.getElementById('ac');
+const statusEl    = document.getElementById('status');
+
+/* =========================================================
+   5. 渲染：高亮 + 行号 + 状态
+   ========================================================= */
+let lastLineCount = -1;
+
+function renderHighlight(val){
+  highlightEl.innerHTML = highlight(val) + '\n';
+}
+
+function updateLineNumbers(val){
+  const count = val.split('\n').length;
+  if (count === lastLineCount) return;
+  lastLineCount = count;
+  let html = '';
+  for (let i = 1; i <= count; i++) html += '<div>' + i + '</div>';
+  lineNumbers.innerHTML = html;
+}
+
+function updateStatus(){
+  const pos = code.selectionStart;
+  const before = code.value.slice(0, pos);
+  const line = before.split('\n').length;
+  const col  = pos - before.lastIndexOf('\n');
+  statusEl.textContent = '行 ' + line + '，列 ' + col;
+}
+
+/* =========================================================
+   6. 插入文本（尽量保留撤销栈）
+   ========================================================= */
+let internalEdit = false;
+
+function replaceRange(start, end, text, selStart, selEnd){
+  internalEdit = true;
+  code.focus();
+  code.setSelectionRange(start, end);
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
+  if (!ok) code.setRangeText(text, start, end, 'end');
+  if (selStart != null) code.setSelectionRange(selStart, selEnd != null ? selEnd : selStart);
+  internalEdit = false;
+  onInput();
+}
+
+/* =========================================================
+   7. 自动补全
+   ========================================================= */
+let acVisible = false, acItems = [], acIndex = 0, acStart = 0;
+
+function hideAC(){
+  if (!acVisible) return;
+  acVisible = false;
+  acEl.style.display = 'none';
+  acEl.innerHTML = '';
+}
+
+function renderAC(prefix){
+  acEl.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  acItems.forEach((it, i) => {
+    const row = document.createElement('div');
+    row.className = 'ac-item' + (i === acIndex ? ' active' : '');
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'ac-name';
+    if (prefix && it.name.toLowerCase().startsWith(prefix.toLowerCase())){
+      const em = document.createElement('em');
+      em.textContent = it.name.slice(0, prefix.length);
+      nameEl.appendChild(em);
+      nameEl.appendChild(document.createTextNode(it.name.slice(prefix.length)));
+    } else {
+      nameEl.textContent = it.name;
+    }
+
+    const kindEl = document.createElement('span');
+    kindEl.className = 'ac-kind ' + it.kind;
+    kindEl.textContent = KIND_LABEL[it.kind] || it.kind;
+
+    row.appendChild(nameEl);
+    row.appendChild(kindEl);
+    row.addEventListener('mousedown', ev => {
+      ev.preventDefault();
+      acIndex = i;
+      acceptCompletion();
+    });
+    frag.appendChild(row);
+  });
+
+  acEl.appendChild(frag);
+  const active = acEl.querySelector('.ac-item.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
+}
+
+/* 光标像素坐标测量 */
+let measureDiv = null;
+function getCaretRect(text, style){
+  if (!measureDiv){
+    measureDiv = document.createElement('div');
+    document.body.appendChild(measureDiv);
+  }
+  measureDiv.style.cssText =
+    'position:fixed;top:-99999px;left:-99999px;visibility:hidden;white-space:pre;' +
+    'border:0;margin:0;box-sizing:border-box;' +
+    'font-family:' + style.fontFamily + ';' +
+    'font-size:' + style.fontSize + ';' +
+    'font-weight:' + style.fontWeight + ';' +
+    'letter-spacing:' + style.letterSpacing + ';' +
+    'line-height:' + style.lineHeight + ';' +
+    'padding:' + style.padding + ';' +
+    'tab-size:' + style.tabSize + ';';
+
+  measureDiv.textContent = text;
+  const span = document.createElement('span');
+  span.textContent = '\u200b';
+  measureDiv.appendChild(span);
+
+  const sr = span.getBoundingClientRect();
+  const dr = measureDiv.getBoundingClientRect();
+  return { left: sr.left - dr.left, top: sr.top - dr.top, height: sr.height || 22 };
+}
+
+function positionAC(pos){
+  const style = getComputedStyle(code);
+  const caret = getCaretRect(code.value.slice(0, pos), style);
+
+  const wrapRect = wrap.getBoundingClientRect();
+  const taRect   = code.getBoundingClientRect();
+
+  let left = taRect.left - wrapRect.left + caret.left - code.scrollLeft;
+  let top  = taRect.top  - wrapRect.top  + caret.top  - code.scrollTop + caret.height;
+
+  const acW = acEl.offsetWidth;
+  const acH = acEl.offsetHeight;
+
+  if (left + acW > wrap.clientWidth) left = Math.max(0, wrap.clientWidth - acW - 4);
+  if (left < 0) left = 0;
+
+  if (top + acH > wrap.clientHeight){
+    const above = top - caret.height - acH - 2;
+    top = above >= 0 ? above : Math.max(0, wrap.clientHeight - acH - 4);
+  }
+
+  acEl.style.left = left + 'px';
+  acEl.style.top  = top + 'px';
+}
+
+function showAC(prefix, startPos, force){
+  const vocab = buildVocabulary(code.value);
+  const p = prefix.toLowerCase();
+  const items = [];
+
+  for (const [name, kind] of vocab){
+    if (name === prefix) continue;
+    if (!name.toLowerCase().startsWith(p)) continue;
+    items.push({ name, kind });
+  }
+
+  if (!items.length){ hideAC(); return; }
+
+  items.sort((a, b) => {
+    const ax = a.name.startsWith(prefix) ? 0 : 1;
+    const bx = b.name.startsWith(prefix) ? 0 : 1;
+    if (ax !== bx) return ax - bx;
+    if (a.name.length !== b.name.length) return a.name.length - b.name.length;
+    return a.name < b.name ? -1 : 1;
+  });
+
+  acItems = items.slice(0, 60);
+  acIndex = 0;
+  acStart = startPos;
+
+  renderAC(prefix);
+  acEl.style.display = 'block';
+  acVisible = true;
+  positionAC(startPos);
+}
+
+function acceptCompletion(){
+  if (!acItems.length) return;
+  const item = acItems[acIndex];
+  const start = acStart;
+  const end = code.selectionStart;
+
+  let insert = item.name;
+  let caret = start + insert.length;
+
+  if (item.kind === 'fn'){
+    const after = code.value[end];
+    if (after !== '('){
+      insert += '()';
+      caret = start + item.name.length + 1;
+    }
+  }
+
+  hideAC();
+  replaceRange(start, end, insert, caret, caret);
+}
+
+/* =========================================================
+   8. 编辑操作
+   ========================================================= */
+function handleEnter(){
+  const val = code.value;
+  const pos = code.selectionStart;
+  const end = code.selectionEnd;
+
+  const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+  const lineText  = val.slice(lineStart, pos);
+  const indent    = (lineText.match(/^[ \t]*/) || [''])[0];
+  const opens     = /[{\[(]\s*$/.test(lineText);
+  const addIndent = opens ? '  ' : '';
+  const nextChar  = val[pos];
+
+  if (addIndent && nextChar === '}'){
+    // 展开成： { ↵ 光标 ↵ }
+    const text = '\n' + indent + addIndent + '\n' + indent;
+    const caret = pos + 1 + indent.length + addIndent.length;
+    replaceRange(pos, end, text, caret, caret);
+  } else {
+    const text = '\n' + indent + addIndent;
+    const caret = pos + text.length;
+    replaceRange(pos, end, text, caret, caret);
+  }
+}
+
+function handleTab(shift){
+  const val = code.value;
+  const start = code.selectionStart;
+  const end   = code.selectionEnd;
+
+  if (start === end && !shift){
+    replaceRange(start, end, '  ', start + 2);
+    return;
+  }
+
+  const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+  let lineEnd = val.indexOf('\n', end);
+  if (lineEnd === -1) lineEnd = val.length;
+
+  const block = val.slice(lineStart, lineEnd);
+  const out = block.split('\n').map(line =>
+    shift ? line.replace(/^( {1,2}|\t)/, '') : '  ' + line
+  ).join('\n');
+
+  replaceRange(lineStart, lineEnd, out, lineStart, lineStart + out.length);
+}
+
+/* =========================================================
+   9. 主循环
+   ========================================================= */
+function onInput(){
+  const val = code.value;
+  renderHighlight(val);
+  updateLineNumbers(val);
+  updateStatus();
+
+  if (code.selectionStart !== code.selectionEnd){ hideAC(); return; }
+
+  const pos = code.selectionStart;
+  const m = val.slice(0, pos).match(/[A-Za-z_]\w*$/);
+  if (m) showAC(m[0], pos - m[0].length, false);
+  else hideAC();
+}
+
+/* 输入事件 */
+code.addEventListener('input', () => {
+  if (!internalEdit) onInput();
+});
+
+/* 按键 */
+code.addEventListener('keydown', e => {
+  /* --- 补全面板导航优先 --- */
+  if (acVisible){
+    if (e.key === 'ArrowDown'){
+      e.preventDefault();
+      acIndex = (acIndex + 1) % acItems.length;
+      renderAC(code.value.slice(acStart, code.selectionStart));
+      return;
+    }
+    if (e.key === 'ArrowUp'){
+      e.preventDefault();
+      acIndex = (acIndex - 1 + acItems.length) % acItems.length;
+      renderAC(code.value.slice(acStart, code.selectionStart));
+      return;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab'){
+      e.preventDefault();
+      acceptCompletion();
+      return;
+    }
+    if (e.key === 'Escape'){
+      e.preventDefault();
+      hideAC();
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home' || e.key === 'End'){
+      hideAC();
+    }
+  }
+
+  /* --- Ctrl + Space 强制补全 --- */
+  if (e.ctrlKey && e.code === 'Space'){
+    e.preventDefault();
+    const pos = code.selectionStart;
+    const m = code.value.slice(0, pos).match(/[A-Za-z_]\w*$/);
+    const prefix = m ? m[0] : '';
+    showAC(prefix, pos - prefix.length, true);
+    return;
+  }
+
+  /* --- Tab 缩进 --- */
+  if (e.key === 'Tab'){
+    e.preventDefault();
+    handleTab(e.shiftKey);
+    return;
+  }
+
+  /* --- Enter 自动缩进 --- */
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    handleEnter();
+    return;
+  }
+
+  /* --- 输入 } 时自动回退缩进 --- */
+  if (e.key === '}' && code.selectionStart === code.selectionEnd){
+    const pos = code.selectionStart;
+    const lineStart = code.value.lastIndexOf('\n', pos - 1) + 1;
+    const before = code.value.slice(lineStart, pos);
+    if (/^ {2,}$/.test(before)){
+      e.preventDefault();
+      replaceRange(lineStart, pos, before.slice(2) + '}', lineStart + before.length - 1);
+      return;
+    }
+  }
+});
+
+/* 光标移动后更新状态栏 */
+code.addEventListener('keyup', updateStatus);
+code.addEventListener('click', () => { hideAC(); updateStatus(); });
+code.addEventListener('blur', () => setTimeout(hideAC, 120));
+
+/* 滚动同步 */
+code.addEventListener('scroll', () => {
+  highlightEl.scrollTop  = code.scrollTop;
+  highlightEl.scrollLeft = code.scrollLeft;
+  lineNumbers.style.transform = 'translateY(' + (-code.scrollTop) + 'px)';
+  hideAC();
+});
+
+/* =========================================================
+   10. 初始示例代码
+   ========================================================= */
+const SAMPLE = `#include <iostream>
+#include <vector>
+#include <string>
+
+using namespace std;
+
+// 计算第 n 个斐波那契数
+int fibonacci(int n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+struct Point {
+    double x;
+    double y;
+
+    double distance(const Point& other) {
+        double dx = x - other.x;
+        double dy = y - other.y;
+        return sqrt(dx * dx + dy * dy);
+    }
+};
+
+int main() {
+    vector<int> numbers;
+    for (int i = 0; i < 10; i++) {
+        numbers.push_back(fibonacci(i));
+    }
+
+    string name = "C++ Editor";
+    cout << "Hello, " << name << endl;
+
+    for (int value : numbers) {
+        cout << value << " ";
+    }
+    cout << endl;
+
+    Point a{0, 0};
+    Point b{3, 4};
+    cout << "distance = " << a.distance(b) << endl;
+
+    return 0;
+}
+`;
+
+code.value = SAMPLE;
+renderHighlight(SAMPLE);
+updateLineNumbers(SAMPLE);
+updateStatus();
+code.focus();
+code.setSelectionRange(0, 0);
+</script>
+</body>
+</html>
