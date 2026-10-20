@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>日历与倒数日</title>
-<script src="https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.4/lunar.min.js"></script>
+<title>大字日历 · 农历与倒数日</title>
+<!-- 农历库改为动态多源加载，见脚本 loadLunarLib() -->
 <style>
   :root {
     --bg: #0f1115;
@@ -33,7 +33,6 @@
 
   .app { width: 100%; max-width: 760px; }
 
-  /* ---------- 顶部大字日期 ---------- */
   .hero { text-align: center; padding: 12px 0 34px; }
 
   .hero-weekday {
@@ -83,7 +82,6 @@
     letter-spacing: 2px;
   }
 
-  /* ---------- 区块标题 ---------- */
   .section-title {
     font-size: 14px;
     color: var(--muted);
@@ -100,7 +98,6 @@
     letter-spacing: 0;
   }
 
-  /* ---------- 固定倒数日 ---------- */
   .fixed-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -158,7 +155,6 @@
     color: #6b7280;
   }
 
-  /* ---------- 自定义倒数日 ---------- */
   .custom-form {
     display: flex;
     gap: 10px;
@@ -249,7 +245,6 @@
     margin-left: 2px;
   }
 
-  /* ---------- 可点击天数的公共样式 ---------- */
   .fixed-days,
   .custom-item-days {
     cursor: pointer;
@@ -280,7 +275,6 @@
     letter-spacing: 3px;
   }
 
-  /* ---------- 删除按钮 ---------- */
   .delete-btn {
     background: transparent;
     border: 1px solid var(--line);
@@ -320,7 +314,6 @@
 <body>
 <div class="app">
 
-  <!-- 大字日期区 -->
   <section class="hero">
     <div class="hero-weekday" id="weekday">—</div>
     <div class="hero-date">
@@ -331,7 +324,6 @@
     <div class="hero-ganzhi" id="ganzhi">—</div>
   </section>
 
-  <!-- 固定倒数日 -->
   <div class="section-title">
     <span>固定倒数日</span>
     <span>点击天数切换单位</span>
@@ -349,7 +341,6 @@
     </div>
   </div>
 
-  <!-- 自定义倒数日 -->
   <div class="section-title">
     <span>自定义倒数日</span>
     <span id="customCount">0 个事件</span>
@@ -373,10 +364,9 @@
   // 基础工具
   // ============================================================
   var MS_PER_DAY = 86400000;
-  var DAYS_PER_MONTH = 30.436875; // 平均月长
-  var DAYS_PER_YEAR = 365.2425;   // 平均年长
+  var DAYS_PER_MONTH = 30.436875;
+  var DAYS_PER_YEAR = 365.2425;
 
-  // 单位循环：天 → 周 → 月 → 年 → 天
   var UNIT_CYCLE = ["day", "week", "month", "year"];
   var UNIT_LABEL = { day: "天", week: "周", month: "月", year: "年" };
 
@@ -395,7 +385,6 @@
     return d;
   }
 
-  /** 目标日期 - 今天 的天数差（当天为 0，过去为负） */
   function daysUntil(targetDate) {
     var t = new Date(targetDate + "T00:00:00");
     t.setHours(0, 0, 0, 0);
@@ -407,7 +396,6 @@
     return d.getFullYear() + " 年 " + (d.getMonth() + 1) + " 月 " + d.getDate() + " 日";
   }
 
-  /** 保留 1 位小数，整数时去掉 .0 */
   function trimNum(n) {
     return n.toFixed(1).replace(/\.0$/, "");
   }
@@ -423,6 +411,53 @@
 
   function genId() {
     return "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  // ============================================================
+  // 农历库：多 CDN 兜底动态加载
+  // ============================================================
+  var LUNAR_CDNS = [
+    "https://cdn.jsdelivr.net/npm/lunar-javascript@1.6.4/lunar.min.js",
+    "https://fastly.jsdelivr.net/npm/lunar-javascript@1.6.4/lunar.min.js",
+    "https://unpkg.com/lunar-javascript@1.6.4/lunar.min.js"
+  ];
+
+  var lunarLoadState = "loading"; // loading | ok | fail
+
+  function loadScriptOnce(url) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = url;
+      s.async = true;
+      s.onload = function () { resolve(true); };
+      s.onerror = function () { reject(new Error("load fail: " + url)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function loadLunarLib() {
+    if (typeof window.Solar !== "undefined") {
+      lunarLoadState = "ok";
+      return Promise.resolve(true);
+    }
+    var i = 0;
+    function tryNext() {
+      if (i >= LUNAR_CDNS.length) {
+        lunarLoadState = "fail";
+        return Promise.resolve(false);
+      }
+      var url = LUNAR_CDNS[i++];
+      return loadScriptOnce(url).then(function () {
+        if (typeof window.Solar !== "undefined") {
+          lunarLoadState = "ok";
+          return true;
+        }
+        return tryNext();
+      }).catch(function () {
+        return tryNext();
+      });
+    }
+    return Promise.resolve().then(tryNext);
   }
 
   // ============================================================
@@ -460,7 +495,6 @@
   // 丝滑的数字切换动画
   // ============================================================
   function animateSwap(el, newHTML) {
-    // 不支持 Web Animations 时直接替换
     if (!el.animate) {
       el.innerHTML = newHTML;
       return;
@@ -469,22 +503,17 @@
     var token = (el._swapToken || 0) + 1;
     el._swapToken = token;
 
-    // 快速连续点击：取消当前动画，直接更新内容并做一个轻微弹跳
     if (el._swapAnim) {
       el._swapAnim.cancel();
       el._swapAnim = null;
       el.innerHTML = newHTML;
       el.animate(
-        [
-          { transform: "scale(0.92)" },
-          { transform: "scale(1)" }
-        ],
+        [{ transform: "scale(0.92)" }, { transform: "scale(1)" }],
         { duration: 200, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
       );
       return;
     }
 
-    // 第一阶段：旧数字上滑淡出
     var out = el.animate(
       [
         { transform: "translateY(0) scale(1)", opacity: 1 },
@@ -496,12 +525,10 @@
 
     out.onfinish = function () {
       if (el._swapToken !== token) return;
-
       out.cancel();
       el._swapAnim = null;
       el.innerHTML = newHTML;
 
-      // 第二阶段：新数字从下方滑入
       var inn = el.animate(
         [
           { transform: "translateY(45%) scale(0.9)", opacity: 0 },
@@ -520,13 +547,12 @@
   }
 
   // ============================================================
-  // 农历渲染
+  // 农历渲染（公历始终渲染，农历失败有降级提示）
   // ============================================================
   function renderLunar() {
     var now = new Date();
-    var solar = Solar.fromDate(now);
-    var lunar = solar.getLunar();
 
+    // 公历部分：不依赖任何外部库
     document.getElementById("year").textContent = now.getFullYear() + " 年";
     document.getElementById("monthDay").textContent =
       (now.getMonth() + 1) + " 月 " + now.getDate() + " 日";
@@ -534,11 +560,30 @@
     var weekdays = ["日", "一", "二", "三", "四", "五", "六"];
     document.getElementById("weekday").textContent = "星期" + weekdays[now.getDay()];
 
-    document.getElementById("lunar").textContent =
-      lunar.getMonthInChinese() + "月" + lunar.getDayInChinese();
+    var lunarEl = document.getElementById("lunar");
+    var ganzhiEl = document.getElementById("ganzhi");
 
-    document.getElementById("ganzhi").textContent =
-      lunar.getYearInGanZhi() + "年 · " + lunar.getYearShengXiao() + "年";
+    if (typeof window.Solar === "undefined") {
+      if (lunarLoadState === "fail") {
+        lunarEl.textContent = "农历加载失败";
+        ganzhiEl.textContent = "可检查 Edge 跟踪防护或刷新重试";
+      } else {
+        lunarEl.textContent = "农历加载中…";
+        ganzhiEl.textContent = "";
+      }
+      return;
+    }
+
+    try {
+      var solar = window.Solar.fromDate(now);
+      var lunar = solar.getLunar();
+      lunarEl.textContent = lunar.getMonthInChinese() + "月" + lunar.getDayInChinese();
+      ganzhiEl.textContent = lunar.getYearInGanZhi() + "年 · " + lunar.getYearShengXiao() + "年";
+    } catch (e) {
+      lunarEl.textContent = "农历解析失败";
+      ganzhiEl.textContent = "";
+      if (window.console) console.error(e);
+    }
   }
 
   // ============================================================
@@ -627,7 +672,6 @@
     } catch (e) { /* 忽略 */ }
   }
 
-  /** 兼容旧数据：补全 id 与 unit 字段 */
   function ensureEventFields(events) {
     var changed = false;
     events.forEach(function (ev) {
@@ -690,12 +734,10 @@
     renderCustomEvents();
   }
 
-  /** 事件委托：处理天数的点击切换 / 删除 */
   function initCustomListDelegation() {
     var list = document.getElementById("customList");
 
     list.addEventListener("click", function (e) {
-      // 1) 点击天数 → 切换单位
       var daysEl = e.target.closest ? e.target.closest(".custom-item-days") : null;
       if (daysEl && daysEl.dataset.id) {
         var id = daysEl.dataset.id;
@@ -716,7 +758,6 @@
         return;
       }
 
-      // 2) 点击删除按钮
       var btn = e.target.closest ? e.target.closest(".delete-btn") : null;
       if (btn && btn.dataset.id) {
         deleteEvent(btn.dataset.id);
@@ -724,7 +765,6 @@
     });
   }
 
-  // ---------- 添加事件 ----------
   function addCustomEvent() {
     var nameInput = document.getElementById("eventName");
     var dateInput = document.getElementById("eventDate");
@@ -759,19 +799,26 @@
   });
 
   // ============================================================
-  // 初始化 & 跨天刷新
+  // 初始化 & 跨天刷新（各模块独立容错）
   // ============================================================
   function refreshAll() {
-    renderLunar();
-    renderFixedCountdowns(false);
-    renderCustomEvents();
+    try { renderLunar(); } catch (e) { console.error("renderLunar", e); }
+    try { renderFixedCountdowns(false); } catch (e) { console.error("renderFixed", e); }
+    try { renderCustomEvents(); } catch (e) { console.error("renderCustom", e); }
   }
 
   initFixedClicks();
   initCustomListDelegation();
+
+  // 先立即渲染一次（公历 + 倒数日），农历此时显示“加载中”
   refreshAll();
 
-  // 每 30 秒检测一次日期变化，跨天后自动重绘
+  // 动态加载农历库，成功/失败后重新渲染农历区域
+  loadLunarLib().then(function () {
+    try { renderLunar(); } catch (e) { console.error(e); }
+  });
+
+  // 跨天自动刷新
   var lastDayKey = new Date().toDateString();
   setInterval(function () {
     var key = new Date().toDateString();
