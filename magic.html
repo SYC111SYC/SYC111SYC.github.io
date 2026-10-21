@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ 霍格沃茨决斗俱乐部 ⚡</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;padding:18px;min-height:100vh;
+  background:radial-gradient(ellipse at 50% -10%, #3a2260 0%, #1a1030 40%, #070410 100%);
+  background-attachment:fixed;color:#e9e2f5;
+  font-family:"Palatino Linotype","Book Antiqua","Songti SC",Georgia,serif;
+}
+.hidden{display:none !important}
+.title{
+  text-align:center;font-size:2rem;margin:10px 0 4px;
+  background:linear-gradient(180deg,#ffe9a8,#d4a12a 60%,#8a5f10);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 26px rgba(255,200,80,.25);letter-spacing:2px;
+}
+.subtitle{text-align:center;color:#a89ac4;margin:0 0 22px;font-size:.95rem}
+
+/* ===== 设置界面 ===== */
+.slots{max-width:720px;margin:0 auto;display:grid;gap:10px}
+.slot{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:linear-gradient(90deg,rgba(70,48,120,.5),rgba(30,20,55,.5));
+  border:1px solid rgba(170,140,255,.2);border-radius:12px;padding:10px 14px;
+}
+.slot-info{display:flex;align-items:center;gap:10px}
+.slot-emoji{font-size:1.4rem}
+.slot-name{font-size:1.05rem}
+select{
+  background:#1d1330;color:#e9e2f5;border:1px solid rgba(170,140,255,.35);
+  border-radius:8px;padding:8px 12px;font-size:.95rem;font-family:inherit;cursor:pointer;outline:none;
+}
+select:focus{border-color:#ffd76a}
+.btn-primary{
+  display:block;margin:26px auto 0;
+  background:linear-gradient(180deg,#ffd76a,#c08e1e);
+  color:#2a1a00;font-weight:bold;font-family:inherit;
+  border:none;border-radius:30px;padding:14px 46px;font-size:1.1rem;
+  cursor:pointer;letter-spacing:2px;box-shadow:0 6px 24px rgba(255,200,80,.35);transition:.2s;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,200,80,.5)}
+
+/* ===== 游戏界面 ===== */
+.game-header{display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto 14px;flex-wrap:wrap;gap:10px}
+.game-header .title{font-size:1.4rem;margin:0}
+#roundBadge{
+  background:rgba(255,215,106,.12);border:1px solid rgba(255,215,106,.4);
+  color:#ffd76a;padding:6px 16px;border-radius:20px;font-size:.9rem;
+}
+#board{
+  max-width:1200px;margin:0 auto 16px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:12px;
+}
+.pcard{
+  background:linear-gradient(160deg,rgba(60,40,100,.85),rgba(22,14,42,.95));
+  border:1px solid rgba(180,150,255,.22);border-radius:14px;padding:10px 12px;
+  position:relative;transition:.25s;box-shadow:0 4px 18px rgba(0,0,0,.5);
+}
+.pcard.active{border-color:#ffd76a;box-shadow:0 0 20px rgba(255,215,106,.55)}
+.pcard.dead{opacity:.32;filter:grayscale(1)}
+.phead{display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.phead .emoji{font-size:1.25rem}
+.phead .pname{font-size:.95rem;font-weight:bold;flex:1;color:#fff}
+.phead .ptype{font-size:.75rem;opacity:.6}
+.bar{
+  position:relative;height:19px;border-radius:10px;background:rgba(0,0,0,.45);
+  overflow:hidden;margin-bottom:5px;border:1px solid rgba(255,255,255,.07);
+}
+.bar .fill{height:100%;transition:width .35s ease;border-radius:10px}
+.bar.hp .fill{background:linear-gradient(90deg,#ff5b5b,#a01515)}
+.bar.mp .fill{background:linear-gradient(90deg,#5bc8ff,#1a5ea8)}
+.bar .btxt{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;letter-spacing:.5px;text-shadow:0 1px 3px #000;color:#fff;
+}
+.pfoot{display:flex;flex-wrap:wrap;gap:5px;min-height:20px;margin-top:6px}
+.tag{font-size:.7rem;padding:1px 7px;border-radius:10px;background:rgba(255,255,255,.1)}
+.tag.shield{background:rgba(120,200,255,.22);color:#9fe0ff}
+.tag.st-stun{background:rgba(255,255,120,.18);color:#ffe57a}
+.tag.st-burn{background:rgba(255,120,60,.2);color:#ffa46b}
+.tag.st-curse{background:rgba(200,60,200,.2);color:#e58fff}
+.tag.st-blind{background:rgba(200,200,200,.2);color:#ddd}
+.tag.st-slow{background:rgba(120,255,180,.18);color:#8fe6b5}
+
+/* ===== 施法区 ===== */
+#chooserBar{
+  max-width:1200px;margin:0 auto 10px;padding:10px 16px;
+  background:linear-gradient(90deg,rgba(255,215,106,.14),rgba(255,215,106,.03));
+  border-left:3px solid #ffd76a;border-radius:8px;
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;
+}
+#chooserName{color:#ffd76a;font-weight:bold}
+#chooserHint{font-size:.85rem;color:#b6a8d4}
+#spellPanel{max-width:1200px;margin:0 auto 16px}
+.spell-group{margin-bottom:14px}
+.group-label{font-size:.85rem;color:#b9a8e0;margin:0 0 7px 3px;letter-spacing:1px}
+.spell-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:9px}
+.spell-btn{
+  text-align:left;background:linear-gradient(160deg,rgba(58,40,96,.9),rgba(24,16,46,.95));
+  border:1px solid rgba(160,130,240,.28);border-radius:11px;padding:9px 11px;
+  color:#e9e2f5;font-family:inherit;cursor:pointer;transition:.16s;
+}
+.spell-btn:hover:not(.disabled){
+  border-color:#ffd76a;transform:translateY(-2px);
+  box-shadow:0 6px 18px rgba(255,215,106,.22);
+}
+.spell-btn.disabled{opacity:.32;cursor:not-allowed}
+.sp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+.sp-name{font-weight:bold;font-size:.95rem;color:#fff}
+.sp-cost{font-size:.78rem;color:#8fd8ff}
+.sp-en{font-size:.66rem;color:#9b8ec0;font-style:italic;margin-bottom:4px}
+.sp-desc{font-size:.72rem;color:#c3b6dd;line-height:1.35}
+.picker-title{color:#ffd76a;margin-bottom:10px;font-size:1rem}
+.target-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;margin-bottom:12px}
+.target-btn{
+  background:linear-gradient(160deg,rgba(90,40,60,.85),rgba(30,16,26,.95));
+  border:1px solid rgba(255,140,140,.3);border-radius:11px;padding:12px;
+  color:#e9e2f5;font-family:inherit;cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;gap:3px;transition:.16s;
+}
+.target-btn:hover{border-color:#ff7676;transform:translateY(-2px);box-shadow:0 6px 18px rgba(255,100,100,.25)}
+.target-btn .te{font-size:1.5rem}
+.target-btn .tn{font-size:.9rem;font-weight:bold}
+.target-btn .thp{font-size:.75rem;color:#ff9e9e}
+.btn-ghost{
+  background:transparent;border:1px solid rgba(170,140,255,.35);color:#b9a8e0;
+  padding:8px 18px;border-radius:20px;cursor:pointer;font-family:inherit;font-size:.85rem;
+}
+.btn-ghost:hover{border-color:#ffd76a;color:#ffd76a}
+
+/* ===== 日志 ===== */
+#logWrap{max-width:1200px;margin:0 auto}
+.log-title{font-size:.85rem;color:#b9a8e0;margin-bottom:6px;letter-spacing:1px}
+#log{
+  height:190px;overflow-y:auto;background:rgba(0,0,0,.42);
+  border:1px solid rgba(170,140,255,.18);border-radius:12px;padding:10px 14px;
+  font-size:.82rem;line-height:1.55;font-family:"Consolas","Menlo","Songti SC",monospace;
+}
+#log::-webkit-scrollbar{width:7px}
+#log::-webkit-scrollbar-thumb{background:rgba(170,140,255,.35);border-radius:4px}
+.log-line{color:#c8bede}
+.log-line.round{color:#ffd76a;font-weight:bold;margin:6px 0 4px;border-bottom:1px dashed rgba(255,215,106,.3);padding-bottom:3px}
+.log-line.cast{color:#9fe8ff}
+.log-line.dmg{color:#ff9e9e}
+.log-line.heal{color:#9dffb8}
+.log-line.mana{color:#8fd8ff}
+.log-line.buff{color:#9fe0ff}
+.log-line.debuff{color:#e58fff}
+.log-line.miss{color:#9b8ec0;font-style:italic}
+.log-line.sys{color:#b0a4cc}
+.log-line.death{color:#ff5b5b;font-weight:bold}
+
+/* ===== 结算横幅 ===== */
+#banner{
+  position:fixed;inset:0;background:rgba(5,3,12,.88);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:50;
+}
+.crown{font-size:5rem;animation:pop .6s ease}
+@keyframes pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1)}}
+.wtitle{font-size:1.6rem;color:#ffd76a;text-align:center;padding:0 20px}
+@media (max-width:600px){
+  .title{font-size:1.4rem}
+  .game-header .title{font-size:1.05rem}
+  .spell-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 设置界面 ============ -->
+<div id="setupScreen">
+  <h1 class="title">⚡ 霍格沃茨决斗俱乐部 ⚡</h1>
+  <p class="subtitle">选择你的决斗者 · 施展咒语 · 成为最后的胜者</p>
+  <div id="slots" class="slots"></div>
+  <button id="startBtn" class="btn-primary">开始决斗</button>
+</div>
+
+<!-- ============ 游戏界面 ============ -->
+<div id="gameScreen" class="hidden">
+  <div class="game-header">
+    <h1 class="title">⚡ 决斗俱乐部 ⚡</h1>
+    <div id="roundBadge">第 1 回合</div>
+  </div>
+  <div id="board"></div>
+  <div id="chooserBar" class="hidden">
+    <div id="chooserName"></div>
+    <div id="chooserHint"></div>
+  </div>
+  <div id="spellPanel"></div>
+  <div id="logWrap">
+    <div class="log-title">📜 决斗日志</div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<!-- ============ 结算 ============ -->
+<div id="banner" class="hidden"></div>
+
+<script>
+/* =========================================================
+   咒语数据（20条原作咒语）
+   ========================================================= */
+const SPELLS = [
+  // ---------- 攻击 ----------
+  { id:'expelliarmus', name:'除你武器', en:'Expelliarmus', cost:8, cat:'attack', target:'enemy', power:10,
+    extra:{ mpBurn:20 }, desc:'造成10点伤害，并削去目标20点魔力' },
+  { id:'diffindo', name:'四分五裂', en:'Diffindo', cost:12, cat:'attack', target:'enemy', power:18,
+    desc:'造成18点伤害' },
+  { id:'expulso', name:'霹雳爆炸', en:'Expulso', cost:18, cat:'attack', target:'enemy', power:26,
+    desc:'造成26点伤害' },
+  { id:'confringo', name:'粉身碎骨', en:'Confringo', cost:20, cat:'attack', target:'enemy', power:30,
+    desc:'造成30点伤害' },
+  { id:'incendio', name:'火焰熊熊', en:'Incendio', cost:16, cat:'attack', target:'enemy', power:16,
+    extra:{ status:{ type:'burn', dur:2, val:6 } },
+    desc:'造成16点伤害，附加灼烧2回合（每回合6点）' },
+  { id:'stupefy', name:'昏昏倒地', en:'Stupefy', cost:14, cat:'attack', target:'enemy', power:18,
+    extra:{ status:{ type:'stun', dur:1, chance:0.6 } },
+    desc:'造成18点伤害，60%几率使目标昏迷1回合' },
+  { id:'petrificus', name:'统统石化', en:'Petrificus Totalus', cost:12, cat:'attack', target:'enemy', power:6,
+    extra:{ status:{ type:'stun', dur:1, chance:0.8 } },
+    desc:'造成6点伤害，80%几率石化目标1回合' },
+  { id:'incarcerous', name:'速速禁锢', en:'Incarcerous', cost:16, cat:'attack', target:'enemy', power:8,
+    extra:{ status:{ type:'stun', dur:2, chance:0.6 } },
+    desc:'造成8点伤害，60%几率束缚目标2回合' },
+  { id:'impedimenta', name:'障碍重重', en:'Impedimenta', cost:10, cat:'attack', target:'enemy', power:8,
+    extra:{ status:{ type:'slow', dur:2 } },
+    desc:'造成8点伤害，并使目标减速2回合（最后行动）' },
+  { id:'sectumsempra', name:'神锋无影', en:'Sectumsempra', cost:24, cat:'attack', target:'enemy', power:36,
+    desc:'造成36点伤害' },
+  { id:'crucio', name:'钻心剜骨', en:'Crucio', cost:30, cat:'attack', target:'enemy', power:20,
+    extra:{ status:{ type:'curse', dur:3, val:9 } },
+    desc:'造成20点伤害，施加痛苦诅咒3回合（每回合9点）' },
+  { id:'avadakedavra', name:'阿瓦达索命', en:'Avada Kedavra', cost:50, cat:'attack', target:'enemy', power:70,
+    desc:'不可饶恕咒，造成70点伤害' },
+  { id:'aguamenti', name:'清水如泉', en:'Aguamenti', cost:10, cat:'attack', target:'enemy', power:12,
+    extra:{ cleanseTarget:true },
+    desc:'造成12点伤害，并熄灭目标身上的灼烧' },
+  { id:'legilimens', name:'摄魂取念', en:'Legilimens', cost:12, cat:'attack', target:'enemy', power:8,
+    extra:{ mpSteal:20 },
+    desc:'造成8点伤害，并汲取目标20点魔力' },
+  { id:'lumos', name:'荧光闪烁', en:'Lumos', cost:6, cat:'attack', target:'enemy', power:0,
+    extra:{ status:{ type:'blind', dur:2, chance:0.9 } },
+    desc:'强光致盲：90%几率使目标2回合内45%概率失手' },
+
+  // ---------- 防御 ----------
+  { id:'protego', name:'盔甲护身', en:'Protego', cost:10, cat:'defense', target:'self', shield:30,
+    desc:'获得30点护盾，抵挡伤害' },
+  { id:'patronum', name:'呼神护卫', en:'Expecto Patronum', cost:22, cat:'defense', target:'self', shield:40,
+    extra:{ cleanseAll:true },
+    desc:'获得40点护盾，并驱散自身所有负面状态' },
+
+  // ---------- 治愈 ----------
+  { id:'episkey', name:'愈合如初', en:'Episkey', cost:14, cat:'heal', target:'self', heal:30,
+    desc:'恢复30点生命值' },
+
+  // ---------- 辅助 ----------
+  { id:'finite', name:'咒立停', en:'Finite Incantatem', cost:8, cat:'utility', target:'self',
+    extra:{ cleanseAll:true },
+    desc:'驱散自身所有负面状态' },
+
+  // ---------- 回魔 ----------
+  { id:'meditate', name:'冥想凝神', en:'Meditation', cost:0, cat:'mana', target:'self', manaGain:38,
+    desc:'凝神静气，恢复38点魔力' },
+];
+
+const STATUS_ICON = { stun:'💫', burn:'🔥', curse:'🩸', blind:'😵', slow:'🐢' };
+const STATUS_NAME = { stun:'昏迷', burn:'灼烧', curse:'痛苦诅咒', blind:'致盲', slow:'减速' };
+
+const ROSTER = [
+  { name:'哈利·波特',   emoji:'⚡', color:'#c0392b' },
+  { name:'赫敏·格兰杰', emoji:'📚', color:'#8e44ad' },
+  { name:'罗恩·韦斯莱', emoji:'🧡', color:'#e67e22' },
+  { name:'德拉科·马尔福', emoji:'🐍', color:'#27ae60' },
+  { name:'卢娜·洛夫古德', emoji:'🌙', color:'#3498db' },
+];
+
+const SLOT_OPTIONS = [
+  { v:'none',  label:'— 空置 —' },
+  { v:'human', label:'🧑 人类玩家' },
+  { v:'ai1',   label:'🤖 电脑 · 简单' },
+  { v:'ai2',   label:'🤖 电脑 · 普通' },
+  { v:'ai3',   label:'🤖 电脑 · 困难' },
+];
+
+const MAX_HP = 120, MAX_MP = 100, MP_REGEN = 5;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const pick  = a => a[Math.floor(Math.random() * a.length)];
+
+/* =========================================================
+   全局状态
+   ========================================================= */
+let state = {
+  players: [], round: 0, log: [], phase: 'setup', currentChooser: null
+};
+
+/* =========================================================
+   设置界面
+   ========================================================= */
+function buildSlots() {
+  const wrap = document.getElementById('slots');
+  wrap.innerHTML = '';
+  ROSTER.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'slot';
+    const dft = i === 0 ? 'human' : (i === 1 ? 'ai2' : 'none');
+    div.innerHTML = `
+      <div class="slot-info">
+        <span class="slot-emoji">${r.emoji}</span>
+        <span class="slot-name">${r.name}</span>
+      </div>
+      <select data-slot="${i}">
+        ${SLOT_OPTIONS.map(o => `<option value="${o.v}"${o.v === dft ? ' selected' : ''}>${o.label}</option>`).join('')}
+      </select>`;
+    wrap.appendChild(div);
+  });
+}
+
+document.getElementById('startBtn').onclick = startGame;
+
+function startGame() {
+  const selects = [...document.querySelectorAll('.slot select')];
+  const chosen = [];
+  selects.forEach((s, i) => { if (s.value !== 'none') chosen.push({ slot: i, v: s.value }); });
+
+  if (chosen.length < 2) { alert('至少需要 2 位决斗者才能开始！'); return; }
+
+  state = { players: [], round: 0, log: [], phase: 'select', currentChooser: null };
+
+  chosen.forEach((c, i) => {
+    const r = ROSTER[c.slot];
+    const isHuman = c.v === 'human';
+    state.players.push({
+      idx: i,
+      name: r.name, emoji: r.emoji, color: r.color,
+      type: isHuman ? 'human' : 'ai',
+      level: isHuman ? 0 : parseInt(c.v.slice(2), 10),
+      hp: MAX_HP, maxHp: MAX_HP,
+      mp: MAX_MP, maxMp: MAX_MP,
+      shield: 0, statuses: [], alive: true,
+      choice: null, speedRoll: 0,
+    });
+  });
+
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('gameScreen').classList.remove('hidden');
+
+  addLog('🎬 决斗开始！', 'round');
+  addLog(state.players.map(p => `${p.emoji}${p.name}(${p.type === 'human' ? '人类' : '电脑' + (p.level === 1 ? '简单' : p.level === 2 ? '普通' : '困难')})`).join('　vs　'), 'sys');
+
+  renderBoard();
+  beginRound();
+}
+
+/* =========================================================
+   工具函数
+   ========================================================= */
+function hasStatus(p, type) { return p.statuses.some(s => s.type === type); }
+function aliveCount() { return state.players.filter(p => p.alive).length; }
+
+function addLog(text, cls = '') {
+  state.log.push({ text, cls });
+  renderLog();
+}
+function renderLog() {
+  const el = document.getElementById('log');
+  el.innerHTML = state.log.map(l => `<div class="log-line ${l.cls}">${l.text}</div>`).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+/* =========================================================
+   渲染
+   ========================================================= */
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  document.getElementById('roundBadge').textContent = `第 ${state.round} 回合`;
+
+  for (const p of state.players) {
+    const el = document.createElement('div');
+    el.className = 'pcard' + (p.alive ? '' : ' dead') + (state.currentChooser === p ? ' active' : '');
+    const hpPct = Math.max(0, p.hp / p.maxHp * 100);
+    const mpPct = Math.max(0, p.mp / p.maxMp * 100);
+    el.innerHTML = `
+      <div class="phead">
+        <span class="emoji">${p.emoji}</span>
+        <span class="pname">${p.name}</span>
+        <span class="ptype">${p.type === 'human' ? '🧑' : '🤖'}</span>
+      </div>
+      <div class="bar hp">
+        <div class="fill" style="width:${hpPct}%"></div>
+        <span class="btxt">❤ ${p.hp} / ${p.maxHp}</span>
+      </div>
+      <div class="bar mp">
+        <div class="fill" style="width:${mpPct}%"></div>
+        <span class="btxt">💧 ${p.mp} / ${p.maxMp}</span>
+      </div>
+      <div class="pfoot">
+        ${p.shield > 0 ? `<span class="tag shield">🛡 ${p.shield}</span>` : ''}
+        ${p.statuses.map(s => `<span class="tag st-${s.type}">${STATUS_ICON[s.type]}${s.dur}</span>`).join('')}
+        ${!p.alive ? '<span class="tag">💀 已倒下</span>' : ''}
+      </div>`;
+    board.appendChild(el);
+  }
+}
+
+/* =========================================================
+   回合流程
+   ========================================================= */
+function beginRound() {
+  if (state.phase === 'gameover') return;
+  state.round++;
+  state.phase = 'select';
+  state.currentChooser = null;
+
+  addLog(`第 ${state.round} 回合`, 'round');
+
+  for (const p of state.players) {
+    if (!p.alive) { p.choice = null; continue; }
+    p.mp = Math.min(p.maxMp, p.mp + MP_REGEN);
+    p.choice = null;
+    if (hasStatus(p, 'stun')) {
+      p.choice = { skip: true };
+      addLog(`💫 ${p.emoji} ${p.name} 被定住了，无法行动！`, 'sys');
+    }
+  }
+
+  renderBoard();
+  askNext();
+}
+
+function askNext() {
+  if (state.phase === 'gameover') return;
+
+  const human = state.players.find(x => x.alive && x.type === 'human' && x.choice === null);
+  if (!human) {
+    // 电脑决策
+    for (const q of state.players) {
+      if (q.alive && q.type === 'ai' && q.choice === null) {
+        q.choice = aiChoose(q);
+      }
+    }
+    resolveRound();
+    return;
+  }
+
+  state.currentChooser = human;
+  renderBoard();
+  renderSpellPanel(human);
+}
+
+/* =========================================================
+   人类玩家咒语面板
+   ========================================================= */
+function renderSpellPanel(p) {
+  const bar = document.getElementById('chooserBar');
+  bar.classList.remove('hidden');
+  document.getElementById('chooserName').textContent = `${p.emoji} ${p.name}，请选择你的咒语`;
+  document.getElementById('chooserHint').textContent =
+    `❤ ${p.hp}/${p.maxHp}　💧 ${p.mp}/${p.maxMp}${p.shield ? `　🛡 ${p.shield}` : ''}`;
+
+  const panel = document.getElementById('spellPanel');
+  panel.innerHTML = '';
+
+  const groups = [
+    ['attack', '⚔️ 攻击咒'],
+    ['defense', '🛡️ 防御咒'],
+    ['heal', '💚 治愈咒'],
+    ['utility', '✨ 辅助咒'],
+    ['mana', '💧 魔力恢复'],
+  ];
+
+  for (const [cat, label] of groups) {
+    const list = SPELLS.filter(s => s.cat === cat);
+    if (!list.length) continue;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'spell-group';
+    wrap.innerHTML = `<div class="group-label">${label}</div>`;
+
+    const grid = document.createElement('div');
+    grid.className = 'spell-grid';
+
+    for (const sp of list) {
+      const ok = p.mp >= sp.cost;
+      const btn = document.createElement('button');
+      btn.className = 'spell-btn' + (ok ? '' : ' disabled');
+      btn.disabled = !ok;
+      btn.innerHTML = `
+        <div class="sp-top">
+          <span class="sp-name">${sp.name}</span>
+          <span class="sp-cost">${sp.cost}💧</span>
+        </div>
+        <div class="sp-en">${sp.en}</div>
+        <div class="sp-desc">${sp.desc}</div>`;
+      btn.onclick = () => chooseSpell(p, sp);
+      grid.appendChild(btn);
+    }
+    wrap.appendChild(grid);
+    panel.appendChild(wrap);
+  }
+}
+
+function chooseSpell(p, spell) {
+  if (p.mp < spell.cost) return;
+
+  if (spell.target === 'enemy') {
+    const enemies = state.players.filter(x => x.alive && x !== p);
+    if (!enemies.length) return;
+    renderTargetPicker(p, spell, enemies);
+  } else {
+    commitChoice(p, spell, null);
+  }
+}
+
+function renderTargetPicker(p, spell, enemies) {
+  const panel = document.getElementById('spellPanel');
+  panel.innerHTML = `<div class="picker-title">【${spell.name}】 → 选择你的目标</div>`;
+
+  const grid = document.createElement('div');
+  grid.className = 'target-grid';
+
+  for (const e of enemies) {
+    const b = document.createElement('button');
+    b.className = 'target-btn';
+    b.innerHTML = `
+      <span class="te">${e.emoji}</span>
+      <span class="tn">${e.name}</span>
+      <span class="thp">❤ ${e.hp}${e.shield ? `　🛡 ${e.shield}` : ''}</span>`;
+    b.onclick = () => commitChoice(p, spell, e.idx);
+    grid.appendChild(b);
+  }
+  panel.appendChild(grid);
+
+  const back = document.createElement('button');
+  back.className = 'btn-ghost';
+  back.textContent = '← 返回咒语列表';
+  back.onclick = () => renderSpellPanel(p);
+  panel.appendChild(back);
+}
+
+function commitChoice(p, spell, targetIdx) {
+  p.choice = { spell, targetIdx };
+  state.currentChooser = null;
+  document.getElementById('spellPanel').innerHTML = '';
+  document.getElementById('chooserBar').classList.add('hidden');
+  renderBoard();
+  askNext();
+}
+
+/* =========================================================
+   电脑 AI
+   ========================================================= */
+function aiChoose(p) {
+  const enemies = state.players.filter(x => x.alive && x !== p);
+  if (!enemies.length) return { skip: true };
+
+  const affordable = SPELLS.filter(s => s.cost <= p.mp);
+  const attacks    = affordable.filter(s => s.cat === 'attack');
+  const episkey    = SPELLS.find(s => s.id === 'episkey');
+  const meditate   = SPELLS.find(s => s.id === 'meditate');
+  const protego    = SPELLS.find(s => s.id === 'protego');
+  const patronum   = SPELLS.find(s => s.id === 'patronum');
+  const hpPct      = p.hp / p.maxHp;
+
+  /* ---------- 简单：基本随机 ---------- */
+  if (p.level === 1) {
+    const pool = affordable.filter(s => s.cat !== 'defense' || Math.random() < 0.25);
+    const spell = pool.length ? pick(pool) : meditate;
+    const target = spell.target === 'enemy' ? pick(enemies) : null;
+    return { spell, targetIdx: target ? target.idx : null };
+  }
+
+  /* ---------- 普通：会治疗、回魔、打最弱的 ---------- */
+  if (p.level === 2) {
+    if (hpPct < 0.35 && p.mp >= episkey.cost && Math.random() < 0.8) {
+      return { spell: episkey, targetIdx: null };
+    }
+    if (p.mp < 20) return { spell: meditate, targetIdx: null };
+
+    const weakest = enemies.slice().sort((a, b) => (a.hp + a.shield) - (b.hp + b.shield))[0];
+    if (attacks.length) {
+      const killer = attacks.filter(s => s.power > 0)
+        .find(s => s.power >= weakest.hp + weakest.shield);
+      if (killer) return { spell: killer, targetIdx: weakest.idx };
+
+      const best = attacks.slice()
+        .sort((a, b) => (b.power / Math.max(1, b.cost)) - (a.power / Math.max(1, a.cost)))[0];
+      return { spell: best, targetIdx: weakest.idx };
+    }
+    return { spell: meditate, targetIdx: null };
+  }
+
+  /* ---------- 困难：击杀优先 + 资源管理 ---------- */
+  const sortedByPower = attacks.filter(s => s.power > 0).sort((a, b) => b.power - a.power);
+  for (const sp of sortedByPower) {
+    const victim = enemies.find(e => e.hp + e.shield <= sp.power);
+    if (victim) return { spell: sp, targetIdx: victim.idx };
+  }
+
+  if (hpPct < 0.38 && p.mp >= episkey.cost) {
+    return { spell: episkey, targetIdx: null };
+  }
+  if (p.mp < 28) return { spell: meditate, targetIdx: null };
+
+  if (hpPct < 0.55 && Math.random() < 0.3) {
+    if (p.statuses.length && p.mp >= patronum.cost) return { spell: patronum, targetIdx: null };
+    if (p.mp >= protego.cost) return { spell: protego, targetIdx: null };
+  }
+
+  const weakest = enemies.slice().sort((a, b) => (a.hp + a.shield) - (b.hp + b.shield))[0];
+  if (attacks.length) {
+    const scored = attacks.map(s => {
+      let v = s.power;
+      if (s.extra && s.extra.status) {
+        v += 14 * (s.extra.status.dur || 1) * (s.extra.status.chance != null ? s.extra.status.chance : 1);
+      }
+      if (s.extra && s.extra.mpSteal) v += 9;
+      if (s.extra && s.extra.mpBurn) v += 7;
+      return { s, v: v / Math.max(1, s.cost) };
+    }).sort((a, b) => b.v - a.v);
+    return { spell: scored[0].s, targetIdx: weakest.idx };
+  }
+  return { spell: meditate, targetIdx: null };
+}
+
+/* =========================================================
+   结算
+   ========================================================= */
+async function resolveRound() {
+  if (state.phase === 'gameover') return;
+  state.phase = 'resolve';
+  state.currentChooser = null;
+  document.getElementById('chooserBar').classList.add('hidden');
+  document.getElementById('spellPanel').innerHTML = '';
+  renderBoard();
+
+  await sleep(280);
+
+  const actors = state.players.filter(p => p.alive && p.choice && !p.choice.skip);
+  actors.forEach(a => { a.speedRoll = Math.random(); });
+  actors.sort((a, b) => {
+    const sa = hasStatus(a, 'slow') ? 1 : 0;
+    const sb = hasStatus(b, 'slow') ? 1 : 0;
+    if (sa !== sb) return sa - sb;
+    return b.speedRoll - a.speedRoll;
+  });
+
+  for (const actor of actors) {
+    if (!actor.alive) continue;
+    if (aliveCount() <= 1) break;
+    executeChoice(actor);
+    renderBoard();
+    await sleep(520);
+  }
+
+  await endRound();
+  await sleep(380);
+
+  if (aliveCount() <= 1) { gameOver(); return; }
+
+  state.players.forEach(p => { p.choice = null; });
+  beginRound();
+}
+
+function dealDamage(target, amount) {
+  let remaining = amount;
+  if (target.shield > 0) {
+    const absorbed = Math.min(target.shield, remaining);
+    target.shield -= absorbed;
+    remaining -= absorbed;
+  }
+  target.hp = Math.max(0, target.hp - remaining);
+  if (target.hp <= 0 && target.alive) {
+    target.alive = false;
+    addLog(`💀 ${target.emoji} ${target.name} 倒下了！`, 'death');
+  }
+  return amount;
+}
+
+function executeChoice(actor) {
+  const choice = actor.choice;
+  if (!choice || choice.skip) return;
+  const spell = choice.spell;
+
+  if (actor.mp < spell.cost) {
+    addLog(`⚠️ ${actor.name} 魔力不足，${spell.name} 未能施放！`, 'miss');
+    return;
+  }
+  actor.mp -= spell.cost;
+
+  let target = null;
+  if (spell.target === 'enemy') {
+    target = state.players[choice.targetIdx];
+    if (!target || !target.alive) {
+      const cands = state.players.filter(x => x.alive && x !== actor);
+      if (!cands.length) return;
+      target = pick(cands);
+      addLog(`↪️ ${actor.name} 原本的目标已倒下，转向 ${target.name}！`, 'sys');
+    }
+  } else {
+    target = actor;
+  }
+
+  addLog(`✨ ${actor.emoji} ${actor.name} 施放了【${spell.name}】`, 'cast');
+
+  // 致盲判定
+  if (spell.target === 'enemy' && hasStatus(actor, 'blind') && Math.random() < 0.45) {
+    addLog('　　😵 强光晃眼，咒语打偏了！', 'miss');
+    return;
+  }
+
+  // 伤害
+  if (spell.power > 0 && target && target !== actor) {
+    const hadShield = target.shield;
+    dealDamage(target, spell.power);
+    const absorbed = hadShield > 0 ? Math.min(hadShield, spell.power) : 0;
+    addLog(`　　💥 ${target.name} 受到 ${spell.power} 点伤害${absorbed ? `（护盾吸收 ${absorbed}）` : ''}`, 'dmg');
+  }
+
+  // 护盾
+  if (spell.shield) {
+    actor.shield += spell.shield;
+    addLog(`　　🛡 ${actor.name} 获得 ${spell.shield} 点护盾`, 'buff');
+  }
+
+  // 治疗
+  if (spell.heal) {
+    const before = actor.hp;
+    actor.hp = Math.min(actor.maxHp, actor.hp + spell.heal);
+    addLog(`　　💚 ${actor.name} 恢复了 ${actor.hp - before} 点生命`, 'heal');
+  }
+
+  // 回魔
+  if (spell.manaGain) {
+    const before = actor.mp;
+    actor.mp = Math.min(actor.maxMp, actor.mp + spell.manaGain);
+    addLog(`　　💧 ${actor.name} 恢复了 ${actor.mp - before} 点魔力`, 'mana');
+  }
+
+  const ex = spell.extra || {};
+
+  if (ex.mpBurn && target && target !== actor) {
+    const b = Math.min(target.mp, ex.mpBurn);
+    target.mp -= b;
+    addLog(`　　🔻 ${target.name} 失去 ${b} 点魔力`, 'mana');
+  }
+
+  if (ex.mpSteal && target && target !== actor) {
+    const b = Math.min(target.mp, ex.mpSteal);
+    target.mp -= b;
+    actor.mp = Math.min(actor.maxMp, actor.mp + b);
+    addLog(`　　🩸 ${actor.name} 汲取了 ${b} 点魔力`, 'mana');
+  }
+
+  if (ex.cleanseTarget && target && target !== actor) {
+    const n = target.statuses.filter(s => s.type === 'burn').length;
+    if (n) {
+      target.statuses = target.statuses.filter(s => s.type !== 'burn');
+      addLog(`　　💨 ${target.name} 身上的火焰被熄灭了`, 'sys');
+    }
+  }
+
+  if (ex.cleanseAll) {
+    const n = actor.statuses.length;
+    if (n) {
+      actor.statuses = [];
+      addLog(`　　✨ ${actor.name} 身上的负面状态被驱散了`, 'sys');
+    }
+  }
+
+  if (ex.status && target) {
+    const st = ex.status;
+    const chance = st.chance != null ? st.chance : 1;
+    if (Math.random() < chance) {
+      target.statuses = target.statuses.filter(s => s.type !== st.type);
+      target.statuses.push({ type: st.type, dur: st.dur, val: st.val || 0, appliedRound: state.round });
+      addLog(`　　${STATUS_ICON[st.type]} ${target.name} 陷入【${STATUS_NAME[st.type]}】${st.dur} 回合`, 'debuff');
+    } else {
+      addLog(`　　✖ 状态未能附加`, 'miss');
+    }
+  }
+
+  // 二次确认死亡
+  for (const q of state.players) {
+    if (q.alive && q.hp <= 0) {
+      q.alive = false;
+      q.hp = 0;
+      addLog(`💀 ${q.emoji} ${q.name} 倒下了！`, 'death');
+    }
+  }
+}
+
+async function endRound() {
+  // 持续伤害
+  for (const p of state.players) {
+    if (!p.alive) continue;
+    for (const st of [...p.statuses]) {
+      if ((st.type === 'burn' || st.type === 'curse') && st.appliedRound < state.round) {
+        dealDamage(p, st.val);
+        addLog(`${STATUS_ICON[st.type]} ${p.name} 受到 ${st.val} 点${STATUS_NAME[st.type]}伤害`, 'dmg');
+        if (!p.alive) break;
+      }
+    }
+  }
+
+  // 状态衰减（本回合刚附加的不减）
+  for (const p of state.players) {
+    p.statuses = p.statuses.filter(st => {
+      if (st.appliedRound >= state.round) return true;
+      st.dur -= 1;
+      return st.dur > 0;
+    });
+  }
+
+  renderBoard();
+}
+
+/* =========================================================
+   结束
+   ========================================================= */
+function gameOver() {
+  state.phase = 'gameover';
+  state.currentChooser = null;
+  document.getElementById('chooserBar').classList.add('hidden');
+  document.getElementById('spellPanel').innerHTML = '';
+
+  const winner = state.players.find(p => p.alive);
+  const banner = document.getElementById('banner');
+  banner.classList.remove('hidden');
+  banner.innerHTML = winner
+    ? `<div class="crown">🏆</div>
+       <div class="wtitle">${winner.emoji} ${winner.name} 赢得了决斗！</div>
+       <button class="btn-primary" onclick="location.reload()">再来一局</button>`
+    : `<div class="crown">💀</div>
+       <div class="wtitle">同归于尽，无人胜出……</div>
+       <button class="btn-primary" onclick="location.reload()">再来一局</button>`;
+
+  addLog(winner ? `🏆 ${winner.name} 赢得了决斗！` : '💀 同归于尽，无人胜出……', 'round');
+}
+
+/* =========================================================
+   启动
+   ========================================================= */
+buildSlots();
+</script>
+</body>
+</html>
