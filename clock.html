@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>世界时钟 · 地图选点</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { min-height: 100%; }
+  body {
+    margin: 0;
+    padding: 30px 20px 70px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    color: #e6ecff;
+    background:
+      radial-gradient(1100px 600px at 10% -10%, #1e2a4a 0%, rgba(30,42,74,0) 60%),
+      radial-gradient(900px 500px at 90% 0%, #1a2b46 0%, rgba(26,43,70,0) 55%),
+      #05070d;
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ================= 顶部 ================= */
+  .page-head {
+    max-width: 1240px;
+    margin: 0 auto 22px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(22px, 3vw, 30px);
+    letter-spacing: .1em;
+    font-weight: 600;
+    background: linear-gradient(90deg, #ffffff 10%, #8fb4ff 90%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .sub {
+    margin: 6px 0 0;
+    font-size: 12px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: #6b7ca3;
+  }
+  .head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .local-time {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 9px 16px; border-radius: 12px;
+    background: rgba(24, 35, 60, .6);
+    border: 1px solid rgba(120, 160, 255, .18);
+  }
+  .local-time .label { font-size: 12px; color: #7f90b5; letter-spacing: .1em; }
+  .local-time .value {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 18px; color: #cfe0ff;
+    font-variant-numeric: tabular-nums; letter-spacing: .06em;
+  }
+  .btn-ghost {
+    padding: 9px 16px; border-radius: 12px; cursor: pointer;
+    font-size: 13px; letter-spacing: .06em;
+    color: #a8bde8; background: rgba(24, 35, 60, .6);
+    border: 1px solid rgba(120, 160, 255, .18);
+    transition: .2s;
+  }
+  .btn-ghost:hover { color: #fff; border-color: rgba(120,160,255,.5); background: rgba(40,58,96,.8); }
+
+  /* ================= 地图面板 ================= */
+  .map-panel {
+    max-width: 1240px;
+    margin: 0 auto 30px;
+    padding: 16px;
+    border-radius: 22px;
+    background: linear-gradient(160deg, rgba(22, 33, 57, .88), rgba(8, 12, 22, .92));
+    border: 1px solid rgba(120, 160, 255, .16);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .map-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap;
+    padding: 4px 6px 14px;
+  }
+  .map-head h2 {
+    margin: 0; font-size: 15px; font-weight: 600;
+    letter-spacing: .08em; color: #cfe0ff;
+  }
+  .map-head p {
+    margin: 5px 0 0; font-size: 12px; color: #6b7ca3; letter-spacing: .04em;
+  }
+  .map-hint {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px; color: #7f95c8;
+    padding: 6px 13px; border-radius: 999px;
+    background: rgba(12, 20, 36, .8);
+    border: 1px solid rgba(120, 160, 255, .14);
+    white-space: nowrap;
+  }
+  .map-box {
+    position: relative;
+    border-radius: 15px;
+    overflow: hidden;
+    background: #060a14;
+    border: 1px solid rgba(90, 130, 210, .16);
+  }
+  #worldMap { display: block; width: 100%; height: auto; cursor: crosshair; }
+
+  .ocean { fill: #0a1120; }
+  .graticule { stroke: rgba(120, 160, 255, .07); stroke-width: .8; fill: none; }
+  .land {
+    fill: #22304b;
+    stroke: #3f5686;
+    stroke-width: .8;
+    stroke-linejoin: round;
+    transition: fill .22s ease;
+  }
+  #worldMap:hover .land { fill: #273a5b; }
+
+  .map-marker { pointer-events: auto; cursor: pointer; }
+  .map-marker .dot {
+    fill: #6d9bff; stroke: #dbe8ff; stroke-width: 1.1;
+    transition: fill .2s;
+  }
+  .map-marker:hover .dot { fill: #a7c2ff; }
+  .map-marker .pulse {
+    fill: none; stroke: #6d9bff; stroke-width: 1.4;
+    animation: markerPulse 2.2s ease-out infinite;
+  }
+  .map-marker text {
+    font-size: 11px; font-weight: 500;
+    fill: #dbe8ff;
+    text-anchor: middle;
+    paint-order: stroke;
+    stroke: #05080f; stroke-width: 3.2; stroke-linejoin: round;
+    pointer-events: none;
+  }
+  @keyframes markerPulse {
+    0%   { r: 5;  opacity: .85; }
+    100% { r: 17; opacity: 0; }
+  }
+  #mapCursor { display: none; pointer-events: none; }
+  #mapCursor circle { fill: none; stroke: #6d9bff; stroke-width: 1.2; opacity: .55; }
+  #mapCursor line { stroke: #6d9bff; stroke-width: .7; opacity: .3; }
+
+  /* ================= 时钟网格 ================= */
+  .clocks {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+    gap: 18px;
+  }
+
+  .clock-card {
+    position: relative;
+    padding: 16px 14px 14px;
+    border-radius: 20px;
+    text-align: center;
+    background: linear-gradient(160deg, rgba(32, 45, 74, .9), rgba(11, 16, 28, .92));
+    border: 1px solid rgba(120, 160, 255, .14);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .06);
+    transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease,
+                opacity .26s ease;
+    animation: cardIn .38s cubic-bezier(.2,.9,.3,1.2) both;
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(12px) scale(.96); }
+    to   { opacity: 1; transform: none; }
+  }
+  .clock-card.leaving { opacity: 0; transform: scale(.9); }
+  .clock-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(120, 160, 255, .42);
+    box-shadow: 0 20px 44px rgba(0, 0, 0, .6), 0 0 50px rgba(79, 124, 255, .14);
+  }
+  .clock-card.flash { animation: flashRing .85s ease 2; }
+  @keyframes flashRing {
+    0%, 100% { box-shadow: 0 14px 34px rgba(0,0,0,.5); }
+    50% { box-shadow: 0 0 0 3px rgba(109,155,255,.85), 0 0 40px rgba(109,155,255,.45); }
+  }
+
+  .remove {
+    position: absolute; top: 7px; right: 7px;
+    width: 22px; height: 22px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; cursor: pointer;
+    font-size: 15px; color: #8ea3cc;
+    background: rgba(10, 16, 28, .75);
+    border: 1px solid rgba(120, 160, 255, .2);
+    opacity: .4; transition: .2s;
+  }
+  .clock-card:hover .remove { opacity: 1; }
+  .remove:hover { color: #ff8b96; border-color: rgba(255, 93, 108, .6); background: rgba(60, 16, 26, .9); }
+
+  .city { font-size: 16px; font-weight: 600; letter-spacing: .05em; }
+  .region {
+    margin-top: 4px;
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    color: #65759a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .dial-wrap { margin: 12px auto 0; width: 100%; max-width: 176px; }
+  .dial { display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 14px rgba(0,0,0,.55)); }
+
+  .hour-hand   { stroke: #eaf1ff; stroke-width: 5.5; stroke-linecap: round; }
+  .minute-hand { stroke: #a7bce8; stroke-width: 3.4; stroke-linecap: round; }
+  .second-hand {
+    stroke: #ff5d6c; stroke-width: 1.7; stroke-linecap: round;
+    filter: drop-shadow(0 0 4px rgba(255, 93, 108, .9));
+  }
+  .cap-outer { fill: #ff5d6c; }
+  .cap-inner { fill: #0a101d; }
+
+  .digital {
+    margin-top: 12px;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 19px; letter-spacing: .07em;
+    color: #d3e2ff; font-variant-numeric: tabular-nums;
+  }
+  .foot {
+    margin-top: 5px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; color: #7485aa; letter-spacing: .04em;
+  }
+  .foot .daynight { color: #a9bde0; }
+  .foot .daynight.night { color: #7f95c8; }
+
+  .empty-tip {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 46px 20px;
+    color: #5c6c92;
+    font-size: 13.5px;
+    letter-spacing: .08em;
+    border: 1px dashed rgba(120, 160, 255, .18);
+    border-radius: 18px;
+  }
+
+  @media (max-width: 560px) {
+    body { padding: 20px 12px 50px; }
+    .clocks { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 13px; }
+    .digital { font-size: 17px; }
+    .map-panel { padding: 10px; }
+    .map-head p { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <div>
+    <h1>世界时钟</h1>
+    <p class="sub">World Clock · Pick a place on the map</p>
+  </div>
+  <div class="head-right">
+    <div class="local-time">
+      <span class="label">本地时间</span>
+      <span class="value" id="localTime">--:--:--</span>
+    </div>
+    <button class="btn-ghost" id="clearAll" type="button">清空全部</button>
+  </div>
+</header>
+
+<section class="map-panel">
+  <div class="map-head">
+    <div>
+      <h2>点击地图选择地区</h2>
+      <p>点击任意陆地或城市，自动匹配最近的城市时区并添加时钟</p>
+    </div>
+    <div class="map-hint" id="mapHint">移动鼠标查看经纬度</div>
+  </div>
+
+  <div class="map-box">
+    <svg id="worldMap" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <radialGradient id="oceanGrad" cx="50%" cy="42%" r="72%">
+          <stop offset="0%"   stop-color="#0e1830"/>
+          <stop offset="100%" stop-color="#060a14"/>
+        </radialGradient>
+      </defs>
+      <rect class="ocean" x="0" y="0" width="1000" height="500" fill="url(#oceanGrad)"/>
+      <g id="gridGroup"></g>
+      <g id="landGroup"></g>
+      <g id="markerGroup"></g>
+      <g id="mapCursor">
+        <line id="cursorH" x1="0" y1="0" x2="0" y2="0"/>
+        <line id="cursorV" x1="0" y1="0" x2="0" y2="0"/>
+        <circle id="cursorDot" cx="0" cy="0" r="9"/>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<main class="clocks" id="clocks"></main>
+
+<script>
+(function () {
+  'use strict';
+
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const W = 1000, H = 500;          // 地图画布尺寸（等距圆柱投影）
+  const SNAP_KM = 1500;             // 点击位置吸附到最近城市的半径
+
+  /* =========================================================
+     1. 地理数据：简化大陆轮廓（经度, 纬度）
+     ========================================================= */
+  const LAND = [
+    // 北美洲
+    [[-168,65],[-165,60],[-152,58],[-140,60],[-130,55],[-125,49],[-124,40],[-117,32],
+     [-110,24],[-105,20],[-97,16],[-92,15],[-88,21],[-83,10],[-77,8],[-81,25],[-80,32],
+     [-76,38],[-70,42],[-66,45],[-60,47],[-55,52],[-64,60],[-78,62],[-95,68],[-110,68],
+     [-125,70],[-140,70],[-156,71]],
+    // 格陵兰
+    [[-45,60],[-30,68],[-20,75],[-25,82],[-45,84],[-60,80],[-55,70]],
+    // 南美洲
+    [[-80,8],[-76,1],[-80,-4],[-71,-18],[-70,-30],[-71,-42],[-74,-52],[-68,-55],
+     [-65,-48],[-62,-40],[-58,-34],[-48,-25],[-40,-20],[-35,-8],[-44,-2],[-50,0],
+     [-60,6],[-70,12]],
+    // 非洲
+    [[-17,15],[-16,22],[-10,30],[0,36],[10,37],[20,32],[32,31],[35,24],[38,18],
+     [43,12],[51,12],[48,3],[41,-2],[40,-10],[35,-20],[32,-26],[25,-34],[18,-34],
+     [12,-18],[9,-1],[5,5],[-5,5],[-10,7]],
+    // 欧亚大陆
+    [[-10,36],[-9,43],[-2,48],[2,51],[8,54],[10,57],[20,55],[22,60],[25,65],[30,70],
+     [45,68],[60,70],[75,73],[95,78],[110,75],[130,73],[145,72],[160,70],[170,66],
+     [179,65],[179,60],[160,60],[140,52],[130,43],[125,38],[120,32],[110,20],[105,10],
+     [100,3],[95,10],[90,22],[80,10],[75,8],[68,23],[60,25],[57,20],[48,30],[44,38],
+     [35,36],[28,37],[20,40],[15,38],[12,45],[5,44],[-2,43]],
+    // 澳大利亚
+    [[113,-22],[114,-35],[130,-32],[140,-38],[150,-37],[153,-28],[146,-19],[142,-11],
+     [135,-12],[130,-11],[125,-14],[120,-20]],
+    // 南极洲
+    [[-180,-70],[180,-70],[180,-90],[-180,-90]],
+    // 日本
+    [[130,31],[133,34],[137,35],[141,40],[142,45],[145,44],[141,36],[136,33]],
+    // 英国
+    [[-5,50],[-6,54],[-3,58],[0,54],[1,51]],
+    // 马达加斯加
+    [[43,-12],[50,-15],[50,-25],[45,-25]],
+    // 新西兰
+    [[172,-34],[178,-38],[174,-41],[170,-46],[166,-46]],
+    // 印尼群岛（简化）
+    [[95,5],[105,-6],[115,-9],[125,-9],[130,-8],[120,-3],[110,0],[100,3]],
+    // 冰岛
+    [[-24,64],[-14,65],[-14,67],[-22,67]]
+  ];
+
+  /* =========================================================
+     2. 城市与时区数据
+     ========================================================= */
+  const CITIES = [
+    { name:'北京',        lon:116.4,  lat:39.9,   tz:'Asia/Shanghai' },
+    { name:'上海',        lon:121.5,  lat:31.2,   tz:'Asia/Shanghai' },
+    { name:'香港',        lon:114.2,  lat:22.3,   tz:'Asia/Hong_Kong' },
+    { name:'台北',        lon:121.5,  lat:25.0,   tz:'Asia/Taipei' },
+    { name:'东京',        lon:139.7,  lat:35.7,   tz:'Asia/Tokyo' },
+    { name:'首尔',        lon:127.0,  lat:37.6,   tz:'Asia/Seoul' },
+    { name:'新加坡',      lon:103.8,  lat:1.35,   tz:'Asia/Singapore' },
+    { name:'曼谷',        lon:100.5,  lat:13.75,  tz:'Asia/Bangkok' },
+    { name:'雅加达',      lon:106.8,  lat:-6.2,   tz:'Asia/Jakarta' },
+    { name:'新德里',      lon:77.2,   lat:28.6,   tz:'Asia/Kolkata' },
+    { name:'达卡',        lon:90.4,   lat:23.8,   tz:'Asia/Dhaka' },
+    { name:'河内',        lon:105.8,  lat:21.0,   tz:'Asia/Ho_Chi_Minh' },
+    { name:'马尼拉',      lon:121.0,  lat:14.6,   tz:'Asia/Manila' },
+    { name:'迪拜',        lon:55.3,   lat:25.2,   tz:'Asia/Dubai' },
+    { name:'利雅得',      lon:46.7,   lat:24.7,   tz:'Asia/Riyadh' },
+    { name:'德黑兰',      lon:51.4,   lat:35.7,   tz:'Asia/Tehran' },
+    { name:'卡拉奇',      lon:67.0,   lat:24.9,   tz:'Asia/Karachi' },
+    { name:'悉尼',        lon:151.2,  lat:-33.9,  tz:'Australia/Sydney' },
+    { name:'墨尔本',      lon:145.0,  lat:-37.8,  tz:'Australia/Melbourne' },
+    { name:'珀斯',        lon:115.9,  lat:-31.95, tz:'Australia/Perth' },
+    { name:'奥克兰',      lon:174.8,  lat:-36.85, tz:'Pacific/Auckland' },
+    { name:'火奴鲁鲁',    lon:-157.9, lat:21.3,   tz:'Pacific/Honolulu' },
+    { name:'安克雷奇',    lon:-149.9, lat:61.2,   tz:'America/Anchorage' },
+    { name:'洛杉矶',      lon:-118.2, lat:34.05,  tz:'America/Los_Angeles' },
+    { name:'旧金山',      lon:-122.4, lat:37.8,   tz:'America/Los_Angeles' },
+    { name:'西雅图',      lon:-122.3, lat:47.6,   tz:'America/Los_Angeles' },
+    { name:'温哥华',      lon:-123.1, lat:49.3,   tz:'America/Vancouver' },
+    { name:'丹佛',        lon:-105.0, lat:39.7,   tz:'America/Denver' },
+    { name:'芝加哥',      lon:-87.6,  lat:41.9,   tz:'America/Chicago' },
+    { name:'墨西哥城',    lon:-99.1,  lat:19.4,   tz:'America/Mexico_City' },
+    { name:'纽约',        lon:-74.0,  lat:40.7,   tz:'America/New_York' },
+    { name:'多伦多',      lon:-79.4,  lat:43.7,   tz:'America/Toronto' },
+    { name:'哈瓦那',      lon:-82.4,  lat:23.1,   tz:'America/Havana' },
+    { name:'波哥大',      lon:-74.1,  lat:4.7,    tz:'America/Bogota' },
+    { name:'利马',        lon:-77.0,  lat:-12.0,  tz:'America/Lima' },
+    { name:'加拉加斯',    lon:-66.9,  lat:10.5,   tz:'America/Caracas' },
+    { name:'圣地亚哥',    lon:-70.7,  lat:-33.4,  tz:'America/Santiago' },
+    { name:'圣保罗',      lon:-46.6,  lat:-23.5,  tz:'America/Sao_Paulo' },
+    { name:'布宜诺斯艾利斯',lon:-58.4, lat:-34.6, tz:'America/Argentina/Buenos_Aires' },
+    { name:'伦敦',        lon:-0.13,  lat:51.5,   tz:'Europe/London' },
+    { name:'都柏林',      lon:-6.26,  lat:53.35,  tz:'Europe/Dublin' },
+    { name:'里斯本',      lon:-9.14,  lat:38.72,  tz:'Europe/Lisbon' },
+    { name:'巴黎',        lon:2.35,   lat:48.86,  tz:'Europe/Paris' },
+    { name:'柏林',        lon:13.4,   lat:52.5,   tz:'Europe/Berlin' },
+    { name:'马德里',      lon:-3.7,   lat:40.4,   tz:'Europe/Madrid' },
+    { name:'罗马',        lon:12.5,   lat:41.9,   tz:'Europe/Rome' },
+    { name:'阿姆斯特丹',  lon:4.9,    lat:52.37,  tz:'Europe/Amsterdam' },
+    { name:'苏黎世',      lon:8.54,   lat:47.37,  tz:'Europe/Zurich' },
+    { name:'维也纳',      lon:16.37,  lat:48.2,   tz:'Europe/Vienna' },
+    { name:'布拉格',      lon:14.4,   lat:50.08,  tz:'Europe/Prague' },
+    { name:'华沙',        lon:21.0,   lat:52.23,  tz:'Europe/Warsaw' },
+    { name:'斯德哥尔摩',  lon:18.07,  lat:59.33,  tz:'Europe/Stockholm' },
+    { name:'奥斯陆',      lon:10.75,  lat:59.9,   tz:'Europe/Oslo' },
+    { name:'赫尔辛基',    lon:24.94,  lat:60.17,  tz:'Europe/Helsinki' },
+    { name:'莫斯科',      lon:37.6,   lat:55.75,  tz:'Europe/Moscow' },
+    { name:'基辅',        lon:30.5,   lat:50.45,  tz:'Europe/Kiev' },
+    { name:'伊斯坦布尔',  lon:28.98,  lat:41.0,   tz:'Europe/Istanbul' },
+    { name:'雅典',        lon:23.7,   lat:37.98,  tz:'Europe/Athens' },
+    { name:'雷克雅未克',  lon:-21.9,  lat:64.15,  tz:'Atlantic/Reykjavik' },
+    { name:'开罗',        lon:31.2,   lat:30.0,   tz:'Africa/Cairo' },
+    { name:'卡萨布兰卡',  lon:-7.6,   lat:33.6,   tz:'Africa/Casablanca' },
+    { name:'阿尔及尔',    lon:3.05,   lat:36.75,  tz:'Africa/Algiers' },
+    { name:'达喀尔',      lon:-17.4,  lat:14.7,   tz:'Africa/Dakar' },
+    { name:'拉各斯',      lon:3.4,    lat:6.5,    tz:'Africa/Lagos' },
+    { name:'亚的斯亚贝巴',lon:38.7,   lat:9.0,    tz:'Africa/Addis_Ababa' },
+    { name:'内罗毕',      lon:36.8,   lat:-1.3,   tz:'Africa/Nairobi' },
+    { name:'达累斯萨拉姆',lon:39.3,   lat:-6.8,   tz:'Africa/Dar_es_Salaam' },
+    { name:'约翰内斯堡',  lon:28.0,   lat:-26.2,  tz:'Africa/Johannesburg' },
+    { name:'开普敦',      lon:18.4,   lat:-33.9,  tz:'Africa/Johannesburg' }
+  ];
+
+  /* =========================================================
+     3. 通用工具
+     ========================================================= */
+  const pad = n => String(n).padStart(2, '0');
+
+  function project(lon, lat) {
+    return { x: (lon + 180) / 360 * W, y: (90 - lat) / 180 * H };
+  }
+
+  function distKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  // 计算某时区相对 UTC 的偏移（分钟）
+  const offFmtCache = new Map();
+  function tzOffsetMinutes(date, timeZone) {
+    let fmt = offFmtCache.get(timeZone);
+    if (!fmt) {
+      fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone, hour12: false,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+      offFmtCache.set(timeZone, fmt);
+    }
+    const p = {};
+    for (const part of fmt.formatToParts(date)) p[part.type] = part.value;
+    let h = parseInt(p.hour, 10);
+    if (h === 24) h = 0;
+    const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, h, +p.minute, +p.second);
+    return Math.round((asUTC - date.getTime()) / 60000);
+  }
+
+  function utcText(offsetMin) {
+    const sign = offsetMin < 0 ? '-' : '+';
+    const abs = Math.abs(offsetMin);
+    return 'UTC' + sign + pad(Math.floor(abs / 60)) + ':' + pad(abs % 60);
+  }
+
+  /* =========================================================
+     4. 绘制地图
+     ========================================================= */
+  const mapSvg     = document.getElementById('worldMap');
+  const gridGroup  = document.getElementById('gridGroup');
+  const landGroup  = document.getElementById('landGroup');
+  const markerGroup= document.getElementById('markerGroup');
+  const mapHint    = document.getElementById('mapHint');
+  const cursorG    = document.getElementById('mapCursor');
+  const cursorDot  = document.getElementById('cursorDot');
+  const cursorH    = document.getElementById('cursorH');
+  const cursorV    = document.getElementById('cursorV');
+
+  // 经纬网
+  (function drawGraticule() {
+    let d = '';
+    for (let lon = -180; lon <= 180; lon += 30) {
+      const x = project(lon, 0).x;
+      d += `M${x} 0 V${H} `;
+    }
+    for (let lat = -60; lat <= 60; lat += 30) {
+      const y = project(0, lat).y;
+      d += `M0 ${y} H${W} `;
+    }
+    const path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('class', 'graticule');
+    path.setAttribute('d', d);
+    gridGroup.appendChild(path);
+  })();
+
+  // 大陆
+  LAND.forEach(coords => {
+    const d = coords.map(([lon, lat], i) => {
+      const p = project(lon, lat);
+      return (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ' ' + p.y.toFixed(1);
+    }).join(' ') + ' Z';
+
+    const path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('class', 'land');
+    path.setAttribute('d', d);
+    landGroup.appendChild(path);
+  });
+
+  function clientToSvg(evt) {
+    const pt = mapSvg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    const m = mapSvg.getScreenCTM();
+    if (!m) return null;
+    return pt.matrixTransform(m.inverse());
+  }
+
+  /* =========================================================
+     5. 时钟卡片
+     ========================================================= */
+  const clocksRoot = document.getElementById('clocks');
+  const localTimeEl = document.getElementById('localTime');
+  const clockList = [];   // 正在显示的时钟
+  let dialUid = 0;
+  let clockId = 0;
+
+  function buildDialSVG() {
+    const id = ++dialUid;
+    const faceId  = 'face'  + id;
+    const bezelId = 'bezel' + id;
+    const glossId = 'gloss' + id;
+
+    let ticks = '';
+    for (let i = 0; i < 60; i++) {
+      const a = (i * 6) * Math.PI / 180;
+      const major = i % 5 === 0;
+      const r1 = major ? 74 : 81;
+      const r2 = 87;
+      const sin = Math.sin(a), cos = Math.cos(a);
+      ticks += `<line x1="${(100 + r1 * sin).toFixed(2)}" y1="${(100 - r1 * cos).toFixed(2)}"
+                      x2="${(100 + r2 * sin).toFixed(2)}" y2="${(100 - r2 * cos).toFixed(2)}"
+                      stroke="${major ? '#c9d8ff' : '#4a5b80'}"
+                      stroke-width="${major ? 2.6 : 1}" stroke-linecap="round"/>`;
+    }
+
+    let nums = '';
+    for (let i = 1; i <= 12; i++) {
+      const a = (i * 30) * Math.PI / 180;
+      const r = 61;
+      nums += `<text x="${(100 + r * Math.sin(a)).toFixed(2)}"
+                     y="${(100 - r * Math.cos(a)).toFixed(2)}"
+                     text-anchor="middle" dominant-baseline="central"
+                     font-family="Georgia, 'Times New Roman', serif" font-size="16"
+                     fill="#93a8d4">${i}</text>`;
+    }
+
+    return `
+<svg class="dial" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <radialGradient id="${faceId}" cx="42%" cy="30%" r="80%">
+      <stop offset="0%"   stop-color="#25315a"/>
+      <stop offset="55%"  stop-color="#141c33"/>
+      <stop offset="100%" stop-color="#080c16"/>
+    </radialGradient>
+    <linearGradient id="${bezelId}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#5570a8"/>
+      <stop offset="30%"  stop-color="#1b2438"/>
+      <stop offset="70%"  stop-color="#141b2b"/>
+      <stop offset="100%" stop-color="#5570a8"/>
+    </linearGradient>
+    <radialGradient id="${glossId}" cx="34%" cy="20%" r="58%">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#${bezelId})"/>
+  <circle cx="100" cy="100" r="92" fill="url(#${faceId})"/>
+  <circle cx="100" cy="100" r="92" fill="url(#${glossId})"/>
+  <circle cx="100" cy="100" r="91.5" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="1"/>
+  ${ticks}
+  ${nums}
+  <line class="hour-hand"   x1="100" y1="110" x2="100" y2="50"/>
+  <line class="minute-hand" x1="100" y1="114" x2="100" y2="32"/>
+  <line class="second-hand" x1="100" y1="120" x2="100" y2="26"/>
+  <circle class="cap-outer" cx="100" cy="100" r="5.5"/>
+  <circle class="cap-inner" cx="100" cy="100" r="2"/>
+</svg>`;
+  }
+
+  function updateEmptyTip() {
+    const tip = clocksRoot.querySelector('.empty-tip');
+    if (clockList.length === 0 && !tip) {
+      const d = document.createElement('div');
+      d.className = 'empty-tip';
+      d.textContent = '还没有时钟 —— 在上方地图上点击一个地区开始吧';
+      clocksRoot.appendChild(d);
+    } else if (clockList.length > 0 && tip) {
+      tip.remove();
+    }
+  }
+
+  /* ---------- 添加时钟 ---------- */
+  function addClock(opt) {
+    const { tz, label, lon, lat } = opt;
+
+    // 同一时区已存在 → 高亮提示
+    const exist = clockList.find(c => c.tz === tz);
+    if (exist) {
+      flashCard(exist.card);
+      exist.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    const id = ++clockId;
+
+    const card = document.createElement('article');
+    card.className = 'clock-card';
+    card.innerHTML = `
+      <button class="remove" type="button" title="移除时钟">×</button>
+      <div class="city">${escapeHTML(label)}</div>
+      <div class="region" title="${escapeHTML(tz)}">${escapeHTML(tz)}</div>
+      <div class="dial-wrap">${buildDialSVG()}</div>
+      <div class="digital">--:--:--</div>
+      <div class="foot">
+        <span class="daynight"></span>
+        <span class="utc"></span>
+      </div>
+    `;
+    clocksRoot.appendChild(card);
+
+    const clock = {
+      id, tz, label, lon, lat,
+      card,
+      fmt: new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz, hour12: false,
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }),
+      hourEl:   card.querySelector('.hour-hand'),
+      minuteEl: card.querySelector('.minute-hand'),
+      secondEl: card.querySelector('.second-hand'),
+      digitalEl:card.querySelector('.digital'),
+      utcEl:    card.querySelector('.utc'),
+      daynightEl: card.querySelector('.daynight'),
+      h: 0, m: 0, s: 0, secKey: -1,
+      marker: null
+    };
+
+    card.querySelector('.remove').addEventListener('click', () => removeClock(id));
+    clockList.push(clock);
+
+    addMarker(clock);
+    updateEmptyTip();
+
+    // 首次渲染立即显示时间
+    refreshClockText(clock, new Date());
+    return clock;
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+  }
+
+  function flashCard(card) {
+    card.classList.remove('flash');
+    void card.offsetWidth;   // 重置动画
+    card.classList.add('flash');
+  }
+
+  /* ---------- 移除时钟 ---------- */
+  function removeClock(id) {
+    const idx = clockList.findIndex(c => c.id === id);
+    if (idx < 0) return;
+    const c = clockList[idx];
+    clockList.splice(idx, 1);
+
+    if (c.marker) c.marker.remove();
+    c.card.classList.add('leaving');
+    setTimeout(() => {
+      c.card.remove();
+      updateEmptyTip();
+    }, 260);
+  }
+
+  /* ---------- 地图标记 ---------- */
+  function addMarker(clock) {
+    const { x, y } = project(clock.lon, clock.lat);
+
+    const g = document.createElementNS(SVGNS, 'g');
+    g.setAttribute('class', 'map-marker');
+    g.setAttribute('transform', ''); // 保持独立
+
+    const pulse = document.createElementNS(SVGNS, 'circle');
+    pulse.setAttribute('class', 'pulse');
+    pulse.setAttribute('cx', x); pulse.setAttribute('cy', y); pulse.setAttribute('r', 5);
+
+    const dot = document.createElementNS(SVGNS, 'circle');
+    dot.setAttribute('class', 'dot');
+    dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.setAttribute('r', 4.5);
+
+    const text = document.createElementNS(SVGNS, 'text');
+    text.setAttribute('x', x);
+    text.setAttribute('y', y - 11);
+    text.textContent = clock.label;
+
+    g.appendChild(pulse);
+    g.appendChild(dot);
+    g.appendChild(text);
+
+    g.addEventListener('click', evt => {
+      evt.stopPropagation();
+      flashCard(clock.card);
+      clock.card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    markerGroup.appendChild(g);
+    clock.marker = g;
+  }
+
+  /* =========================================================
+     6. 地图交互
+     ========================================================= */
+  mapSvg.addEventListener('mousemove', evt => {
+    const pt = clientToSvg(evt);
+    if (!pt) return;
+    const lon = pt.x / W * 360 - 180;
+    const lat = 90 - pt.y / H * 180;
+
+    mapHint.textContent = `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'}  ` +
+                          `${Math.abs(lon).toFixed(1)}°${lon >= 0 ? 'E' : 'W'}`;
+
+    cursorG.style.display = 'block';
+    cursorDot.setAttribute('cx', pt.x);
+    cursorDot.setAttribute('cy', pt.y);
+    cursorH.setAttribute('x1', 0);
+    cursorH.setAttribute('y1', pt.y);
+    cursorH.setAttribute('x2', W);
+    cursorH.setAttribute('y2', pt.y);
+    cursorV.setAttribute('x1', pt.x);
+    cursorV.setAttribute('y1', 0);
+    cursorV.setAttribute('x2', pt.x);
+    cursorV.setAttribute('y2', H);
+  });
+
+  mapSvg.addEventListener('mouseleave', () => {
+    cursorG.style.display = 'none';
+    mapHint.textContent = '移动鼠标查看经纬度';
+  });
+
+  mapSvg.addEventListener('click', evt => {
+    const pt = clientToSvg(evt);
+    if (!pt) return;
+
+    let lon = pt.x / W * 360 - 180;
+    let lat = 90 - pt.y / H * 180;
+    lon = Math.max(-180, Math.min(180, lon));
+    lat = Math.max(-85, Math.min(85, lat));
+
+    // 找最近的城市
+    let best = null, bestD = Infinity;
+    for (const c of CITIES) {
+      const d = distKm(lat, lon, c.lat, c.lon);
+      if (d < bestD) { bestD = d; best = c; }
+    }
+
+    if (best && bestD <= SNAP_KM) {
+      addClock({ tz: best.tz, label: best.name, lon: best.lon, lat: best.lat });
+    } else {
+      // 远离城市的海洋 / 偏远地区：按经度推算固定偏移时区
+      let n = Math.round(lon / 15);
+      n = Math.max(-12, Math.min(12, n));
+      let tz;
+      if (n === 0)       tz = 'Etc/GMT';
+      else if (n > 0)    tz = 'Etc/GMT-' + n;   // 注意：Etc/GMT 的符号是反的
+      else               tz = 'Etc/GMT+' + (-n);
+
+      const label = 'UTC' + (n >= 0 ? '+' : '-') + pad(Math.abs(n)) + ' 区';
+      addClock({ tz, label, lon, lat });
+    }
+  });
+
+  /* =========================================================
+     7. 时间刷新
+     ========================================================= */
+  function refreshClockText(c, now) {
+    let h = 0, m = 0, s = 0;
+    for (const p of c.fmt.formatToParts(now)) {
+      if (p.type === 'hour')        h = parseInt(p.value, 10) % 24;
+      else if (p.type === 'minute') m = parseInt(p.value, 10);
+      else if (p.type === 'second') s = parseInt(p.value, 10);
+    }
+    c.h = h; c.m = m; c.s = s;
+
+    c.digitalEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+    c.utcEl.textContent = utcText(tzOffsetMinutes(now, c.tz));
+
+    const isDay = h >= 6 && h < 18;
+    c.daynightEl.textContent = isDay ? '☀ 白天' : '☾ 夜晚';
+    c.daynightEl.classList.toggle('night', !isDay);
+  }
+
+  let lastLocalKey = -1;
+
+  function loop() {
+    const now = new Date();
+    const ms = now.getMilliseconds();
+    const secKey = Math.floor(now.getTime() / 1000);
+
+    // 顶部本地时间
+    if (lastLocalKey !== secKey) {
+      lastLocalKey = secKey;
+      localTimeEl.textContent =
+        pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+    }
+
+    for (let i = 0; i < clockList.length; i++) {
+      const c = clockList[i];
+
+      if (c.secKey !== secKey) {
+        c.secKey = secKey;
+        refreshClockText(c, now);
+      }
+
+      const sec  = c.s + ms / 1000;
+      const min  = c.m + sec / 60;
+      const hour = (c.h % 12) + min / 60;
+
+      c.secondEl.setAttribute('transform', 'rotate(' + (sec * 6).toFixed(3) + ' 100 100)');
+      c.minuteEl.setAttribute('transform', 'rotate(' + (min * 6).toFixed(3) + ' 100 100)');
+      c.hourEl.setAttribute('transform',   'rotate(' + (hour * 30).toFixed(3) + ' 100 100)');
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  /* =========================================================
+     8. 初始状态
+     ========================================================= */
+  document.getElementById('clearAll').addEventListener('click', () => {
+    [...clockList].forEach(c => removeClock(c.id));
+  });
+
+  (function bootstrap() {
+    const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const initial = [];
+    const localCity = CITIES.find(c => c.tz === localTz);
+    if (localCity) initial.push(localCity);
+
+    ['北京', '伦敦', '纽约'].forEach(name => {
+      const c = CITIES.find(x => x.name === name);
+      if (c && !initial.includes(c)) initial.push(c);
+    });
+
+    initial.slice(0, 4).forEach(c => {
+      addClock({ tz: c.tz, label: c.name, lon: c.lon, lat: c.lat });
+    });
+
+    updateEmptyTip();
+    requestAnimationFrame(loop);
+  })();
+
+})();
+</script>
+</body>
+</html>
