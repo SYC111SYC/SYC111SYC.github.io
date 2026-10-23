@@ -5,6 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>猫球小站</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            position: relative;
+        }
+
+        .pet {
+            position: fixed;
+            left: 32px;
+            top: 140px;
+            width: 72px;
+            height: 72px;
+            z-index: 9999;
+            pointer-events: auto;
+            cursor: pointer;
+            user-select: none;
+            background: url('images/catball.png') center/contain no-repeat;
+            image-rendering: auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.18));
+            transition: transform 0.15s ease, filter 0.15s ease;
+            will-change: transform, left, top;
+        }
+
+        .pet:hover {
+            transform: scale(1.08);
+            filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.22));
+        }
+
+        .pet.running {
+            transform: scale(1.12);
+            filter: drop-shadow(0 8px 16px rgba(255, 120, 120, 0.35));
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -15,8 +47,6 @@
             <a href="rand.html">随机数抽取</a>
             <a href="calendar.html">日历与倒数日</a>
             <a href="clock.html">世界时间</a>
-            
-        
         </nav>
     </header>
 
@@ -25,15 +55,12 @@
         <p id="searchTip"></p>
     </div>
 
-    <!-- 官方复刻版小恐龙（裁剪后纯游戏画面） -->
-        <!-- 可折叠游戏中心（默认收起） -->
     <div class="post-card foldable-game">
         <div class="fold-header" id="foldToggle">
             <span>🎮 游戏中心</span>
             <span class="fold-arrow">▼</span>
         </div>
         <div class="fold-content" id="foldContent">
-            <!-- 小恐龙游戏 -->
             <div class="game-item">
                 <h4>🦖 小恐龙</h4>
                 <p class="game-tip">按 <kbd>空格</kbd> 跳跃，<kbd>↓</kbd> 下蹲</p>
@@ -47,21 +74,18 @@
                     </iframe>
                 </div>
             </div>
-
-            <!-- Super Mona 跑酷 -->
-            
         </div>
     </div>
 
-
     <main id="postList">加载中...</main>
+
+    <div id="pet" class="pet" aria-label="桌宠" title="点我让它乱跑 10 秒"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="js/main.js"></script>
     <script>
         let allPosts = [];
 
-        // 加载帖子数据
         fetch('posts.json')
             .then(res => res.json())
             .then(data => {
@@ -73,7 +97,6 @@
                 console.error(err);
             });
 
-        // 渲染帖子列表
         function renderPosts(posts) {
             const container = document.getElementById('postList');
             if (posts.length === 0) {
@@ -93,7 +116,6 @@
             container.innerHTML = html;
         }
 
-        // 搜索功能
         const searchInput = document.getElementById('searchInput');
         const searchTip = document.getElementById('searchTip');
         searchInput.addEventListener('input', function() {
@@ -111,7 +133,7 @@
             renderPosts(filtered);
             searchTip.textContent = `找到 ${filtered.length} 篇相关帖子`;
         });
-                // 游戏中心折叠切换
+
         const foldToggle = document.getElementById('foldToggle');
         const foldContent = document.getElementById('foldContent');
         const foldArrow = foldToggle.querySelector('.fold-arrow');
@@ -121,6 +143,101 @@
             foldArrow.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
         });
 
+        const pet = document.getElementById('pet');
+        const petState = {
+            x: 32,
+            y: 140,
+            vx: 1.1,
+            vy: 0.8,
+            running: false,
+            runUntil: 0,
+            idleTimer: 0,
+            lastTime: 0
+        };
+
+        function randomRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function setRandomIdleDirection() {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = randomRange(0.8, 1.8);
+            petState.vx = Math.cos(angle) * speed;
+            petState.vy = Math.sin(angle) * speed;
+            petState.idleTimer = randomRange(55, 140);
+        }
+
+        function setPetPosition() {
+            const maxX = window.innerWidth - pet.offsetWidth - 8;
+            const maxY = window.innerHeight - pet.offsetHeight - 8;
+            petState.x = clamp(petState.x, 8, maxX);
+            petState.y = clamp(petState.y, 8, maxY);
+            pet.style.left = petState.x + 'px';
+            pet.style.top = petState.y + 'px';
+        }
+
+        function animate(timestamp) {
+            if (!petState.lastTime) petState.lastTime = timestamp;
+            const delta = (timestamp - petState.lastTime) / 16.67;
+            petState.lastTime = timestamp;
+
+            const maxX = window.innerWidth - pet.offsetWidth - 8;
+            const maxY = window.innerHeight - pet.offsetHeight - 8;
+
+            if (petState.running) {
+                if (timestamp > petState.runUntil) {
+                    petState.running = false;
+                    pet.classList.remove('running');
+                    setRandomIdleDirection();
+                } else {
+                    petState.vx += randomRange(-2.4, 2.4) * delta;
+                    petState.vy += randomRange(-2.4, 2.4) * delta;
+                    const length = Math.hypot(petState.vx, petState.vy) || 1;
+                    const maxSpeed = 9.5;
+                    if (length > maxSpeed) {
+                        petState.vx = (petState.vx / length) * maxSpeed;
+                        petState.vy = (petState.vy / length) * maxSpeed;
+                    }
+                }
+            } else {
+                petState.idleTimer -= delta;
+                if (petState.idleTimer <= 0 || petState.x <= 8 || petState.x >= maxX || petState.y <= 8 || petState.y >= maxY) {
+                    setRandomIdleDirection();
+                }
+                petState.vx *= 0.98;
+                petState.vy *= 0.98;
+                const currentSpeed = Math.hypot(petState.vx, petState.vy) || 1;
+                if (currentSpeed < 0.8) {
+                    setRandomIdleDirection();
+                }
+            }
+
+            petState.x += petState.vx * delta;
+            petState.y += petState.vy * delta;
+            setPetPosition();
+            requestAnimationFrame(animate);
+        }
+
+        pet.addEventListener('click', function() {
+            petState.running = true;
+            petState.runUntil = performance.now() + 10000;
+            pet.classList.add('running');
+
+            const angle = Math.random() * Math.PI * 2;
+            const speed = randomRange(7.5, 11.5);
+            petState.vx = Math.cos(angle) * speed;
+            petState.vy = Math.sin(angle) * speed;
+        });
+
+        setRandomIdleDirection();
+        setPetPosition();
+        requestAnimationFrame(animate);
+
+        window.addEventListener('resize', setPetPosition);
     </script>
 </body>
 </html>
