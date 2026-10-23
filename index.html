@@ -7,13 +7,14 @@
     <link rel="stylesheet" href="css/style.css">
     <style>
         body {
+            margin: 0;                    /* 避免 absolute 定位偏移 */
             position: relative;
             min-height: 100vh;
         }
 
         header {
             position: relative;
-            z-index: 10000;                 /* 让猫窝盖住桌宠 */
+            z-index: 10000;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -92,16 +93,16 @@
             border-radius: 50%;
         }
 
-        /* —— 关键改造：固定定位 + 容器不挡点击 —— */
+        /* —— 关键：绝对定位 → 站在页面（文档坐标系） —— */
         .pet-wrap {
-            position: fixed;
+            position: absolute;
             left: 0;
             top: 0;
             width: 94px;
             height: 94px;
             z-index: 9999;
             user-select: none;
-            pointer-events: none;              /* 容器不挡页面元素 */
+            pointer-events: none;
             opacity: 0;
             transform: translate3d(32px, 140px, 0);
             will-change: transform;
@@ -115,7 +116,7 @@
             width: 72px;
             height: 72px;
             cursor: pointer;
-            pointer-events: auto;              /* 仅猫本体可点 */
+            pointer-events: auto;
             background: url('images/catball.png') center/contain no-repeat;
             image-rendering: auto;
             filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.18));
@@ -381,6 +382,7 @@
 
     /* =========================================================
        三、桌宠系统
+       —— 坐标系：文档坐标（page-x / page-y），宠物站在页面上
        ========================================================= */
     const petWrap     = document.getElementById('petWrap');
     const pet         = document.getElementById('pet');
@@ -397,14 +399,17 @@
     let bubbleKey      = '';
 
     const idlePhrases    = ['喵~', '喵呜~', '欢迎！', '我是猫球。', '哈哈，快来陪我玩！'];
+    const returnPhrases  = ['等等我！', '不要抛弃我！', '我回来了，慢点！'];
     const correctPhrases = ['真聪明！', '对啦！', '真棒！', '哈哈哈！'];
     const wrongPhrases   = ['不对哦...', '这都能错？？！', '好好练去吧~', '下次再来试试...'];
 
-    const STEP      = 16.67;
-    const MAX_DELTA = 3;
+    const STEP         = 16.67;
+    const MAX_DELTA    = 3;
+    const RETURN_SPEED = 13;
+    const EDGE_PAD     = 8;
 
     const petState = {
-        mode: 'roaming',
+        mode: 'roaming',            // roaming | resting | sleeping | returning
         x: 32,
         y: 140,
         vx: 1,
@@ -417,6 +422,7 @@
         nextQuestionAt: 0,
         nextIdleSpeechAt: 0,
         nextMeowAt: 0,
+        nextReturnSpeechAt: 0,
         lastInteraction: performance.now(),
         lastTime: 0,
         bedX: 0,
@@ -425,15 +431,9 @@
     };
 
     /* ---------- 通用工具 ---------- */
-    function randomRange(min, max) {
-        return Math.random() * (max - min) + min;
-    }
-    function randomInt(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-    function clamp(value, min, max) {
-        return Math.min(Math.max(value, min), max);
-    }
+    function randomRange(min, max) { return Math.random() * (max - min) + min; }
+    function randomInt(min, max)   { return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function clamp(v, min, max)    { return Math.min(Math.max(v, min), max); }
 
     function say(text, duration = 1400) {
         petSpeech.textContent = text;
@@ -450,29 +450,52 @@
         if (!visible) petQuestion.classList.remove('visible');
     }
 
-    /* ---------- 猫窝位置（视口坐标） ---------- */
+    /* ---------- 视口边界（文档坐标） ---------- */
+    function viewportBounds() {
+        const sx = window.scrollX;
+        const sy = window.scrollY;
+        return {
+            left:   sx + EDGE_PAD,
+            top:    sy + EDGE_PAD,
+            right:  sx + window.innerWidth  - petWrap.offsetWidth  - EDGE_PAD,
+            bottom: sy + window.innerHeight - petWrap.offsetHeight - EDGE_PAD
+        };
+    }
+
+    /* 宠物中心是否已经离开视口（用于触发“飞回来”） */
+    function isPetCenterOutsideViewport() {
+        const sx = window.scrollX, sy = window.scrollY;
+        const sw = window.innerWidth, sh = window.innerHeight;
+        const cx = petState.x + petWrap.offsetWidth  / 2;
+        const cy = petState.y + petWrap.offsetHeight / 2;
+        return cx < sx || cx > sx + sw || cy < sy || cy > sy + sh;
+    }
+
+    /* ---------- 猫窝位置（文档坐标） ---------- */
     function updateBedPosition() {
         const r = catBed.getBoundingClientRect();
         const visible = r.bottom > 0 && r.top < window.innerHeight &&
                         r.right > 0 && r.left < window.innerWidth;
         petState.bedVisible = visible;
         if (visible) {
-            petState.bedX = r.left + 12;
-            petState.bedY = r.top + 18;
+            petState.bedX = r.left + window.scrollX + 12;
+            petState.bedY = r.top  + window.scrollY + 18;
         }
     }
 
     /* ---------- 气泡定位（带缓存，避免每帧写样式） ---------- */
     function positionQuestionBubble() {
         if (!petState.questionOpen) return;
-        const key = `${Math.round(petState.x)},${Math.round(petState.y)},${window.innerWidth}`;
+        const key = `${Math.round(petState.x)},${Math.round(petState.y)},${window.scrollX},${window.scrollY},${window.innerWidth}`;
         if (key === bubbleKey) return;
         bubbleKey = key;
 
-        const bubbleW   = Math.min(250, window.innerWidth - 60);
-        const spaceRight = window.innerWidth - (petState.x + 94) - 12;
-        const left  = spaceRight >= 200 ? 88 : -(Math.min(bubbleW, 190) + 14);
-        const top   = petState.y < 130 ? 74 : -14;
+        const bubbleW = Math.min(250, window.innerWidth - 60);
+        // 屏幕坐标下判断左右空间
+        const screenX = petState.x - window.scrollX;
+        const spaceRight = window.innerWidth - (screenX + 94) - 12;
+        const left = spaceRight >= 200 ? 88 : -(Math.min(bubbleW, 190) + 14);
+        const top  = (petState.y - window.scrollY) < 130 ? 74 : -14;
 
         petQuestion.style.left     = left + 'px';
         petQuestion.style.top      = top + 'px';
@@ -555,7 +578,7 @@
         if (!petState.questionOpen) return;
 
         const raw = mathAnswer.value.trim();
-        if (raw === '') {                                 // 空值拦截
+        if (raw === '') {
             mathAnswer.focus({ preventScroll: true });
             return;
         }
@@ -591,8 +614,9 @@
         petState.questionOpen = false;
         petQuestion.classList.remove('visible');
         setPetVisible(true);
-        petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
-        petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+        const v = viewportBounds();
+        petState.x = clamp(petState.bedX + 18, v.left, v.right);
+        petState.y = clamp(petState.bedY + 8,  v.top,  v.bottom);
         petState.vx = petState.vy = 0;
         petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
         say('你好！', 1000);
@@ -604,11 +628,11 @@
         pet.classList.remove('running');
         hideQuestion();
         petState.vx = petState.vy = 0;
-        petState.x = clamp(petState.bedX, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
-        petState.y = clamp(petState.bedY, 8, window.innerHeight - petWrap.offsetHeight - 8);
+        petState.x = petState.bedX;
+        petState.y = petState.bedY;
         setPetPosition();
 
-        // 先说话，再隐藏（修复原代码中气泡永远看不到的问题）
+        // 先说完，再隐藏（否则气泡永远看不到）
         say('你不理我那我先回去了，好困呀，回窝窝', 1200);
         clearTimeout(sleepHideTimer);
         sleepHideTimer = setTimeout(() => {
@@ -623,8 +647,9 @@
         hideQuestion();
         setPetVisible(true);
         petState.lastInteraction = performance.now();
-        petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
-        petState.y = clamp(petState.bedY + 14, 8, window.innerHeight - petWrap.offsetHeight - 8);
+        const v = viewportBounds();
+        petState.x = clamp(petState.bedX + 18, v.left, v.right);
+        petState.y = clamp(petState.bedY + 14, v.top,  v.bottom);
         setRandomIdleDirection();
         petState.nextIdleSpeechAt = performance.now() + randomRange(2200, 4200);
 
@@ -633,16 +658,8 @@
         say(text, 1400);
     }
 
-    /* ---------- 位置更新（视口坐标 + 边界反弹） ---------- */
+    /* ---------- 渲染位置 ---------- */
     function setPetPosition() {
-        const maxX = Math.max(8, window.innerWidth  - petWrap.offsetWidth  - 8);
-        const maxY = Math.max(8, window.innerHeight - petWrap.offsetHeight - 8);
-
-        if (petState.x < 8)    { petState.x = 8;    petState.vx =  Math.abs(petState.vx) * 0.8; }
-        if (petState.x > maxX) { petState.x = maxX; petState.vx = -Math.abs(petState.vx) * 0.8; }
-        if (petState.y < 8)    { petState.y = 8;    petState.vy =  Math.abs(petState.vy) * 0.8; }
-        if (petState.y > maxY) { petState.y = maxY; petState.vy = -Math.abs(petState.vy) * 0.8; }
-
         petWrap.style.transform = `translate3d(${petState.x}px, ${petState.y}px, 0)`;
     }
 
@@ -653,13 +670,42 @@
         petState.lastTime = timestamp;
         const now = performance.now();
 
-        if (petState.mode === 'sleeping') {          // 休眠时不跑物理
+        if (petState.mode === 'sleeping') {
             requestAnimationFrame(animate);
             return;
         }
 
-        /* 奔跑状态 */
-        if (petState.running) {
+        /* ---------- ① 检测：滚动导致宠物中心离开画面 → 触发“飞回来” ---------- */
+        if (petState.mode !== 'returning' && isPetCenterOutsideViewport()) {
+            petState.mode    = 'returning';
+            petState.running = false;
+            pet.classList.remove('running');
+            if (now > petState.nextReturnSpeechAt) {
+                say(returnPhrases[Math.floor(Math.random() * returnPhrases.length)], 1500);
+                petState.nextReturnSpeechAt = now + 2000;
+            }
+        }
+
+        /* ---------- ② 状态机 ---------- */
+        if (petState.mode === 'returning') {
+            // 目标：当前视口中心（随滚动实时更新）
+            const tx = window.scrollX + window.innerWidth  / 2 - petWrap.offsetWidth  / 2;
+            const ty = window.scrollY + window.innerHeight / 2 - petWrap.offsetHeight / 2;
+            const dx = tx - petState.x;
+            const dy = ty - petState.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            petState.vx = dx / dist * RETURN_SPEED;
+            petState.vy = dy / dist * RETURN_SPEED;
+
+            if (dist < 24) {
+                // 回来了 → 继续漫游（同时保持页面锚定）
+                petState.mode = 'roaming';
+                setRandomIdleDirection();
+            } else if (now > petState.nextReturnSpeechAt) {
+                say(returnPhrases[Math.floor(Math.random() * returnPhrases.length)], 1500);
+                petState.nextReturnSpeechAt = now + 2000;
+            }
+        } else if (petState.running) {
             if (now > petState.runUntil) {
                 petState.running = false;
                 pet.classList.remove('running');
@@ -679,10 +725,10 @@
             }
         }
 
-        /* 状态机 */
         if (petState.mode === 'resting') {
-            petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
-            petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+            const v = viewportBounds();
+            petState.x = clamp(petState.bedX + 18, v.left, v.right);
+            petState.y = clamp(petState.bedY + 8,  v.top,  v.bottom);
             petState.vx = petState.vy = 0;
 
             if (now > petState.nextQuestionAt) {
@@ -690,6 +736,7 @@
                 petState.nextQuestionAt = now + randomRange(15000, 30000);
             }
             if (now - petState.lastInteraction > 45000) enterSleeping();
+
         } else if (petState.mode === 'roaming') {
             petState.idleTimer -= delta;
             if (petState.idleTimer <= 0) setRandomIdleDirection();
@@ -705,14 +752,26 @@
             if (now - petState.lastInteraction > 25000) enterResting();
         }
 
-        /* 答题超时（统一处理，不再局限于 resting） */
+        /* ---------- ③ 答题超时 ---------- */
         if (petState.questionOpen && now > petState.answerDeadline) {
             hideQuestion();
             say('时间到啦~', 1200);
         }
 
+        /* ---------- ④ 应用速度 ---------- */
         petState.x += petState.vx * delta;
         petState.y += petState.vy * delta;
+
+        /* ---------- ⑤ 视口边界约束（returning 时不夹）---------- */
+        if (petState.mode !== 'returning') {
+            const v = viewportBounds();
+            if (petState.x < v.left)   { petState.x = v.left;   petState.vx =  Math.abs(petState.vx) * 0.8; }
+            if (petState.x > v.right)  { petState.x = v.right;  petState.vx = -Math.abs(petState.vx) * 0.8; }
+            if (petState.y < v.top)    { petState.y = v.top;    petState.vy =  Math.abs(petState.vy) * 0.8; }
+            if (petState.y > v.bottom) { petState.y = v.bottom; petState.vy = -Math.abs(petState.vy) * 0.8; }
+        }
+
+        /* ---------- ⑥ 渲染 ---------- */
         setPetPosition();
         if (petState.questionOpen) positionQuestionBubble();
         requestAnimationFrame(animate);
@@ -750,8 +809,9 @@
         petState.mode = 'resting';
         petState.running = false;
         hideQuestion();
-        petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
-        petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+        const v = viewportBounds();
+        petState.x = clamp(petState.bedX + 18, v.left, v.right);
+        petState.y = clamp(petState.bedY + 8,  v.top,  v.bottom);
         setPetVisible(true);
         pet.classList.remove('running');
         say('叫我啥事？', 1000);
@@ -769,24 +829,29 @@
     /* ---------- 视口事件 ---------- */
     window.addEventListener('scroll', () => {
         updateBedPosition();
-        // 猫窝滚出视野时，休息中的猫球应恢复漫游
+        // 猫窝滚出视口时，不再保持 resting（避免卡在屏幕外）
         if (petState.mode === 'resting' && !petState.bedVisible) {
-            enterRoaming();
+            petState.mode = 'roaming';
+            setRandomIdleDirection();
         }
     }, { passive: true });
 
     window.addEventListener('resize', () => {
         updateBedPosition();
+        if (petState.mode === 'resting' && !petState.bedVisible) {
+            petState.mode = 'roaming';
+        }
         if (petState.mode === 'resting' && petState.bedVisible) {
-            petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
-            petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+            const v = viewportBounds();
+            petState.x = clamp(petState.bedX + 18, v.left, v.right);
+            petState.y = clamp(petState.bedY + 8,  v.top,  v.bottom);
         }
         setPetPosition();
         positionQuestionBubble();
     });
 
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) petState.lastTime = 0;   // 切回前台重置时间基准
+        if (!document.hidden) petState.lastTime = 0;
     });
 
     /* ---------- 启动 ---------- */
@@ -794,6 +859,10 @@
         updateBedPosition();
         setPetPosition();
     });
+
+    // 初始位置：以当前视口左上为参考（避免带滚动位置进入页面时瞬间飞回）
+    petState.x = window.scrollX + 32;
+    petState.y = window.scrollY + 140;
 
     updateBedPosition();
     setRandomIdleDirection();
