@@ -88,6 +88,86 @@
             opacity: 1;
             transform: translateY(0);
         }
+
+        /* ---------- 新增：猫粮状态栏 ---------- */
+        .pet-food-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            margin: 8px 18px;
+            padding: 8px 14px;
+            background: linear-gradient(135deg, #fff8ec, #ffe9cc);
+            border: 1px solid rgba(210, 160, 90, 0.35);
+            border-radius: 12px;
+            font-size: 14px;
+            color: #6d3a00;
+            box-shadow: 0 2px 8px rgba(180, 120, 40, 0.08);
+        }
+
+        .pet-food-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pet-food-info strong {
+            font-size: 1.15em;
+            color: #d47700;
+            transition: color 0.25s ease, transform 0.25s ease;
+            display: inline-block;
+            min-width: 1em;
+            text-align: center;
+        }
+
+        .pet-food-info strong.flash {
+            color: #ff8800;
+            transform: scale(1.35);
+        }
+
+        .pet-food-status {
+            color: #a06b28;
+            font-size: 13px;
+        }
+
+        .pet-food-status.fed {
+            color: #2f8a2f;
+            font-weight: 600;
+        }
+
+        .pet-food-btn {
+            margin-left: auto;
+            padding: 6px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #ffbf66;
+            color: #3a2200;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .pet-food-btn:hover:not(:disabled) {
+            background: #ffb144;
+        }
+
+        .pet-food-btn:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+
+        .pet-food-btn:disabled {
+            background: #e8dccb;
+            color: #a08b70;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 500px) {
+            .pet-food-btn {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -101,6 +181,13 @@
             <a href="clock.html">世界时间</a>
         </nav>
     </header>
+
+    <!-- 新增：猫粮状态栏 -->
+    <div class="pet-food-bar">
+        <span class="pet-food-info">🍖 猫粮：<strong id="foodCount">0</strong></span>
+        <span class="pet-food-status" id="feedStatus">今天还没喂</span>
+        <button class="pet-food-btn" id="feedBtn" type="button">喂猫 🐱</button>
+    </div>
 
     <div class="search-container">
         <input type="text" id="searchInput" placeholder="搜索帖子标题或内容...">
@@ -117,8 +204,8 @@
                 <h4>🦖 小恐龙</h4>
                 <p class="game-tip">按 <kbd>空格</kbd> 跳跃，<kbd>↓</kbd> 下蹲</p>
                 <div class="game-viewport">
-                    <iframe 
-                        src="https://chromedino.com/embed/" 
+                    <iframe
+                        src="https://chromedino.com/embed/"
                         frameborder="0"
                         scrolling="no"
                         class="game-iframe"
@@ -139,6 +226,9 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="js/main.js"></script>
     <script>
+        /* =========================================================
+           文章加载 / 渲染 / 搜索 / 折叠（原有）
+           ========================================================= */
         let allPosts = [];
 
         fetch('posts.json')
@@ -180,7 +270,7 @@
                 renderPosts(allPosts);
                 return;
             }
-            const filtered = allPosts.filter(post => 
+            const filtered = allPosts.filter(post =>
                 post.title.toLowerCase().includes(keyword) ||
                 post.summary.toLowerCase().includes(keyword) ||
                 post.content.toLowerCase().includes(keyword)
@@ -197,6 +287,9 @@
             foldArrow.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
         });
 
+        /* =========================================================
+           桌宠系统（原有）
+           ========================================================= */
         const petWrap = document.getElementById('petWrap');
         const pet = document.getElementById('pet');
         const petSpeech = document.getElementById('petSpeech');
@@ -360,6 +453,147 @@
                 petState.nextReturnSpeechAt = performance.now();
             }
         }, { passive: true });
+
+        /* =========================================================
+           新增：猫粮系统
+           ========================================================= */
+        const FOOD_KEY        = 'catball_food_v1';           // 猫粮数量
+        const FEED_DATE_KEY   = 'catball_feed_date_v1';      // 上次喂食日期 YYYY-MM-DD
+
+        const foodCountEl     = document.getElementById('foodCount');
+        const feedStatusEl    = document.getElementById('feedStatus');
+        const feedBtn         = document.getElementById('feedBtn');
+
+        // localStorage 安全封装（隐私模式下会抛错）
+        function safeGet(key) {
+            try { return localStorage.getItem(key); } catch (e) { return null; }
+        }
+        function safeSet(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) { /* 忽略 */ }
+        }
+
+        // 本地日期（不涉及时区，用本地 0 点做日界）
+        function todayStr() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function getFoodCount() {
+            const raw = parseInt(safeGet(FOOD_KEY) || '0', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 0;
+        }
+
+        function setFoodCount(n) {
+            const safe = Math.max(0, Math.floor(Number(n) || 0));
+            safeSet(FOOD_KEY, String(safe));
+            updateFoodUI();
+        }
+
+        function addFood(n = 1) {
+            setFoodCount(getFoodCount() + n);
+            flashFoodCount();
+        }
+
+        function hasFedToday() {
+            return safeGet(FEED_DATE_KEY) === todayStr();
+        }
+
+        function flashFoodCount() {
+            foodCountEl.classList.add('flash');
+            clearTimeout(flashFoodCount._t);
+            flashFoodCount._t = setTimeout(() => {
+                foodCountEl.classList.remove('flash');
+            }, 350);
+        }
+
+        function updateFoodUI() {
+            const count = getFoodCount();
+            const fed = hasFedToday();
+
+            foodCountEl.textContent = count;
+
+            if (fed) {
+                feedStatusEl.textContent = '今日已喂 ✅（明天再来）';
+                feedStatusEl.classList.add('fed');
+                feedBtn.disabled = true;
+                feedBtn.textContent = '今天喂过啦';
+            } else if (count < 1) {
+                feedStatusEl.textContent = '还没有猫粮（浏览帖子可 +1）';
+                feedStatusEl.classList.remove('fed');
+                feedBtn.disabled = true;
+                feedBtn.textContent = '猫粮不足';
+            } else {
+                feedStatusEl.textContent = '今天还没喂，快点我~';
+                feedStatusEl.classList.remove('fed');
+                feedBtn.disabled = false;
+                feedBtn.textContent = '喂猫 🐱';
+            }
+        }
+
+        // 喂猫
+        function feedCat() {
+            if (hasFedToday()) {
+                say('我今天已经吃过啦，明天再来~', 1800);
+                return;
+            }
+            const count = getFoodCount();
+            if (count < 1) {
+                say('还没有猫粮…去看看帖子攒猫粮喵~', 2200);
+                return;
+            }
+
+            // 扣粮 + 记录今日
+            setFoodCount(count - 1);
+            safeSet(FEED_DATE_KEY, todayStr());
+
+            // 开心乱跑 3 秒
+            petState.running = true;
+            petState.runUntil = performance.now() + 3000;
+            pet.classList.add('running');
+            petState.nextMeowAt = performance.now() + 250;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = randomRange(9, 12);
+            petState.vx = Math.cos(angle) * speed;
+            petState.vy = Math.sin(angle) * speed;
+
+            say('好吃！最喜欢你啦喵~', 1800);
+            setTimeout(() => say('喵呜~ 🍖', 1200), 1900);
+
+            updateFoodUI();
+        }
+
+        feedBtn.addEventListener('click', feedCat);
+
+        /* 浏览帖子 → +1 猫粮（事件委托，动态渲染也生效） */
+        document.getElementById('postList').addEventListener('click', function(e) {
+            const link = e.target.closest('a[href*="post.html"]');
+            if (!link) return;
+            addFood(1);
+            // 页面马上会跳转，所以不 say，用户返回时猫粮数已经是新值
+        });
+
+        /* 跨标签页同步（其他标签喂/得粮时，本页 UI 自动刷新） */
+        window.addEventListener('storage', function(e) {
+            if (e.key === FOOD_KEY || e.key === FEED_DATE_KEY) {
+                updateFoodUI();
+            }
+        });
+
+        /* 跨午夜自动解禁（保持页面长时间打开也能重置） */
+        let lastToday = todayStr();
+        setInterval(function() {
+            const cur = todayStr();
+            if (cur !== lastToday) {
+                lastToday = cur;
+                updateFoodUI();
+            }
+        }, 60 * 1000);
+
+        /* 初始化 */
+        updateFoodUI();
     </script>
 </body>
 </html>
