@@ -99,6 +99,7 @@
             z-index: 9999;
             user-select: none;
             pointer-events: auto;
+            transition: opacity 0.2s ease;
         }
 
         .pet {
@@ -166,9 +167,9 @@
         .pet-question {
             position: absolute;
             left: 110px;
-            top: 56px;
+            top: 58px;
             padding: 10px 12px;
-            max-width: 230px;
+            width: min(250px, calc(100vw - 60px));
             background: rgba(255,255,255,0.95);
             border: 1px solid rgba(0,0,0,0.08);
             border-radius: 12px;
@@ -179,6 +180,7 @@
             transform: translateY(8px);
             transition: opacity 0.2s ease, transform 0.2s ease;
             pointer-events: none;
+            z-index: 10;
         }
 
         .pet-question.visible {
@@ -195,13 +197,20 @@
 
         .pet-question form {
             display: flex;
+            flex-wrap: wrap;
             gap: 6px;
             align-items: center;
             pointer-events: auto;
         }
 
+        .pet-question #mathPrompt {
+            display: inline-block;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+
         .pet-question input {
-            width: 74px;
+            width: 76px;
             padding: 6px 7px;
             border: 1px solid #d3d3d3;
             border-radius: 8px;
@@ -230,8 +239,8 @@
             }
 
             .pet-question {
+                width: min(220px, calc(100vw - 46px));
                 left: 88px;
-                max-width: 190px;
             }
         }
     </style>
@@ -366,20 +375,18 @@
 
         const idlePhrases = ['喵~', '喵呜~', '欢迎！', '我是猫球。', '哈哈，快来陪我玩！'];
         const returnPhrases = ['等等我！', '不要抛弃我！', '我回来了，慢点！'];
-        const bedReturnPhrases = ['你不理我那我先回去了，好困呀，回窝窝'];
         const correctPhrases = ['真聪明！', '对啦！', '真棒！', '哈哈哈！'];
         const wrongPhrases = ['不对哦...', '这都能错？？！', '好好练去吧~', '下次再来试试...'];
         const wakePhrases = ['早上好', '叫我啥事？', '你好！', '睡了个好觉~'];
+        const restLeavePhrases = ['你不理我那我先回去了，好困呀，回窝窝'];
 
         const petState = {
+            mode: 'roaming',
             x: 32,
             y: 140,
             vx: 1,
             vy: 0.6,
             running: false,
-            returning: false,
-            atBed: false,
-            sleeping: false,
             questionOpen: false,
             answerDeadline: 0,
             runUntil: 0,
@@ -406,16 +413,6 @@
             return Math.min(Math.max(value, min), max);
         }
 
-        function updateBedPosition() {
-            const rect = catBed.getBoundingClientRect();
-            petState.bedX = rect.left + window.scrollX + 12;
-            petState.bedY = rect.top + window.scrollY + 16;
-            if (petState.sleeping || petState.atBed) {
-                petState.x = petState.bedX + 10;
-                petState.y = petState.bedY + 8;
-            }
-        }
-
         function say(text, duration = 1400) {
             petSpeech.textContent = text;
             petSpeech.classList.add('visible');
@@ -425,21 +422,59 @@
             }, duration);
         }
 
+        function setPetVisible(visible) {
+            petWrap.style.opacity = visible ? '1' : '0';
+            petWrap.style.pointerEvents = visible ? 'auto' : 'none';
+            if (!visible) {
+                petQuestion.classList.remove('visible');
+            }
+        }
+
+        function updateBedPosition() {
+            const rect = catBed.getBoundingClientRect();
+            petState.bedX = rect.left + window.scrollX + 12;
+            petState.bedY = rect.top + window.scrollY + 18;
+
+            if (petState.mode === 'sleeping') {
+                petState.x = petState.bedX + 10;
+                petState.y = petState.bedY + 8;
+            }
+            if (petState.mode === 'resting') {
+                petState.x = petState.bedX + 14;
+                petState.y = petState.bedY + 8;
+            }
+        }
+
         function hideQuestion() {
             petQuestion.classList.remove('visible');
             petState.questionOpen = false;
             petState.answerDeadline = 0;
             mathAnswer.value = '';
+            mathAnswer.dataset.answer = '';
         }
 
-        function beginQuestion() {
-            if (petState.questionOpen) return;
+        function positionQuestionBubble() {
+            if (!petState.questionOpen) return;
+            const pageLeft = petState.x + petWrap.offsetWidth * 0.5;
+            const viewportX = pageLeft - window.scrollX;
+            let left = 110;
+            if (viewportX < window.innerWidth * 0.38) {
+                left = -200;
+            } else if (viewportX > window.innerWidth * 0.62) {
+                left = 110;
+            }
+            const top = petState.y < window.innerHeight * 0.42 ? 0 : 58;
+            petQuestion.style.left = left + 'px';
+            petQuestion.style.top = top + 'px';
+            petQuestion.style.maxWidth = Math.min(250, window.innerWidth - 50) + 'px';
+        }
 
-            petState.questionOpen = true;
+        function generateMathQuestion() {
             const a = randomInt(1, 99);
             const b = randomInt(1, 99);
             const ops = ['+', '-', '*', '÷'];
             const op = ops[randomInt(0, ops.length - 1)];
+
             let expr = '';
             let answer = 0;
 
@@ -447,8 +482,10 @@
                 expr = `${a} + ${b}`;
                 answer = a + b;
             } else if (op === '-') {
-                expr = `${Math.max(a, b)} - ${Math.min(a, b)}`;
-                answer = Math.abs(a - b);
+                const left = Math.max(a, b);
+                const right = Math.min(a, b);
+                expr = `${left} - ${right}`;
+                answer = left - right;
             } else if (op === '*') {
                 expr = `${a} × ${b}`;
                 answer = a * b;
@@ -462,10 +499,13 @@
 
             mathTitle.textContent = '数学题';
             mathPrompt.textContent = `${expr} = ?`;
+            mathAnswer.dataset.answer = String(answer);
+            mathAnswer.value = '';
             petQuestion.classList.add('visible');
-            mathAnswer.focus();
+            petState.questionOpen = true;
             petState.answerDeadline = performance.now() + 60000;
-            petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
+            positionQuestionBubble();
+            setTimeout(() => mathAnswer.focus(), 30);
         }
 
         function setRandomIdleDirection() {
@@ -486,50 +526,72 @@
         }
 
         function isPetOutsideViewport() {
-            const left = petState.x;
-            const top = petState.y;
-            const right = left + petWrap.offsetWidth;
-            const bottom = top + petWrap.offsetHeight;
-
+            const x = petState.x;
+            const y = petState.y;
+            const right = x + petWrap.offsetWidth;
+            const bottom = y + petWrap.offsetHeight;
             return right < window.scrollX - 30 ||
-                left > window.scrollX + window.innerWidth + 30 ||
+                x > window.scrollX + window.innerWidth + 30 ||
                 bottom < window.scrollY - 30 ||
-                top > window.scrollY + window.innerHeight + 30;
+                y > window.scrollY + window.innerHeight + 30;
         }
 
-        function sendBackToBed() {
-            petState.returning = false;
-            petState.atBed = true;
-            petState.sleeping = false;
+        function enterRoaming() {
+            petState.mode = 'roaming';
             petState.questionOpen = false;
-            hideQuestion();
-            say(bedReturnPhrases[Math.floor(Math.random() * bedReturnPhrases.length)], 2000);
-            petState.lastInteraction = performance.now();
+            petQuestion.classList.remove('visible');
+            setPetVisible(true);
+            setRandomIdleDirection();
+            petState.nextIdleSpeechAt = performance.now() + randomRange(2200, 4000);
             petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
         }
 
-        function wakePetFromBed() {
-            petState.sleeping = false;
-            petState.atBed = false;
-            petState.returning = false;
+        function enterResting() {
+            petState.mode = 'resting';
+            petState.running = false;
+            petState.questionOpen = false;
+            petQuestion.classList.remove('visible');
+            setPetVisible(true);
+            petState.x = petState.bedX + 18;
+            petState.y = petState.bedY + 8;
+            petState.vx = 0;
+            petState.vy = 0;
+            petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
+            say('你好！', 1000);
+        }
+
+        function enterSleeping() {
+            petState.mode = 'sleeping';
+            petState.running = false;
+            hideQuestion();
+            petState.questionOpen = false;
+            petState.vx = 0;
+            petState.vy = 0;
+            petState.x = petState.bedX + 10;
+            petState.y = petState.bedY + 8;
+            setPetVisible(false);
+            say('你不理我那我先回去了，好困呀，回窝窝', 1600);
+        }
+
+        function wakeFromSleep() {
+            petState.mode = 'roaming';
             petState.questionOpen = false;
             hideQuestion();
+            setPetVisible(true);
             const hour = new Date().getHours();
             let text = '你好！';
             if (hour < 6) text = '睡了个好觉~';
             else if (hour < 12) text = '早上好';
             else if (hour < 18) text = '叫我啥事？';
-            else text = '你好！';
-            say(text, 1500);
+            say(text, 1400);
             petState.lastInteraction = performance.now();
             setRandomIdleDirection();
-            petState.x = petState.bedX + 16;
-            petState.y = petState.bedY + 18;
+            petState.x = petState.bedX + 18;
+            petState.y = petState.bedY + 14;
             petState.nextIdleSpeechAt = performance.now() + randomRange(2200, 4200);
         }
 
         function handleCorrectAnswer() {
-            petState.questionOpen = false;
             hideQuestion();
             petState.lastInteraction = performance.now();
             petState.running = true;
@@ -541,6 +603,7 @@
             petState.vy = Math.sin(angle) * speed;
             say(correctPhrases[Math.floor(Math.random() * correctPhrases.length)], 1600);
             petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
+            petState.mode = 'roaming';
         }
 
         function handleWrongAnswer() {
@@ -572,14 +635,14 @@
                 if (now > petState.runUntil) {
                     petState.running = false;
                     pet.classList.remove('running');
-                    setRandomIdleDirection();
-                    petState.nextIdleSpeechAt = now + randomRange(2200, 4200);
+                    if (petState.mode !== 'resting' && petState.mode !== 'sleeping') {
+                        setRandomIdleDirection();
+                    }
                 } else {
                     if (now > petState.nextMeowAt) {
                         say('喵喵~', 700);
                         petState.nextMeowAt = now + 550;
                     }
-
                     petState.vx += randomRange(-2.5, 2.5) * delta;
                     petState.vy += randomRange(-2.5, 2.5) * delta;
                     const length = Math.hypot(petState.vx, petState.vy) || 1;
@@ -589,97 +652,81 @@
                         petState.vy = (petState.vy / length) * maxSpeed;
                     }
                 }
-            } else if (petState.sleeping) {
+            }
+
+            if (petState.mode === 'sleeping') {
                 petState.x = petState.bedX + 10;
                 petState.y = petState.bedY + 8;
                 petState.vx = 0;
                 petState.vy = 0;
-            } else if (petState.questionOpen && petState.answerDeadline && now > petState.answerDeadline) {
-                hideQuestion();
-                petState.sleeping = true;
-                petState.atBed = true;
-                petState.x = petState.bedX + 10;
+            } else if (petState.mode === 'resting') {
+                petState.x = petState.bedX + 18;
                 petState.y = petState.bedY + 8;
-                say('你不理我那我先回去了，好困呀，回窝窝', 2100);
-            } else if (petState.atBed) {
-                petState.x += (petState.bedX + 10 - petState.x) * 0.22;
-                petState.y += (petState.bedY + 8 - petState.y) * 0.22;
+                petState.vx = 0;
+                petState.vy = 0;
+
                 if (now > petState.nextQuestionAt) {
-                    beginQuestion();
-                    const expected = Number(mathAnswer.dataset.answer || 0);
-                    if (!Number.isFinite(expected) || expected === 0) {
-                        mathAnswer.dataset.answer = '0';
-                    }
-                }
-            } else if (isPetOutsideViewport()) {
-                petState.returning = true;
-                if (now > petState.nextReturnSpeechAt) {
-                    say(returnPhrases[Math.floor(Math.random() * returnPhrases.length)], 1500);
-                    petState.nextReturnSpeechAt = now + 2200;
+                    generateMathQuestion();
+                    petState.nextQuestionAt = now + randomRange(10000, 30000);
                 }
 
-                const centerX = window.scrollX + window.innerWidth * 0.5;
-                const centerY = window.scrollY + window.innerHeight * 0.5;
-                const targetX = clamp(centerX - petWrap.offsetWidth / 2, 8, Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8));
-                const targetY = clamp(centerY - petWrap.offsetHeight / 2, 8, Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8));
-                const dx = targetX - petState.x;
-                const dy = targetY - petState.y;
-                const distance = Math.hypot(dx, dy) || 1;
-                const speed = 13;
-                petState.vx = (dx / distance) * speed;
-                petState.vy = (dy / distance) * speed;
-                if (distance < 18) {
-                    petState.returning = false;
-                    petState.vx = 0;
-                    petState.vy = 0;
-                    setRandomIdleDirection();
+                if (petState.questionOpen && now > petState.answerDeadline) {
+                    hideQuestion();
+                    enterSleeping();
+                }
+
+                if (now - petState.lastInteraction > 60000) {
+                    enterSleeping();
                 }
             } else {
-                petState.idleTimer -= delta;
-                petState.nextQuestionAt = Math.max(petState.nextQuestionAt, now + 1000);
-                if (petState.idleTimer <= 0) {
-                    setRandomIdleDirection();
+                if (isPetOutsideViewport()) {
+                    petState.mode = 'roaming';
+                    petState.returning = true;
+                    if (now > petState.nextReturnSpeechAt) {
+                        say(returnPhrases[Math.floor(Math.random() * returnPhrases.length)], 1500);
+                        petState.nextReturnSpeechAt = now + 2200;
+                    }
+
+                    const centerX = window.scrollX + window.innerWidth * 0.5;
+                    const centerY = window.scrollY + window.innerHeight * 0.5;
+                    const targetX = clamp(centerX - petWrap.offsetWidth / 2, 8, Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8));
+                    const targetY = clamp(centerY - petWrap.offsetHeight / 2, 8, Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8));
+                    const dx = targetX - petState.x;
+                    const dy = targetY - petState.y;
+                    const distance = Math.hypot(dx, dy) || 1;
+                    const speed = 13;
+                    petState.vx = (dx / distance) * speed;
+                    petState.vy = (dy / distance) * speed;
+                    if (distance < 18) {
+                        petState.vx = 0;
+                        petState.vy = 0;
+                        setRandomIdleDirection();
+                    }
+                } else {
+                    petState.idleTimer -= delta;
+                    if (petState.idleTimer <= 0) {
+                        setRandomIdleDirection();
+                    }
+                    petState.vx *= 0.96;
+                    petState.vy *= 0.96;
+                    if (Math.hypot(petState.vx, petState.vy) < 0.35) {
+                        setRandomIdleDirection();
+                    }
+
+                    if (now > petState.nextIdleSpeechAt) {
+                        const text = idlePhrases[Math.floor(Math.random() * idlePhrases.length)];
+                        say(text, 1400);
+                        petState.nextIdleSpeechAt = now + randomRange(2800, 5200);
+                    }
                 }
 
-                petState.vx *= 0.96;
-                petState.vy *= 0.96;
-                if (Math.hypot(petState.vx, petState.vy) < 0.35) {
-                    setRandomIdleDirection();
-                }
-
-                if (now > petState.nextIdleSpeechAt) {
-                    const text = idlePhrases[Math.floor(Math.random() * idlePhrases.length)];
-                    say(text, 1400);
-                    petState.nextIdleSpeechAt = now + randomRange(2800, 5200);
-                }
-
-                if (now - petState.lastInteraction > 22000 && !petState.atBed) {
-                    petState.atBed = true;
-                    petState.returning = false;
-                    petState.x = petState.bedX + 10;
-                    petState.y = petState.bedY + 8;
-                    petState.nextQuestionAt = now + 500;
-                    say('你不理我那我先回去了，好困呀，回窝窝', 2000);
+                if (now - petState.lastInteraction > 25000) {
+                    enterResting();
                 }
             }
 
             if (petState.questionOpen) {
-                const expected = Number(mathAnswer.dataset.answer || 0);
-                if (!Number.isFinite(expected) || expected === 0) {
-                    const currentPrompt = mathPrompt.textContent.replace(' = ?', '');
-                    const match = currentPrompt.match(/(-?\d+)\s*(\+|\-|×|÷)\s*(-?\d+)/);
-                    if (match) {
-                        const left = Number(match[1]);
-                        const op = match[2];
-                        const right = Number(match[3]);
-                        let result = 0;
-                        if (op === '+') result = left + right;
-                        if (op === '-') result = left - right;
-                        if (op === '×') result = left * right;
-                        if (op === '÷') result = left / right;
-                        mathAnswer.dataset.answer = String(result);
-                    }
-                }
+                positionQuestionBubble();
             }
 
             petState.x += petState.vx * delta;
@@ -690,13 +737,14 @@
 
         pet.addEventListener('click', function() {
             petState.lastInteraction = performance.now();
-            if (petState.sleeping) {
-                wakePetFromBed();
+
+            if (petState.mode === 'sleeping') {
+                wakeFromSleep();
                 return;
             }
+
             petState.running = true;
-            petState.atBed = false;
-            petState.returning = false;
+            petState.mode = 'roaming';
             petState.runUntil = performance.now() + 10000;
             pet.classList.add('running');
             petState.nextMeowAt = performance.now() + 200;
@@ -709,29 +757,41 @@
 
         catBed.addEventListener('click', function() {
             petState.lastInteraction = performance.now();
-            if (petState.sleeping) {
-                wakePetFromBed();
+
+            if (petState.mode === 'sleeping') {
+                wakeFromSleep();
                 return;
             }
-            if (petState.questionOpen) {
-                hideQuestion();
-            }
-            petState.atBed = false;
+
+            petState.mode = 'resting';
             petState.running = false;
-            petState.returning = false;
-            petState.sleeping = false;
-            petState.lastInteraction = performance.now();
-            const greeting = wakePhrases[Math.floor(Math.random() * wakePhrases.length)];
-            say(greeting, 1400);
-            setRandomIdleDirection();
+            petState.questionOpen = false;
+            hideQuestion();
             petState.x = petState.bedX + 18;
-            petState.y = petState.bedY + 14;
+            petState.y = petState.bedY + 8;
+            setPetVisible(true);
+            pet.classList.remove('running');
+            say('叫我啥事？', 1000);
+            petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
         });
 
         catBed.addEventListener('mouseenter', function() {
-            if (!petState.sleeping && !petState.questionOpen) {
+            if (petState.mode !== 'sleeping' && !petState.questionOpen) {
                 say('叫我啥事？', 900);
             }
+        });
+
+        window.addEventListener('scroll', function() {
+            if (petState.mode === 'sleeping') return;
+            if (petState.mode === 'resting') {
+                petState.lastInteraction = performance.now();
+                enterRoaming();
+            }
+        }, { passive: true });
+
+        window.addEventListener('resize', function() {
+            updateBedPosition();
+            if (petState.questionOpen) positionQuestionBubble();
         });
 
         setRandomIdleDirection();
@@ -739,19 +799,8 @@
         petState.nextIdleSpeechAt = performance.now() + 1500;
         petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
         setPetPosition();
+        setPetVisible(true);
         requestAnimationFrame(animate);
-
-        window.addEventListener('resize', updateBedPosition);
-        window.addEventListener('scroll', function() {
-            if (petState.running) return;
-            updateBedPosition();
-            if (petState.sleeping) return;
-            if (isPetOutsideViewport()) {
-                petState.returning = true;
-                petState.atBed = false;
-                say(returnPhrases[Math.floor(Math.random() * returnPhrases.length)], 1200);
-            }
-        }, { passive: true });
     </script>
 </body>
 </html>
