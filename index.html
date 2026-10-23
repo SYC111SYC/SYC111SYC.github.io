@@ -13,6 +13,7 @@
 
         header {
             position: relative;
+            z-index: 10000;                 /* 让猫窝盖住桌宠 */
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -34,6 +35,7 @@
 
         .cat-bed {
             position: relative;
+            z-index: 10000;
             width: 72px;
             height: 52px;
             border: none;
@@ -90,15 +92,19 @@
             border-radius: 50%;
         }
 
+        /* —— 关键改造：固定定位 + 容器不挡点击 —— */
         .pet-wrap {
-            position: absolute;
-            left: 32px;
-            top: 140px;
+            position: fixed;
+            left: 0;
+            top: 0;
             width: 94px;
             height: 94px;
             z-index: 9999;
             user-select: none;
-            pointer-events: auto;
+            pointer-events: none;              /* 容器不挡页面元素 */
+            opacity: 0;
+            transform: translate3d(32px, 140px, 0);
+            will-change: transform;
             transition: opacity 0.2s ease;
         }
 
@@ -109,11 +115,12 @@
             width: 72px;
             height: 72px;
             cursor: pointer;
+            pointer-events: auto;              /* 仅猫本体可点 */
             background: url('images/catball.png') center/contain no-repeat;
             image-rendering: auto;
             filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.18));
             transition: transform 0.15s ease, filter 0.15s ease;
-            will-change: transform, left, top;
+            will-change: transform;
         }
 
         .pet:hover {
@@ -166,8 +173,8 @@
 
         .pet-question {
             position: absolute;
-            left: 110px;
-            top: 58px;
+            left: 88px;
+            top: 4px;
             padding: 10px 12px;
             width: min(250px, calc(100vw - 60px));
             background: rgba(255,255,255,0.95);
@@ -237,11 +244,6 @@
                 left: 64px;
                 max-width: 140px;
             }
-
-            .pet-question {
-                width: min(220px, calc(100vw - 46px));
-                left: 88px;
-            }
         }
     </style>
 </head>
@@ -260,7 +262,7 @@
     </header>
 
     <div class="search-container">
-        <input type="text" id="searchInput" placeholder="搜索帖子标题或内容...">
+        <input type="text" id="searchInput" placeholder="搜索帖子标题或内容..." disabled>
         <p id="searchTip"></p>
     </div>
 
@@ -274,8 +276,8 @@
                 <h4>🦖 小恐龙</h4>
                 <p class="game-tip">按 <kbd>空格</kbd> 跳跃，<kbd>↓</kbd> 下蹲</p>
                 <div class="game-viewport">
-                    <iframe 
-                        src="https://chromedino.com/embed/" 
+                    <iframe
+                        src="https://chromedino.com/embed/"
                         frameborder="0"
                         scrolling="no"
                         class="game-iframe"
@@ -304,503 +306,502 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="js/main.js"></script>
     <script>
-        let allPosts = [];
+    /* =========================================================
+       一、文章加载 / 渲染 / 搜索
+       ========================================================= */
+    let allPosts = [];
+    let dataLoaded = false;
 
-        fetch('posts.json')
-            .then(res => res.json())
-            .then(data => {
-                allPosts = data.posts;
-                renderPosts(allPosts);
-            })
-            .catch(err => {
-                document.getElementById('postList').innerHTML = '<p class="error">加载失败，请检查 posts.json 语法是否正确</p>';
-                console.error(err);
-            });
+    function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
 
-        function renderPosts(posts) {
-            const container = document.getElementById('postList');
-            if (posts.length === 0) {
-                container.innerHTML = '<p>没有找到相关帖子</p>';
-                return;
-            }
-            let html = '';
-            posts.forEach(post => {
-                html += `
-                <article class="post-card">
-                    <h2><a href="post.html?id=${post.id}">${post.title}</a></h2>
-                    <div class="post-meta">${post.date} · 作者：${post.author}</div>
-                    <p class="post-summary">${post.summary}</p>
-                </article>
-                `;
-            });
-            container.innerHTML = html;
-        }
-
-        const searchInput = document.getElementById('searchInput');
-        const searchTip = document.getElementById('searchTip');
-        searchInput.addEventListener('input', function() {
-            const keyword = this.value.trim().toLowerCase();
-            if (!keyword) {
-                searchTip.textContent = '';
-                renderPosts(allPosts);
-                return;
-            }
-            const filtered = allPosts.filter(post => 
-                post.title.toLowerCase().includes(keyword) ||
-                post.summary.toLowerCase().includes(keyword) ||
-                post.content.toLowerCase().includes(keyword)
-            );
-            renderPosts(filtered);
-            searchTip.textContent = `找到 ${filtered.length} 篇相关帖子`;
+    fetch('posts.json')
+        .then(res => res.json())
+        .then(data => {
+            allPosts = Array.isArray(data.posts) ? data.posts : [];
+            dataLoaded = true;
+            renderPosts(allPosts);
+            searchInput.disabled = false;
+        })
+        .catch(err => {
+            document.getElementById('postList').innerHTML =
+                '<p class="error">加载失败，请检查 posts.json 语法是否正确</p>';
+            console.error(err);
         });
 
-        const foldToggle = document.getElementById('foldToggle');
-        const foldContent = document.getElementById('foldContent');
-        const foldArrow = foldToggle.querySelector('.fold-arrow');
-        foldToggle.addEventListener('click', function() {
-            const isOpen = foldContent.classList.toggle('open');
-            foldArrow.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
-        });
+    function renderPosts(posts) {
+        const container = document.getElementById('postList');
+        if (!posts.length) {
+            container.innerHTML = '<p>没有找到相关帖子</p>';
+            return;
+        }
+        container.innerHTML = posts.map(post => `
+            <article class="post-card">
+                <h2><a href="post.html?id=${encodeURIComponent(post.id)}">${esc(post.title)}</a></h2>
+                <div class="post-meta">${esc(post.date)} · 作者：${esc(post.author)}</div>
+                <p class="post-summary">${esc(post.summary)}</p>
+            </article>
+        `).join('');
+    }
 
-        const petWrap = document.getElementById('petWrap');
-        const pet = document.getElementById('pet');
-        const petSpeech = document.getElementById('petSpeech');
-        const petQuestion = document.getElementById('petQuestion');
-        const mathTitle = document.getElementById('mathTitle');
-        const mathPrompt = document.getElementById('mathPrompt');
-        const mathAnswer = document.getElementById('mathAnswer');
-        const mathForm = document.getElementById('mathForm');
-        const catBed = document.getElementById('catBed');
-        let speechTimer = null;
+    const searchInput = document.getElementById('searchInput');
+    const searchTip   = document.getElementById('searchTip');
 
-        const idlePhrases = ['喵~', '喵呜~', '欢迎！', '我是猫球。', '哈哈，快来陪我玩！'];
-        const returnPhrases = ['等等我！', '不要抛弃我！', '我回来了，慢点！'];
-        const correctPhrases = ['真聪明！', '对啦！', '真棒！', '哈哈哈！'];
-        const wrongPhrases = ['不对哦...', '这都能错？？！', '好好练去吧~', '下次再来试试...'];
-        const wakePhrases = ['早上好', '叫我啥事？', '你好！', '睡了个好觉~'];
-        const restLeavePhrases = ['你不理我那我先回去了，好困呀，回窝窝'];
+    searchInput.addEventListener('input', function () {
+        if (!dataLoaded) return;
+        const keyword = this.value.trim().toLowerCase();
+        if (!keyword) {
+            searchTip.textContent = '';
+            renderPosts(allPosts);
+            return;
+        }
+        const filtered = allPosts.filter(post =>
+            (post.title   || '').toLowerCase().includes(keyword) ||
+            (post.summary || '').toLowerCase().includes(keyword) ||
+            (post.content || '').toLowerCase().includes(keyword)
+        );
+        renderPosts(filtered);
+        searchTip.textContent = `找到 ${filtered.length} 篇相关帖子`;
+    });
 
-        const petState = {
-            mode: 'roaming',
-            x: 32,
-            y: 140,
-            vx: 1,
-            vy: 0.6,
-            running: false,
-            questionOpen: false,
-            answerDeadline: 0,
-            runUntil: 0,
-            idleTimer: 0,
-            nextQuestionAt: 0,
-            nextIdleSpeechAt: 0,
-            nextMeowAt: 0,
-            nextReturnSpeechAt: 0,
-            lastInteraction: performance.now(),
-            lastTime: 0,
-            bedX: 0,
-            bedY: 0
-        };
+    /* =========================================================
+       二、折叠面板
+       ========================================================= */
+    const foldToggle  = document.getElementById('foldToggle');
+    const foldContent = document.getElementById('foldContent');
+    const foldArrow   = foldToggle.querySelector('.fold-arrow');
 
-        function randomRange(min, max) {
-            return Math.random() * (max - min) + min;
+    foldToggle.addEventListener('click', () => {
+        const isOpen = foldContent.classList.toggle('open');
+        foldArrow.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+    });
+
+    /* =========================================================
+       三、桌宠系统
+       ========================================================= */
+    const petWrap     = document.getElementById('petWrap');
+    const pet         = document.getElementById('pet');
+    const petSpeech   = document.getElementById('petSpeech');
+    const petQuestion = document.getElementById('petQuestion');
+    const mathTitle   = document.getElementById('mathTitle');
+    const mathPrompt  = document.getElementById('mathPrompt');
+    const mathAnswer  = document.getElementById('mathAnswer');
+    const mathForm    = document.getElementById('mathForm');
+    const catBed      = document.getElementById('catBed');
+
+    let speechTimer    = null;
+    let sleepHideTimer = null;
+    let bubbleKey      = '';
+
+    const idlePhrases    = ['喵~', '喵呜~', '欢迎！', '我是猫球。', '哈哈，快来陪我玩！'];
+    const correctPhrases = ['真聪明！', '对啦！', '真棒！', '哈哈哈！'];
+    const wrongPhrases   = ['不对哦...', '这都能错？？！', '好好练去吧~', '下次再来试试...'];
+
+    const STEP      = 16.67;
+    const MAX_DELTA = 3;
+
+    const petState = {
+        mode: 'roaming',
+        x: 32,
+        y: 140,
+        vx: 1,
+        vy: 0.6,
+        running: false,
+        questionOpen: false,
+        answerDeadline: 0,
+        runUntil: 0,
+        idleTimer: 0,
+        nextQuestionAt: 0,
+        nextIdleSpeechAt: 0,
+        nextMeowAt: 0,
+        lastInteraction: performance.now(),
+        lastTime: 0,
+        bedX: 0,
+        bedY: 0,
+        bedVisible: true
+    };
+
+    /* ---------- 通用工具 ---------- */
+    function randomRange(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+    function randomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    }
+
+    function say(text, duration = 1400) {
+        petSpeech.textContent = text;
+        petSpeech.classList.add('visible');
+        clearTimeout(speechTimer);
+        speechTimer = setTimeout(() => {
+            petSpeech.classList.remove('visible');
+        }, duration);
+    }
+
+    function setPetVisible(visible) {
+        petWrap.style.opacity = visible ? '1' : '0';
+        pet.style.pointerEvents = visible ? 'auto' : 'none';
+        if (!visible) petQuestion.classList.remove('visible');
+    }
+
+    /* ---------- 猫窝位置（视口坐标） ---------- */
+    function updateBedPosition() {
+        const r = catBed.getBoundingClientRect();
+        const visible = r.bottom > 0 && r.top < window.innerHeight &&
+                        r.right > 0 && r.left < window.innerWidth;
+        petState.bedVisible = visible;
+        if (visible) {
+            petState.bedX = r.left + 12;
+            petState.bedY = r.top + 18;
+        }
+    }
+
+    /* ---------- 气泡定位（带缓存，避免每帧写样式） ---------- */
+    function positionQuestionBubble() {
+        if (!petState.questionOpen) return;
+        const key = `${Math.round(petState.x)},${Math.round(petState.y)},${window.innerWidth}`;
+        if (key === bubbleKey) return;
+        bubbleKey = key;
+
+        const bubbleW   = Math.min(250, window.innerWidth - 60);
+        const spaceRight = window.innerWidth - (petState.x + 94) - 12;
+        const left  = spaceRight >= 200 ? 88 : -(Math.min(bubbleW, 190) + 14);
+        const top   = petState.y < 130 ? 74 : -14;
+
+        petQuestion.style.left     = left + 'px';
+        petQuestion.style.top      = top + 'px';
+        petQuestion.style.maxWidth = bubbleW + 'px';
+    }
+
+    /* ---------- 答题 ---------- */
+    function hideQuestion() {
+        petQuestion.classList.remove('visible');
+        petState.questionOpen = false;
+        petState.answerDeadline = 0;
+        mathAnswer.value = '';
+        mathAnswer.dataset.answer = '';
+        bubbleKey = '';
+    }
+
+    function generateMathQuestion() {
+        const a  = randomInt(1, 99);
+        const b  = randomInt(1, 99);
+        const ops = ['+', '-', '*', '÷'];
+        const op  = ops[randomInt(0, ops.length - 1)];
+
+        let expr = '', answer = 0;
+
+        if (op === '+') {
+            expr = `${a} + ${b}`;
+            answer = a + b;
+        } else if (op === '-') {
+            const left  = Math.max(a, b);
+            const right = Math.min(a, b);
+            expr = `${left} - ${right}`;
+            answer = left - right;
+        } else if (op === '*') {
+            expr = `${a} × ${b}`;
+            answer = a * b;
+        } else {
+            const divisor  = randomInt(2, 9);
+            const quotient = randomInt(1, 9);
+            expr = `${divisor * quotient} ÷ ${divisor}`;
+            answer = quotient;
         }
 
-        function randomInt(min, max) {
-            return Math.floor(Math.random() * (max - min + 1)) + min;
+        mathTitle.textContent  = '数学题';
+        mathPrompt.textContent = `${expr} = ?`;
+        mathAnswer.dataset.answer = String(answer);
+        mathAnswer.value = '';
+        petQuestion.classList.add('visible');
+        petState.questionOpen  = true;
+        petState.answerDeadline = performance.now() + 20000;
+        positionQuestionBubble();
+        if (document.activeElement === document.body) {
+            setTimeout(() => mathAnswer.focus({ preventScroll: true }), 30);
         }
+    }
 
-        function clamp(value, min, max) {
-            return Math.min(Math.max(value, min), max);
+    function handleCorrectAnswer() {
+        hideQuestion();
+        petState.lastInteraction = performance.now();
+        petState.running  = true;
+        petState.runUntil = performance.now() + 3000;
+        pet.classList.add('running');
+        const angle = Math.random() * Math.PI * 2;
+        const speed = randomRange(8, 12);
+        petState.vx = Math.cos(angle) * speed;
+        petState.vy = Math.sin(angle) * speed;
+        say(correctPhrases[Math.floor(Math.random() * correctPhrases.length)], 1600);
+        petState.mode = 'roaming';
+        petState.nextIdleSpeechAt = performance.now() + 3000;
+    }
+
+    function handleWrongAnswer() {
+        petState.lastInteraction = performance.now();
+        say(wrongPhrases[Math.floor(Math.random() * wrongPhrases.length)], 1700);
+        mathAnswer.value = '';
+        mathAnswer.focus({ preventScroll: true });
+    }
+
+    mathForm.addEventListener('submit', e => {
+        e.preventDefault();
+        if (!petState.questionOpen) return;
+
+        const raw = mathAnswer.value.trim();
+        if (raw === '') {                                 // 空值拦截
+            mathAnswer.focus({ preventScroll: true });
+            return;
         }
+        const answer   = Number(raw);
+        const expected = Number(mathAnswer.dataset.answer);
+        if (!Number.isFinite(answer)) return;
 
-        function say(text, duration = 1400) {
-            petSpeech.textContent = text;
-            petSpeech.classList.add('visible');
-            clearTimeout(speechTimer);
-            speechTimer = setTimeout(() => {
-                petSpeech.classList.remove('visible');
-            }, duration);
-        }
+        answer === expected ? handleCorrectAnswer() : handleWrongAnswer();
+    });
 
-        function setPetVisible(visible) {
-            petWrap.style.opacity = visible ? '1' : '0';
-            petWrap.style.pointerEvents = visible ? 'auto' : 'none';
-            if (!visible) {
-                petQuestion.classList.remove('visible');
-            }
-        }
+    /* ---------- 状态切换 ---------- */
+    function setRandomIdleDirection() {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = randomRange(0.45, 1.1);
+        petState.vx = Math.cos(angle) * speed;
+        petState.vy = Math.sin(angle) * speed;
+        petState.idleTimer = randomRange(60, 170);
+    }
 
-        function updateBedPosition() {
-            const rect = catBed.getBoundingClientRect();
-            petState.bedX = rect.left + window.scrollX + 12;
-            petState.bedY = rect.top + window.scrollY + 18;
-
-            if (petState.mode === 'sleeping') {
-                petState.x = petState.bedX + 10;
-                petState.y = petState.bedY + 8;
-            }
-            if (petState.mode === 'resting') {
-                petState.x = petState.bedX + 14;
-                petState.y = petState.bedY + 8;
-            }
-        }
-
-        function hideQuestion() {
-            petQuestion.classList.remove('visible');
-            petState.questionOpen = false;
-            petState.answerDeadline = 0;
-            mathAnswer.value = '';
-            mathAnswer.dataset.answer = '';
-        }
-
-        function positionQuestionBubble() {
-            if (!petState.questionOpen) return;
-            const pageLeft = petState.x + petWrap.offsetWidth * 0.5;
-            const viewportX = pageLeft - window.scrollX;
-            let left = 110;
-            if (viewportX < window.innerWidth * 0.38) {
-                left = -200;
-            } else if (viewportX > window.innerWidth * 0.62) {
-                left = 110;
-            }
-            const top = petState.y < window.innerHeight * 0.42 ? 0 : 58;
-            petQuestion.style.left = left + 'px';
-            petQuestion.style.top = top + 'px';
-            petQuestion.style.maxWidth = Math.min(250, window.innerWidth - 50) + 'px';
-        }
-
-        function generateMathQuestion() {
-            const a = randomInt(1, 99);
-            const b = randomInt(1, 99);
-            const ops = ['+', '-', '*', '÷'];
-            const op = ops[randomInt(0, ops.length - 1)];
-
-            let expr = '';
-            let answer = 0;
-
-            if (op === '+') {
-                expr = `${a} + ${b}`;
-                answer = a + b;
-            } else if (op === '-') {
-                const left = Math.max(a, b);
-                const right = Math.min(a, b);
-                expr = `${left} - ${right}`;
-                answer = left - right;
-            } else if (op === '*') {
-                expr = `${a} × ${b}`;
-                answer = a * b;
-            } else {
-                const divisor = randomInt(2, 9);
-                const quotient = randomInt(1, 9);
-                const dividend = divisor * quotient;
-                expr = `${dividend} ÷ ${divisor}`;
-                answer = quotient;
-            }
-
-            mathTitle.textContent = '数学题';
-            mathPrompt.textContent = `${expr} = ?`;
-            mathAnswer.dataset.answer = String(answer);
-            mathAnswer.value = '';
-            petQuestion.classList.add('visible');
-            petState.questionOpen = true;
-            petState.answerDeadline = performance.now() + 60000;
-            positionQuestionBubble();
-            setTimeout(() => mathAnswer.focus(), 30);
-        }
-
-        function setRandomIdleDirection() {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = randomRange(0.45, 1.1);
-            petState.vx = Math.cos(angle) * speed;
-            petState.vy = Math.sin(angle) * speed;
-            petState.idleTimer = randomRange(60, 170);
-        }
-
-        function setPetPosition() {
-            const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
-            const maxY = Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8);
-            petState.x = clamp(petState.x, 8, maxX);
-            petState.y = clamp(petState.y, 8, maxY);
-            petWrap.style.left = petState.x + 'px';
-            petWrap.style.top = petState.y + 'px';
-        }
-
-        function isPetOutsideViewport() {
-            const x = petState.x;
-            const y = petState.y;
-            const right = x + petWrap.offsetWidth;
-            const bottom = y + petWrap.offsetHeight;
-            return right < window.scrollX - 30 ||
-                x > window.scrollX + window.innerWidth + 30 ||
-                bottom < window.scrollY - 30 ||
-                y > window.scrollY + window.innerHeight + 30;
-        }
-
-        function enterRoaming() {
-            petState.mode = 'roaming';
-            petState.questionOpen = false;
-            petQuestion.classList.remove('visible');
-            setPetVisible(true);
-            setRandomIdleDirection();
-            petState.nextIdleSpeechAt = performance.now() + randomRange(2200, 4000);
-            petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
-        }
-
-        function enterResting() {
-            petState.mode = 'resting';
-            petState.running = false;
-            petState.questionOpen = false;
-            petQuestion.classList.remove('visible');
-            setPetVisible(true);
-            petState.x = petState.bedX + 18;
-            petState.y = petState.bedY + 8;
-            petState.vx = 0;
-            petState.vy = 0;
-            petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
-            say('你好！', 1000);
-        }
-
-        function enterSleeping() {
-            petState.mode = 'sleeping';
-            petState.running = false;
-            hideQuestion();
-            petState.questionOpen = false;
-            petState.vx = 0;
-            petState.vy = 0;
-            petState.x = petState.bedX + 10;
-            petState.y = petState.bedY + 8;
-            setPetVisible(false);
-            say('你不理我那我先回去了，好困呀，回窝窝', 1600);
-        }
-
-        function wakeFromSleep() {
-            petState.mode = 'roaming';
-            petState.questionOpen = false;
-            hideQuestion();
-            setPetVisible(true);
-            const hour = new Date().getHours();
-            let text = '你好！';
-            if (hour < 6) text = '睡了个好觉~';
-            else if (hour < 12) text = '早上好';
-            else if (hour < 18) text = '叫我啥事？';
-            say(text, 1400);
-            petState.lastInteraction = performance.now();
-            setRandomIdleDirection();
-            petState.x = petState.bedX + 18;
-            petState.y = petState.bedY + 14;
-            petState.nextIdleSpeechAt = performance.now() + randomRange(2200, 4200);
-        }
-
-        function handleCorrectAnswer() {
-            hideQuestion();
-            petState.lastInteraction = performance.now();
-            petState.running = true;
-            petState.runUntil = performance.now() + 3000;
-            pet.classList.add('running');
-            const angle = Math.random() * Math.PI * 2;
-            const speed = randomRange(8, 12);
-            petState.vx = Math.cos(angle) * speed;
-            petState.vy = Math.sin(angle) * speed;
-            say(correctPhrases[Math.floor(Math.random() * correctPhrases.length)], 1600);
-            petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
-            petState.mode = 'roaming';
-        }
-
-        function handleWrongAnswer() {
-            petState.lastInteraction = performance.now();
-            say(wrongPhrases[Math.floor(Math.random() * wrongPhrases.length)], 1700);
-            mathAnswer.value = '';
-            mathAnswer.focus();
-        }
-
-        mathForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            if (!petState.questionOpen) return;
-            const answer = Number(mathAnswer.value);
-            const expected = Number(mathAnswer.dataset.answer || 0);
-            if (Number.isFinite(answer) && answer === expected) {
-                handleCorrectAnswer();
-            } else {
-                handleWrongAnswer();
-            }
-        });
-
-        function animate(timestamp) {
-            if (!petState.lastTime) petState.lastTime = timestamp;
-            const delta = (timestamp - petState.lastTime) / 16.67;
-            petState.lastTime = timestamp;
-            const now = performance.now();
-
-            if (petState.running) {
-                if (now > petState.runUntil) {
-                    petState.running = false;
-                    pet.classList.remove('running');
-                    if (petState.mode !== 'resting' && petState.mode !== 'sleeping') {
-                        setRandomIdleDirection();
-                    }
-                } else {
-                    if (now > petState.nextMeowAt) {
-                        say('喵喵~', 700);
-                        petState.nextMeowAt = now + 550;
-                    }
-                    petState.vx += randomRange(-2.5, 2.5) * delta;
-                    petState.vy += randomRange(-2.5, 2.5) * delta;
-                    const length = Math.hypot(petState.vx, petState.vy) || 1;
-                    const maxSpeed = 11.5;
-                    if (length > maxSpeed) {
-                        petState.vx = (petState.vx / length) * maxSpeed;
-                        petState.vy = (petState.vy / length) * maxSpeed;
-                    }
-                }
-            }
-
-            if (petState.mode === 'sleeping') {
-                petState.x = petState.bedX + 10;
-                petState.y = petState.bedY + 8;
-                petState.vx = 0;
-                petState.vy = 0;
-            } else if (petState.mode === 'resting') {
-                petState.x = petState.bedX + 18;
-                petState.y = petState.bedY + 8;
-                petState.vx = 0;
-                petState.vy = 0;
-
-                if (now > petState.nextQuestionAt) {
-                    generateMathQuestion();
-                    petState.nextQuestionAt = now + randomRange(10000, 30000);
-                }
-
-                if (petState.questionOpen && now > petState.answerDeadline) {
-                    hideQuestion();
-                    enterSleeping();
-                }
-
-                if (now - petState.lastInteraction > 60000) {
-                    enterSleeping();
-                }
-            } else {
-                if (isPetOutsideViewport()) {
-                    petState.mode = 'roaming';
-                    petState.returning = true;
-                    if (now > petState.nextReturnSpeechAt) {
-                        say(returnPhrases[Math.floor(Math.random() * returnPhrases.length)], 1500);
-                        petState.nextReturnSpeechAt = now + 2200;
-                    }
-
-                    const centerX = window.scrollX + window.innerWidth * 0.5;
-                    const centerY = window.scrollY + window.innerHeight * 0.5;
-                    const targetX = clamp(centerX - petWrap.offsetWidth / 2, 8, Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8));
-                    const targetY = clamp(centerY - petWrap.offsetHeight / 2, 8, Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8));
-                    const dx = targetX - petState.x;
-                    const dy = targetY - petState.y;
-                    const distance = Math.hypot(dx, dy) || 1;
-                    const speed = 13;
-                    petState.vx = (dx / distance) * speed;
-                    petState.vy = (dy / distance) * speed;
-                    if (distance < 18) {
-                        petState.vx = 0;
-                        petState.vy = 0;
-                        setRandomIdleDirection();
-                    }
-                } else {
-                    petState.idleTimer -= delta;
-                    if (petState.idleTimer <= 0) {
-                        setRandomIdleDirection();
-                    }
-                    petState.vx *= 0.96;
-                    petState.vy *= 0.96;
-                    if (Math.hypot(petState.vx, petState.vy) < 0.35) {
-                        setRandomIdleDirection();
-                    }
-
-                    if (now > petState.nextIdleSpeechAt) {
-                        const text = idlePhrases[Math.floor(Math.random() * idlePhrases.length)];
-                        say(text, 1400);
-                        petState.nextIdleSpeechAt = now + randomRange(2800, 5200);
-                    }
-                }
-
-                if (now - petState.lastInteraction > 25000) {
-                    enterResting();
-                }
-            }
-
-            if (petState.questionOpen) {
-                positionQuestionBubble();
-            }
-
-            petState.x += petState.vx * delta;
-            petState.y += petState.vy * delta;
-            setPetPosition();
-            requestAnimationFrame(animate);
-        }
-
-        pet.addEventListener('click', function() {
-            petState.lastInteraction = performance.now();
-
-            if (petState.mode === 'sleeping') {
-                wakeFromSleep();
-                return;
-            }
-
-            petState.running = true;
-            petState.mode = 'roaming';
-            petState.runUntil = performance.now() + 10000;
-            pet.classList.add('running');
-            petState.nextMeowAt = performance.now() + 200;
-            const angle = Math.random() * Math.PI * 2;
-            const speed = randomRange(8, 12);
-            petState.vx = Math.cos(angle) * speed;
-            petState.vy = Math.sin(angle) * speed;
-            say('喵喵喵！', 900);
-        });
-
-        catBed.addEventListener('click', function() {
-            petState.lastInteraction = performance.now();
-
-            if (petState.mode === 'sleeping') {
-                wakeFromSleep();
-                return;
-            }
-
-            petState.mode = 'resting';
-            petState.running = false;
-            petState.questionOpen = false;
-            hideQuestion();
-            petState.x = petState.bedX + 18;
-            petState.y = petState.bedY + 8;
-            setPetVisible(true);
-            pet.classList.remove('running');
-            say('叫我啥事？', 1000);
-            petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
-        });
-
-        catBed.addEventListener('mouseenter', function() {
-            if (petState.mode !== 'sleeping' && !petState.questionOpen) {
-                say('叫我啥事？', 900);
-            }
-        });
-
-        window.addEventListener('scroll', function() {
-            if (petState.mode === 'sleeping') return;
-            if (petState.mode === 'resting') {
-                petState.lastInteraction = performance.now();
-                enterRoaming();
-            }
-        }, { passive: true });
-
-        window.addEventListener('resize', function() {
-            updateBedPosition();
-            if (petState.questionOpen) positionQuestionBubble();
-        });
-
-        setRandomIdleDirection();
-        updateBedPosition();
-        petState.nextIdleSpeechAt = performance.now() + 1500;
-        petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
-        setPetPosition();
+    function enterRoaming() {
+        petState.mode = 'roaming';
+        petState.questionOpen = false;
+        petQuestion.classList.remove('visible');
         setPetVisible(true);
+        setRandomIdleDirection();
+        petState.nextIdleSpeechAt = performance.now() + randomRange(2200, 4000);
+        petState.nextQuestionAt   = performance.now() + randomRange(10000, 30000);
+    }
+
+    function enterResting() {
+        petState.mode = 'resting';
+        petState.running = false;
+        petState.questionOpen = false;
+        petQuestion.classList.remove('visible');
+        setPetVisible(true);
+        petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
+        petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+        petState.vx = petState.vy = 0;
+        petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
+        say('你好！', 1000);
+    }
+
+    function enterSleeping() {
+        petState.mode = 'sleeping';
+        petState.running = false;
+        pet.classList.remove('running');
+        hideQuestion();
+        petState.vx = petState.vy = 0;
+        petState.x = clamp(petState.bedX, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
+        petState.y = clamp(petState.bedY, 8, window.innerHeight - petWrap.offsetHeight - 8);
+        setPetPosition();
+
+        // 先说话，再隐藏（修复原代码中气泡永远看不到的问题）
+        say('你不理我那我先回去了，好困呀，回窝窝', 1200);
+        clearTimeout(sleepHideTimer);
+        sleepHideTimer = setTimeout(() => {
+            if (petState.mode === 'sleeping') setPetVisible(false);
+        }, 1300);
+    }
+
+    function wakeFromSleep() {
+        clearTimeout(sleepHideTimer);
+        sleepHideTimer = null;
+        petState.mode = 'roaming';
+        hideQuestion();
+        setPetVisible(true);
+        petState.lastInteraction = performance.now();
+        petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
+        petState.y = clamp(petState.bedY + 14, 8, window.innerHeight - petWrap.offsetHeight - 8);
+        setRandomIdleDirection();
+        petState.nextIdleSpeechAt = performance.now() + randomRange(2200, 4200);
+
+        const h = new Date().getHours();
+        const text = h < 6 ? '睡了个好觉~' : h < 12 ? '早上好' : h < 18 ? '叫我啥事？' : '你好！';
+        say(text, 1400);
+    }
+
+    /* ---------- 位置更新（视口坐标 + 边界反弹） ---------- */
+    function setPetPosition() {
+        const maxX = Math.max(8, window.innerWidth  - petWrap.offsetWidth  - 8);
+        const maxY = Math.max(8, window.innerHeight - petWrap.offsetHeight - 8);
+
+        if (petState.x < 8)    { petState.x = 8;    petState.vx =  Math.abs(petState.vx) * 0.8; }
+        if (petState.x > maxX) { petState.x = maxX; petState.vx = -Math.abs(petState.vx) * 0.8; }
+        if (petState.y < 8)    { petState.y = 8;    petState.vy =  Math.abs(petState.vy) * 0.8; }
+        if (petState.y > maxY) { petState.y = maxY; petState.vy = -Math.abs(petState.vy) * 0.8; }
+
+        petWrap.style.transform = `translate3d(${petState.x}px, ${petState.y}px, 0)`;
+    }
+
+    /* ---------- 主循环 ---------- */
+    function animate(timestamp) {
+        if (!petState.lastTime) petState.lastTime = timestamp;
+        const delta = Math.min((timestamp - petState.lastTime) / STEP, MAX_DELTA);
+        petState.lastTime = timestamp;
+        const now = performance.now();
+
+        if (petState.mode === 'sleeping') {          // 休眠时不跑物理
+            requestAnimationFrame(animate);
+            return;
+        }
+
+        /* 奔跑状态 */
+        if (petState.running) {
+            if (now > petState.runUntil) {
+                petState.running = false;
+                pet.classList.remove('running');
+                if (petState.mode === 'roaming') setRandomIdleDirection();
+            } else {
+                if (now > petState.nextMeowAt) {
+                    say('喵喵~', 700);
+                    petState.nextMeowAt = now + 550;
+                }
+                petState.vx += randomRange(-2.5, 2.5) * delta;
+                petState.vy += randomRange(-2.5, 2.5) * delta;
+                const len = Math.hypot(petState.vx, petState.vy) || 1;
+                if (len > 11.5) {
+                    petState.vx = petState.vx / len * 11.5;
+                    petState.vy = petState.vy / len * 11.5;
+                }
+            }
+        }
+
+        /* 状态机 */
+        if (petState.mode === 'resting') {
+            petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
+            petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+            petState.vx = petState.vy = 0;
+
+            if (now > petState.nextQuestionAt) {
+                generateMathQuestion();
+                petState.nextQuestionAt = now + randomRange(15000, 30000);
+            }
+            if (now - petState.lastInteraction > 45000) enterSleeping();
+        } else if (petState.mode === 'roaming') {
+            petState.idleTimer -= delta;
+            if (petState.idleTimer <= 0) setRandomIdleDirection();
+
+            petState.vx *= 0.96;
+            petState.vy *= 0.96;
+            if (Math.hypot(petState.vx, petState.vy) < 0.35) setRandomIdleDirection();
+
+            if (now > petState.nextIdleSpeechAt) {
+                say(idlePhrases[Math.floor(Math.random() * idlePhrases.length)], 1400);
+                petState.nextIdleSpeechAt = now + randomRange(2800, 5200);
+            }
+            if (now - petState.lastInteraction > 25000) enterResting();
+        }
+
+        /* 答题超时（统一处理，不再局限于 resting） */
+        if (petState.questionOpen && now > petState.answerDeadline) {
+            hideQuestion();
+            say('时间到啦~', 1200);
+        }
+
+        petState.x += petState.vx * delta;
+        petState.y += petState.vy * delta;
+        setPetPosition();
+        if (petState.questionOpen) positionQuestionBubble();
         requestAnimationFrame(animate);
+    }
+
+    /* ---------- 交互事件 ---------- */
+    pet.addEventListener('click', () => {
+        petState.lastInteraction = performance.now();
+
+        if (petState.mode === 'sleeping') {
+            wakeFromSleep();
+            return;
+        }
+
+        petState.running  = true;
+        petState.mode     = 'roaming';
+        petState.runUntil = performance.now() + 10000;
+        pet.classList.add('running');
+        petState.nextMeowAt = performance.now() + 200;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = randomRange(8, 12);
+        petState.vx = Math.cos(angle) * speed;
+        petState.vy = Math.sin(angle) * speed;
+        say('喵喵喵！', 900);
+    });
+
+    catBed.addEventListener('click', () => {
+        petState.lastInteraction = performance.now();
+
+        if (petState.mode === 'sleeping') {
+            wakeFromSleep();
+            return;
+        }
+
+        petState.mode = 'resting';
+        petState.running = false;
+        hideQuestion();
+        petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
+        petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+        setPetVisible(true);
+        pet.classList.remove('running');
+        say('叫我啥事？', 1000);
+        petState.nextQuestionAt = performance.now() + randomRange(10000, 30000);
+    });
+
+    catBed.addEventListener('pointerenter', () => {
+        if (petState.mode === 'sleeping') {
+            say('点我一下叫醒猫球~', 1200);
+        } else if (!petState.questionOpen) {
+            say('叫我啥事？', 900);
+        }
+    });
+
+    /* ---------- 视口事件 ---------- */
+    window.addEventListener('scroll', () => {
+        updateBedPosition();
+        // 猫窝滚出视野时，休息中的猫球应恢复漫游
+        if (petState.mode === 'resting' && !petState.bedVisible) {
+            enterRoaming();
+        }
+    }, { passive: true });
+
+    window.addEventListener('resize', () => {
+        updateBedPosition();
+        if (petState.mode === 'resting' && petState.bedVisible) {
+            petState.x = clamp(petState.bedX + 18, 8, window.innerWidth  - petWrap.offsetWidth  - 8);
+            petState.y = clamp(petState.bedY + 8,  8, window.innerHeight - petWrap.offsetHeight - 8);
+        }
+        setPetPosition();
+        positionQuestionBubble();
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) petState.lastTime = 0;   // 切回前台重置时间基准
+    });
+
+    /* ---------- 启动 ---------- */
+    window.addEventListener('load', () => {
+        updateBedPosition();
+        setPetPosition();
+    });
+
+    updateBedPosition();
+    setRandomIdleDirection();
+    petState.nextIdleSpeechAt = performance.now() + 1500;
+    petState.nextQuestionAt   = performance.now() + randomRange(10000, 30000);
+    setPetPosition();
+    setPetVisible(true);
+    requestAnimationFrame(animate);
     </script>
 </body>
 </html>
