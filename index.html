@@ -89,7 +89,7 @@
             transform: translateY(0);
         }
 
-        /* ---------- 新增：猫粮状态栏 ---------- */
+        /* ---------- 猫粮状态栏 ---------- */
         .pet-food-bar {
             display: flex;
             align-items: center;
@@ -162,6 +162,91 @@
             cursor: not-allowed;
         }
 
+        /* 猫粮槽位 */
+        .food-slot {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            border: 2px dashed rgba(210, 160, 90, 0.55);
+            background: rgba(255, 255, 255, 0.55);
+            flex: 0 0 auto;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .food-slot.empty {
+            border-color: rgba(190, 190, 190, 0.5);
+            background: rgba(250, 250, 250, 0.4);
+        }
+
+        .food-slot.empty::after {
+            content: "空";
+            font-size: 12px;
+            color: #b8a888;
+            letter-spacing: 1px;
+        }
+
+        .food-slot.empty .draggable-food {
+            display: none;
+        }
+
+        .food-slot.locked .draggable-food {
+            cursor: not-allowed;
+            filter: grayscale(0.4);
+            opacity: 0.65;
+        }
+
+        .draggable-food {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffe0b0, #ffbf66 55%, #e8963f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            line-height: 1;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            box-shadow: 0 2px 6px rgba(180, 120, 40, 0.35);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .draggable-food:hover {
+            transform: scale(1.1);
+        }
+
+        .draggable-food.dragging {
+            cursor: grabbing;
+            transform: scale(1.15);
+            box-shadow: 0 6px 14px rgba(180, 120, 40, 0.5);
+        }
+
+        .draggable-food.floating {
+            position: absolute;
+            z-index: 10000;
+            margin: 0;
+            transition: none;
+            box-shadow: 0 8px 18px rgba(180, 120, 40, 0.5);
+        }
+
+        .draggable-food.caught {
+            cursor: default;
+            z-index: 9998;
+            box-shadow: 0 0 0 3px rgba(255, 150, 100, 0.45), 0 2px 6px rgba(180, 120, 40, 0.35);
+        }
+
+        .draggable-food.gone {
+            transform: scale(0.1);
+            opacity: 0;
+            transition: transform 0.45s ease, opacity 0.45s ease;
+        }
+
         @media (max-width: 500px) {
             .pet-food-btn {
                 margin-left: 0;
@@ -169,7 +254,7 @@
             }
         }
 
-        /* ---------- 新增：每日运势 ---------- */
+        /* ---------- 每日运势 ---------- */
         .daily-fortune-card {
             display: flex;
             align-items: center;
@@ -300,14 +385,17 @@
         </nav>
     </header>
 
-    <!-- 新增：猫粮状态栏 -->
+    <!-- 猫粮状态栏（含可拖动猫粮槽位） -->
     <div class="pet-food-bar">
         <span class="pet-food-info">🍖 猫粮：<strong id="foodCount">0</strong></span>
         <span class="pet-food-status" id="feedStatus">今天还没喂</span>
+        <div class="food-slot" id="foodSlot">
+            <div class="draggable-food" id="draggableFood" title="拖动我去喂猫">🍖</div>
+        </div>
         <button class="pet-food-btn" id="feedBtn" type="button">喂猫 🐱</button>
     </div>
 
-    <!-- 新增：每日运势 -->
+    <!-- 每日运势 -->
     <div class="daily-fortune-card" id="dailyFortune">
         <div class="fortune-level" id="fortuneLevel">…</div>
         <div class="fortune-main">
@@ -418,7 +506,7 @@
         });
 
         /* =========================================================
-           桌宠系统（原有）
+           桌宠系统
            ========================================================= */
         const petWrap = document.getElementById('petWrap');
         const pet = document.getElementById('pet');
@@ -439,7 +527,11 @@
             nextIdleSpeechAt: 0,
             nextMeowAt: 0,
             nextReturnSpeechAt: 0,
-            lastTime: 0
+            lastTime: 0,
+            /* 新增：追逐 / 吃 状态 */
+            chasingFood: false,
+            eating: false,
+            nextEatSpeechAt: 0
         };
 
         function randomRange(min, max) {
@@ -492,7 +584,37 @@
             const delta = (timestamp - petState.lastTime) / 16.67;
             petState.lastTime = timestamp;
 
-            if (petState.running) {
+            /* --- 追逐食物（优先级最高） --- */
+            if (petState.chasingFood && foodDrag.active && !foodDrag.caught) {
+                const fc = getFoodCenter();
+                const pcx = petState.x + petWrap.offsetWidth / 2;
+                const pcy = petState.y + petWrap.offsetHeight / 2;
+                const dx = fc.x - pcx;
+                const dy = fc.y - pcy;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < CATCH_DISTANCE) {
+                    catchFood();
+                } else {
+                    const speed = 13;
+                    petState.vx = (dx / dist) * speed;
+                    petState.vy = (dy / dist) * speed;
+
+                    if (timestamp > petState.nextMeowAt) {
+                        say('喵喵~', 700);
+                        petState.nextMeowAt = timestamp + 700;
+                    }
+                }
+            /* --- 吃东西（基本静止） --- */
+            } else if (petState.eating) {
+                petState.vx = 0;
+                petState.vy = 0;
+
+                if (timestamp > petState.nextEatSpeechAt) {
+                    say(EAT_PHRASES[Math.floor(Math.random() * EAT_PHRASES.length)], 520);
+                    petState.nextEatSpeechAt = timestamp + 300 + Math.random() * 300;
+                }
+            } else if (petState.running) {
                 if (timestamp > petState.runUntil) {
                     petState.running = false;
                     pet.classList.remove('running');
@@ -579,22 +701,27 @@
 
         window.addEventListener('resize', setPetPosition);
         window.addEventListener('scroll', function() {
-            if (!petState.running && isPetOutsideViewport()) {
+            if (!petState.running && !petState.chasingFood && !petState.eating && isPetOutsideViewport()) {
                 petState.nextReturnSpeechAt = performance.now();
             }
         }, { passive: true });
 
         /* =========================================================
-           新增：猫粮系统
+           猫粮系统（含拖拽喂猫）
            ========================================================= */
-        const FOOD_KEY        = 'catball_food_v1';           // 猫粮数量
-        const FEED_DATE_KEY   = 'catball_feed_date_v1';      // 上次喂食日期 YYYY-MM-DD
+        const FOOD_KEY        = 'catball_food_v1';
+        const FEED_DATE_KEY   = 'catball_feed_date_v1';
 
         const foodCountEl     = document.getElementById('foodCount');
         const feedStatusEl    = document.getElementById('feedStatus');
         const feedBtn         = document.getElementById('feedBtn');
+        const foodSlotEl      = document.getElementById('foodSlot');
+        const draggableFood   = document.getElementById('draggableFood');
 
-        // localStorage 安全封装（隐私模式下会抛错）
+        const FOOD_SIZE       = 34;
+        const CATCH_DISTANCE  = 42;
+        const EAT_PHRASES     = ['啊呜', '咔嚓咔嚓', '吧唧吧唧', '喵呜~', '好吃！', '嚼嚼嚼...', '啊呜啊呜'];
+
         function safeGet(key) {
             try { return localStorage.getItem(key); } catch (e) { return null; }
         }
@@ -602,7 +729,6 @@
             try { localStorage.setItem(key, value); } catch (e) { /* 忽略 */ }
         }
 
-        // 本地日期（不涉及时区，用本地 0 点做日界）
         function todayStr() {
             const d = new Date();
             const y = d.getFullYear();
@@ -611,7 +737,6 @@
             return `${y}-${m}-${day}`;
         }
 
-        // 本地“昨天”（用于连续签到判定）
         function yesterdayStr() {
             const d = new Date();
             d.setDate(d.getDate() - 1);
@@ -649,11 +774,270 @@
             }, 350);
         }
 
+        /* ---------- 食物拖拽状态 ---------- */
+        const foodDrag = {
+            active: false,     // 食物是否已浮出到 body 上
+            dragging: false,   // 是否正在被用户拖动
+            caught: false,     // 是否已被猫球抓住
+            pointerId: null,
+            offsetX: 0,
+            offsetY: 0,
+            x: 0,              // 文档坐标（左上角）
+            y: 0
+        };
+
+        function getFoodCenter() {
+            return {
+                x: foodDrag.x + FOOD_SIZE / 2,
+                y: foodDrag.y + FOOD_SIZE / 2
+            };
+        }
+
+        function floatFood() {
+            const rect = draggableFood.getBoundingClientRect();
+            foodDrag.x = rect.left + window.scrollX;
+            foodDrag.y = rect.top + window.scrollY;
+
+            document.body.appendChild(draggableFood);
+            draggableFood.classList.add('floating');
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+            draggableFood.style.transform = '';
+
+            foodDrag.active = true;
+            updateFoodUI();
+        }
+
+        function resetFoodToSlot() {
+            draggableFood.classList.remove('floating', 'caught', 'dragging', 'gone');
+            draggableFood.style.transition = 'none';
+            draggableFood.style.left = '';
+            draggableFood.style.top = '';
+            draggableFood.style.transform = '';
+            draggableFood.style.opacity = '';
+            foodSlotEl.appendChild(draggableFood);
+            void draggableFood.offsetWidth;
+            draggableFood.style.transition = '';
+
+            foodDrag.active = false;
+            foodDrag.dragging = false;
+            foodDrag.caught = false;
+            foodDrag.pointerId = null;
+            updateFoodUI();
+        }
+
+        function moveFoodTo(clientX, clientY) {
+            foodDrag.x = clientX + window.scrollX - foodDrag.offsetX;
+            foodDrag.y = clientY + window.scrollY - foodDrag.offsetY;
+
+            const maxX = Math.max(0, document.documentElement.scrollWidth - FOOD_SIZE);
+            const maxY = Math.max(0, document.documentElement.scrollHeight - FOOD_SIZE);
+            foodDrag.x = clamp(foodDrag.x, 0, maxX);
+            foodDrag.y = clamp(foodDrag.y, 0, maxY);
+
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+        }
+
+        draggableFood.addEventListener('pointerdown', function(e) {
+            if (foodDrag.caught) return;
+            if (petState.eating) return;
+            if (hasFedToday()) {
+                say('今天已经吃过啦，明天再来~', 1800);
+                return;
+            }
+            if (getFoodCount() < 1) {
+                say('还没有猫粮…去看看帖子攒猫粮喵~', 2200);
+                return;
+            }
+
+            e.preventDefault();
+
+            const rect = draggableFood.getBoundingClientRect();
+            foodDrag.offsetX = e.clientX - rect.left;
+            foodDrag.offsetY = e.clientY - rect.top;
+            foodDrag.pointerId = e.pointerId;
+            foodDrag.dragging = true;
+
+            draggableFood.classList.add('dragging');
+            try { draggableFood.setPointerCapture(e.pointerId); } catch (err) {}
+
+            if (!foodDrag.active) {
+                floatFood();
+            }
+
+            // 打断其它状态，进入追逐
+            petState.running = false;
+            pet.classList.remove('running');
+            petState.chasingFood = true;
+            petState.nextMeowAt = performance.now() + 200;
+            say('小鱼干！等我！', 1000);
+        });
+
+        draggableFood.addEventListener('pointermove', function(e) {
+            if (!foodDrag.dragging) return;
+            if (e.pointerId !== foodDrag.pointerId) return;
+            moveFoodTo(e.clientX, e.clientY);
+        });
+
+        function endFoodDrag(e) {
+            if (!foodDrag.dragging) return;
+            if (e && foodDrag.pointerId !== null && e.pointerId !== foodDrag.pointerId) return;
+
+            foodDrag.dragging = false;
+            draggableFood.classList.remove('dragging');
+
+            try {
+                if (foodDrag.pointerId !== null) draggableFood.releasePointerCapture(foodDrag.pointerId);
+            } catch (err) {}
+            foodDrag.pointerId = null;
+
+            // 拖回槽位附近 → 取消喂食
+            if (!foodDrag.caught && foodDrag.active) {
+                const slotRect = foodSlotEl.getBoundingClientRect();
+                const slotCx = slotRect.left + slotRect.width / 2;
+                const slotCy = slotRect.top + slotRect.height / 2;
+                const foodRect = draggableFood.getBoundingClientRect();
+                const foodCx = foodRect.left + foodRect.width / 2;
+                const foodCy = foodRect.top + foodRect.height / 2;
+                const distToSlot = Math.hypot(foodCx - slotCx, foodCy - slotCy);
+
+                if (distToSlot < 40) {
+                    resetFoodToSlot();
+                    petState.chasingFood = false;
+                    setRandomIdleDirection();
+                }
+            }
+        }
+
+        draggableFood.addEventListener('pointerup', endFoodDrag);
+        draggableFood.addEventListener('pointercancel', endFoodDrag);
+
+        function catchFood() {
+            if (!petState.chasingFood) return;
+
+            foodDrag.caught = true;
+            foodDrag.dragging = false;
+            petState.chasingFood = false;
+            petState.vx = 0;
+            petState.vy = 0;
+
+            try {
+                if (foodDrag.pointerId !== null) draggableFood.releasePointerCapture(foodDrag.pointerId);
+            } catch (err) {}
+            foodDrag.pointerId = null;
+
+            draggableFood.classList.remove('dragging');
+            draggableFood.classList.add('caught');
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+
+            startEating();
+        }
+
+        function startEating() {
+            petState.eating = true;
+            petState.vx = 0;
+            petState.vy = 0;
+            petState.nextEatSpeechAt = performance.now() + 600;
+
+            say('啊呜~', 650);
+
+            // 1.2 秒后猫粮缩小消失
+            setTimeout(() => {
+                draggableFood.classList.add('gone');
+            }, 1200);
+
+            // 1.8 秒后吃完
+            setTimeout(finishEating, 1800);
+        }
+
+        function finishEating() {
+            petState.eating = false;
+
+            // 食物复位回槽位（禁用过渡，瞬间复位）
+            draggableFood.classList.remove('gone', 'caught', 'floating', 'dragging');
+            draggableFood.style.transition = 'none';
+            draggableFood.style.left = '';
+            draggableFood.style.top = '';
+            draggableFood.style.transform = '';
+            draggableFood.style.opacity = '';
+            foodSlotEl.appendChild(draggableFood);
+            void draggableFood.offsetWidth;
+            draggableFood.style.transition = '';
+
+            foodDrag.active = false;
+            foodDrag.caught = false;
+            foodDrag.dragging = false;
+            foodDrag.pointerId = null;
+
+            // 扣粮 + 记录喂食
+            const count = getFoodCount();
+            setFoodCount(Math.max(0, count - 1));
+            safeSet(FEED_DATE_KEY, todayStr());
+            updateFoodUI();
+
+            // 开心跑 3 秒
+            petState.running = true;
+            petState.runUntil = performance.now() + 3000;
+            pet.classList.add('running');
+            petState.nextMeowAt = performance.now() + 250;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = randomRange(9, 12);
+            petState.vx = Math.cos(angle) * speed;
+            petState.vy = Math.sin(angle) * speed;
+
+            say('好吃！最喜欢你啦喵~', 1800);
+            setTimeout(() => say('喵呜~ 🍖', 1200), 1900);
+        }
+
+        /* 快捷喂食：点击按钮自动把猫粮弹到猫球附近 */
+        feedBtn.addEventListener('click', function() {
+            if (hasFedToday()) {
+                say('我今天已经吃过啦，明天再来~', 1800);
+                return;
+            }
+            if (getFoodCount() < 1) {
+                say('还没有猫粮…去看看帖子攒猫粮喵~', 2200);
+                return;
+            }
+            if (foodDrag.active || petState.eating) return;
+
+            floatFood();
+
+            const targetX = petState.x + 140 + Math.random() * 80;
+            const targetY = petState.y - 60 + Math.random() * 120;
+            const maxX = Math.max(0, document.documentElement.scrollWidth - FOOD_SIZE);
+            const maxY = Math.max(0, document.documentElement.scrollHeight - FOOD_SIZE);
+            foodDrag.x = clamp(targetX, 0, maxX);
+            foodDrag.y = clamp(targetY, 0, maxY);
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+
+            petState.running = false;
+            pet.classList.remove('running');
+            petState.chasingFood = true;
+            petState.nextMeowAt = performance.now() + 200;
+            say('小鱼干！等我！', 1000);
+        });
+
         function updateFoodUI() {
             const count = getFoodCount();
             const fed = hasFedToday();
 
             foodCountEl.textContent = count;
+
+            // 槽位状态
+            if (foodDrag.active || count < 1) {
+                foodSlotEl.classList.add('empty');
+            } else {
+                foodSlotEl.classList.remove('empty');
+            }
+            if (!foodDrag.active && fed && count > 0) {
+                foodSlotEl.classList.add('locked');
+            } else {
+                foodSlotEl.classList.remove('locked');
+            }
 
             if (fed) {
                 feedStatusEl.textContent = '今日已喂 ✅（明天再来）';
@@ -666,83 +1050,57 @@
                 feedBtn.disabled = true;
                 feedBtn.textContent = '猫粮不足';
             } else {
-                feedStatusEl.textContent = '今天还没喂，快点我~';
+                feedStatusEl.textContent = '拖动猫粮喂我，或点喂猫~';
                 feedStatusEl.classList.remove('fed');
                 feedBtn.disabled = false;
                 feedBtn.textContent = '喂猫 🐱';
             }
         }
 
-        // 喂猫
-        function feedCat() {
-            if (hasFedToday()) {
-                say('我今天已经吃过啦，明天再来~', 1800);
-                return;
-            }
-            const count = getFoodCount();
-            if (count < 1) {
-                say('还没有猫粮…去看看帖子攒猫粮喵~', 2200);
-                return;
-            }
-
-            // 扣粮 + 记录今日
-            setFoodCount(count - 1);
-            safeSet(FEED_DATE_KEY, todayStr());
-
-            // 开心乱跑 3 秒
-            petState.running = true;
-            petState.runUntil = performance.now() + 3000;
-            pet.classList.add('running');
-            petState.nextMeowAt = performance.now() + 250;
-            const angle = Math.random() * Math.PI * 2;
-            const speed = randomRange(9, 12);
-            petState.vx = Math.cos(angle) * speed;
-            petState.vy = Math.sin(angle) * speed;
-
-            say('好吃！最喜欢你啦喵~', 1800);
-            setTimeout(() => say('喵呜~ 🍖', 1200), 1900);
-
-            updateFoodUI();
-        }
-
-        feedBtn.addEventListener('click', feedCat);
-
-        /* 浏览帖子 → +1 猫粮（事件委托，动态渲染也生效） */
+        /* 浏览帖子 → +1 猫粮 */
         document.getElementById('postList').addEventListener('click', function(e) {
             const link = e.target.closest('a[href*="post.html"]');
             if (!link) return;
             addFood(1);
-            // 页面马上会跳转，所以不 say，用户返回时猫粮数已经是新值
         });
 
-        /* 跨标签页同步（其他标签喂/得粮时，本页 UI 自动刷新） */
+        /* 跨标签页同步 */
         window.addEventListener('storage', function(e) {
             if (e.key === FOOD_KEY || e.key === FEED_DATE_KEY) {
+                if (foodDrag.active && !foodDrag.caught) {
+                    resetFoodToSlot();
+                    petState.chasingFood = false;
+                }
                 updateFoodUI();
+            }
+            if (e.key === FORTUNE_KEY || e.key === FORTUNE_STREAK_KEY) {
+                renderFortune();
             }
         });
 
-        /* 跨午夜自动解禁（保持页面长时间打开也能重置） */
+        /* 跨午夜自动刷新 */
         let lastToday = todayStr();
         setInterval(function() {
             const cur = todayStr();
             if (cur !== lastToday) {
                 lastToday = cur;
+                if (foodDrag.active && !foodDrag.caught) {
+                    resetFoodToSlot();
+                    petState.chasingFood = false;
+                }
                 updateFoodUI();
             }
         }, 60 * 1000);
 
-        /* 初始化 */
         updateFoodUI();
 
         /* =========================================================
-           新增：每日运势（需签到，数据存在浏览器本地，每个用户独立）
+           每日运势（需签到，数据存在浏览器本地）
            ========================================================= */
-        const FORTUNE_KEY        = 'catball_fortune_v1';         // 当天运势 {date, level, cls, good, bad}
-        const FORTUNE_STREAK_KEY = 'catball_fortune_streak_v1';  // 连续签到 {last, count}
-        const FORTUNE_UID_KEY    = 'catball_fortune_uid_v1';     // 用户唯一标识（保证每人不同）
+        const FORTUNE_KEY        = 'catball_fortune_v1';
+        const FORTUNE_STREAK_KEY = 'catball_fortune_streak_v1';
+        const FORTUNE_UID_KEY    = 'catball_fortune_uid_v1';
 
-        // 等级与权重（总和 100）
         const FORTUNE_LEVELS = [
             { name: '大吉',   weight: 8,  cls: 'lv-daji' },
             { name: '中吉',   weight: 15, cls: 'lv-zhongji' },
@@ -754,7 +1112,6 @@
             { name: '？？？', weight: 2,  cls: 'lv-mystery' }
         ];
 
-        // 猫猫「宜」
         const FORTUNE_GOOD = [
             '撸猫', '投喂小鱼干', '晒太阳', '钻进纸箱', '给猫球梳毛', '打呼噜',
             '追激光笔', '蹭腿', '踩奶', '观察窗外的小鸟', '安静地喵一声',
@@ -762,7 +1119,6 @@
             '收下猫主子的踩奶', '对着月亮喵喵叫', '给猫球让出沙发'
         ];
 
-        // 猫猫「忌」
         const FORTUNE_BAD = [
             '给猫洗澡', '剪指甲', '深夜跑酷', '抓沙发', '打翻水杯', '踩猫尾巴',
             '抢猫粮', '强行抱抱', '喂巧克力', '对着猫学狗叫', '挪动猫窝',
@@ -776,7 +1132,6 @@
         const fortuneLinesEl  = document.getElementById('fortuneLines');
         const fortuneSignBtn  = document.getElementById('fortuneSignBtn');
 
-        // 用户唯一标识（首次访问生成并持久化）
         function getFortuneUid() {
             let uid = safeGet(FORTUNE_UID_KEY);
             if (!uid) {
@@ -786,7 +1141,6 @@
             return uid;
         }
 
-        // 字符串 → 32 位种子（FNV-1a）
         function fortuneSeed(str) {
             let h = 2166136261 >>> 0;
             for (let i = 0; i < str.length; i++) {
@@ -796,7 +1150,6 @@
             return h >>> 0;
         }
 
-        // 可复现的伪随机数（mulberry32）
         function makeRand(seed) {
             let a = seed >>> 0;
             return function () {
@@ -818,7 +1171,6 @@
             return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
         }
 
-        // 生成运势：种子 = 用户唯一 ID + 日期 → 每人不同、同人同日固定
         function generateFortune(dateStr) {
             const uid = getFortuneUid();
             const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
@@ -839,7 +1191,6 @@
             return { date: dateStr, level: lv.name, cls: lv.cls, good: good, bad: bad };
         }
 
-        // 今日已签到则返回运势对象，否则返回 null
         function getTodayFortune() {
             const raw = safeGet(FORTUNE_KEY);
             if (!raw) return null;
@@ -854,7 +1205,6 @@
             safeSet(FORTUNE_KEY, JSON.stringify(f));
         }
 
-        // 连续签到数据
         function getStreak() {
             const raw = safeGet(FORTUNE_STREAK_KEY);
             if (!raw) return { last: '', count: 0 };
@@ -869,13 +1219,12 @@
             safeSet(FORTUNE_STREAK_KEY, JSON.stringify(s));
         }
 
-        // 当前展示的连续天数（未签到时用于提示“已连续 N 天”）
         function currentStreakDisplay() {
             const s = getStreak();
             const today = todayStr();
             if (s.last === today) return s.count;
-            if (s.last === yesterdayStr()) return s.count;   // 还在连续中
-            return 0;                                        // 已断签
+            if (s.last === yesterdayStr()) return s.count;
+            return 0;
         }
 
         function makeFortuneLine(type, text) {
@@ -899,7 +1248,6 @@
             fortuneDateEl.textContent = today;
 
             if (f) {
-                // 已签到：显示运势
                 fortuneLevelEl.textContent = f.level;
                 fortuneLevelEl.className = 'fortune-level ' + f.cls;
                 fortuneLinesEl.innerHTML = '';
@@ -912,7 +1260,6 @@
                 fortuneSignBtn.style.display = 'none';
                 fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 连续签到 ${streakDisplay} 天` : '';
             } else {
-                // 未签到：隐藏运势内容，显示签到按钮
                 fortuneLevelEl.textContent = '？';
                 fortuneLevelEl.className = 'fortune-level lv-pending';
 
@@ -927,7 +1274,6 @@
             }
         }
 
-        // 签到：抽运势 + 更新连续天数
         function signFortune() {
             const today = todayStr();
             const yesterday = yesterdayStr();
@@ -935,11 +1281,11 @@
 
             let newCount;
             if (s.last === today) {
-                newCount = s.count;              // 今天已签（理论到不了这里）
+                newCount = s.count;
             } else if (s.last === yesterday) {
-                newCount = s.count + 1;          // 昨天也签了 → 连续 +1
+                newCount = s.count + 1;
             } else {
-                newCount = 1;                    // 断签 / 首次 → 重置为 1
+                newCount = 1;
             }
 
             setStreak({ last: today, count: newCount });
@@ -951,17 +1297,6 @@
 
         fortuneSignBtn.addEventListener('click', signFortune);
 
-        /* 跨标签页同步（其他标签签到后本页刷新运势） */
-        window.addEventListener('storage', function(e) {
-            if (e.key === FORTUNE_KEY || e.key === FORTUNE_STREAK_KEY) {
-                renderFortune();
-            }
-        });
-
-        /* 初始化 */
-        renderFortune();
-
-        /* 跨午夜自动切换为“未签到”状态 */
         let lastFortuneDate = todayStr();
         setInterval(function () {
             const cur = todayStr();
@@ -970,6 +1305,8 @@
                 renderFortune();
             }
         }, 60 * 1000);
+
+        renderFortune();
     </script>
 </body>
 </html>
