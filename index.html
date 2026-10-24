@@ -168,6 +168,95 @@
                 width: 100%;
             }
         }
+
+        /* ---------- 新增：每日运势 ---------- */
+        .daily-fortune-card {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px 18px;
+            margin: 8px 18px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #fffdf7, #eef4ff);
+            border: 1px solid rgba(150, 160, 200, 0.28);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(90, 110, 180, 0.08);
+        }
+
+        .fortune-level {
+            flex: 0 0 auto;
+            min-width: 86px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 22px;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: 2px;
+            text-align: center;
+            white-space: nowrap;
+            border: 2px solid transparent;
+        }
+
+        .fortune-level.lv-daji      { color: #d4380d; background: #fff3e8; border-color: #ffb08a; }
+        .fortune-level.lv-zhongji   { color: #d46b08; background: #fff8e6; border-color: #ffd591; }
+        .fortune-level.lv-xiaoji    { color: #ad8b00; background: #fffbe6; border-color: #ffe58f; }
+        .fortune-level.lv-ping      { color: #4a5568; background: #f7f9fc; border-color: #cbd5e0; }
+        .fortune-level.lv-xiaoxiong { color: #3c7a89; background: #eff9fb; border-color: #a8d8e2; }
+        .fortune-level.lv-xiong     { color: #4a5568; background: #f0f2f5; border-color: #b8c0cc; }
+        .fortune-level.lv-daxiong   { color: #2d3748; background: #e8eaee; border-color: #9aa3b0; }
+        .fortune-level.lv-mystery   { color: #8e44ad; background: #f8f2ff; border-color: #d3b3ef; letter-spacing: 0; }
+
+        .fortune-main {
+            flex: 1 1 200px;
+            min-width: 0;
+        }
+
+        .fortune-head {
+            font-size: 13px;
+            color: #8a94a6;
+            margin-bottom: 6px;
+        }
+
+        .fortune-date {
+            margin-left: 8px;
+            color: #b0b8c6;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .fortune-lines {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 20px;
+            font-size: 14px;
+        }
+
+        .fortune-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+        }
+
+        .fortune-item .lbl {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .fortune-good { color: #2f8a2f; }
+        .fortune-good .lbl { background: #e3f5e3; }
+        .fortune-bad { color: #c0392b; }
+        .fortune-bad .lbl { background: #fdeaea; }
+
+        @media (max-width: 500px) {
+            .daily-fortune-card { gap: 10px; }
+            .fortune-level { min-width: 72px; font-size: 20px; padding: 8px 10px; }
+        }
     </style>
 </head>
 <body>
@@ -187,6 +276,15 @@
         <span class="pet-food-info">🍖 猫粮：<strong id="foodCount">0</strong></span>
         <span class="pet-food-status" id="feedStatus">今天还没喂</span>
         <button class="pet-food-btn" id="feedBtn" type="button">喂猫 🐱</button>
+    </div>
+
+    <!-- 新增：每日运势 -->
+    <div class="daily-fortune-card" id="dailyFortune">
+        <div class="fortune-level" id="fortuneLevel">…</div>
+        <div class="fortune-main">
+            <div class="fortune-head">🔮 今日运势<span class="fortune-date" id="fortuneDate"></span></div>
+            <div class="fortune-lines" id="fortuneLines"></div>
+        </div>
     </div>
 
     <div class="search-container">
@@ -594,6 +692,148 @@
 
         /* 初始化 */
         updateFoodUI();
+
+        /* =========================================================
+           新增：每日运势（数据存在浏览器本地）
+           ========================================================= */
+        const FORTUNE_KEY = 'catball_fortune_v1';
+
+        // 等级与权重（总和 100）
+        const FORTUNE_LEVELS = [
+            { name: '大吉',   weight: 8,  cls: 'lv-daji' },
+            { name: '中吉',   weight: 15, cls: 'lv-zhongji' },
+            { name: '小吉',   weight: 20, cls: 'lv-xiaoji' },
+            { name: '平',     weight: 22, cls: 'lv-ping' },
+            { name: '小凶',   weight: 15, cls: 'lv-xiaoxiong' },
+            { name: '凶',     weight: 10, cls: 'lv-xiong' },
+            { name: '大凶',   weight: 8,  cls: 'lv-daxiong' },
+            { name: '？？？', weight: 2,  cls: 'lv-mystery' }
+        ];
+
+        // 猫猫「宜」
+        const FORTUNE_GOOD = [
+            '撸猫', '投喂小鱼干', '晒太阳', '钻进纸箱', '给猫球梳毛', '打呼噜',
+            '追激光笔', '蹭腿', '踩奶', '观察窗外的小鸟', '安静地喵一声',
+            '在键盘上睡觉', '囤猫粮', '陪猫球玩逗猫棒', '午后打个盹',
+            '收下猫主子的踩奶', '对着月亮喵喵叫', '给猫球让出沙发'
+        ];
+
+        // 猫猫「忌」
+        const FORTUNE_BAD = [
+            '给猫洗澡', '剪指甲', '深夜跑酷', '抓沙发', '打翻水杯', '踩猫尾巴',
+            '抢猫粮', '强行抱抱', '喂巧克力', '对着猫学狗叫', '挪动猫窝',
+            '直视猫咪的眼睛', '深夜开吸尘器', '摸猫肚子', '把猫从纸箱里赶出来',
+            '空调直吹猫', '湿着手摸猫', '在猫面前独吞小鱼干'
+        ];
+
+        const fortuneLevelEl = document.getElementById('fortuneLevel');
+        const fortuneDateEl  = document.getElementById('fortuneDate');
+        const fortuneLinesEl = document.getElementById('fortuneLines');
+
+        // 字符串 → 32 位种子（FNV-1a）
+        function fortuneSeed(str) {
+            let h = 2166136261 >>> 0;
+            for (let i = 0; i < str.length; i++) {
+                h ^= str.charCodeAt(i);
+                h = Math.imul(h, 16777619) >>> 0;
+            }
+            return h >>> 0;
+        }
+
+        // 可复现的伪随机数（mulberry32）
+        function makeRand(seed) {
+            let a = seed >>> 0;
+            return function () {
+                a = (a + 0x6D2B79F5) >>> 0;
+                let t = a;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function pickFortuneLevel(rand) {
+            const total = FORTUNE_LEVELS.reduce((s, l) => s + l.weight, 0);
+            let r = rand() * total;
+            for (const lv of FORTUNE_LEVELS) {
+                if (r < lv.weight) return lv;
+                r -= lv.weight;
+            }
+            return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
+        }
+
+        function generateFortune(dateStr) {
+            const rand = makeRand(fortuneSeed('catball::' + dateStr));
+            const lv = pickFortuneLevel(rand);
+
+            let good = '';
+            let bad = '';
+
+            if (lv.name === '大吉') {
+                good = '诸事皆宜';
+            } else if (lv.name === '大凶') {
+                bad = '诸事不宜';
+            } else if (lv.name !== '？？？') {
+                good = FORTUNE_GOOD[Math.floor(rand() * FORTUNE_GOOD.length)];
+                bad = FORTUNE_BAD[Math.floor(rand() * FORTUNE_BAD.length)];
+            }
+
+            return { date: dateStr, level: lv.name, cls: lv.cls, good: good, bad: bad };
+        }
+
+        // 读取（当天已抽过就直接用本地的，否则生成并写入本地）
+        function loadFortune() {
+            const today = todayStr();
+            const raw = safeGet(FORTUNE_KEY);
+            if (raw) {
+                try {
+                    const saved = JSON.parse(raw);
+                    if (saved && saved.date === today && saved.level && saved.cls) return saved;
+                } catch (e) { /* 数据异常则重新生成 */ }
+            }
+            const fresh = generateFortune(today);
+            safeSet(FORTUNE_KEY, JSON.stringify(fresh));
+            return fresh;
+        }
+
+        function makeFortuneLine(type, text) {
+            const item = document.createElement('span');
+            item.className = 'fortune-item fortune-' + type;
+
+            const lbl = document.createElement('span');
+            lbl.className = 'lbl';
+            lbl.textContent = type === 'good' ? '宜' : '忌';
+
+            item.appendChild(lbl);
+            item.appendChild(document.createTextNode(text));
+            return item;
+        }
+
+        function renderFortune() {
+            const f = loadFortune();
+
+            fortuneLevelEl.textContent = f.level;
+            fortuneLevelEl.className = 'fortune-level ' + f.cls;
+            fortuneDateEl.textContent = f.date;
+            fortuneLinesEl.innerHTML = '';
+
+            if (f.level === '？？？') return;   // 什么也不写
+
+            if (f.good) fortuneLinesEl.appendChild(makeFortuneLine('good', f.good));
+            if (f.bad)  fortuneLinesEl.appendChild(makeFortuneLine('bad', f.bad));
+        }
+
+        renderFortune();
+
+        /* 跨午夜自动换新运势 */
+        let lastFortuneDate = todayStr();
+        setInterval(function () {
+            const cur = todayStr();
+            if (cur !== lastFortuneDate) {
+                lastFortuneDate = cur;
+                renderFortune();
+            }
+        }, 60 * 1000);
     </script>
 </body>
 </html>
