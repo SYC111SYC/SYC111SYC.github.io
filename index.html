@@ -315,7 +315,6 @@
             font-weight: 600;
         }
 
-        /* 运势条目：纵向排列，宜一行、忌一行 */
         .fortune-lines {
             display: flex;
             flex-direction: column;
@@ -722,7 +721,10 @@
         const draggableFood   = document.getElementById('draggableFood');
 
         const FOOD_SIZE       = 34;
-        const CATCH_DISTANCE  = 42;
+        /* 【修复】42 → 24：猫球中心与食物中心距离小于 24 才算真正碰到 */
+        const CATCH_DISTANCE  = 24;
+        /* 【修复】用户从按下到真正拖动超过这个距离才开始追，避免一按下就触发 */
+        const DRAG_START_THRESHOLD = 6;
         const EAT_PHRASES     = ['啊呜', '咔嚓咔嚓', '吧唧吧唧', '喵呜~', '好吃！', '嚼嚼嚼...', '啊呜啊呜'];
 
         function safeGet(key) {
@@ -784,6 +786,9 @@
             pointerId: null,
             offsetX: 0,
             offsetY: 0,
+            startX: 0,          // 按下时的 clientX（用于判断是否真的开始拖动）
+            startY: 0,
+            moved: false,       // 是否已经发生过拖动
             x: 0,
             y: 0
         };
@@ -825,6 +830,7 @@
             foodDrag.dragging = false;
             foodDrag.caught = false;
             foodDrag.pointerId = null;
+            foodDrag.moved = false;
             updateFoodUI();
         }
 
@@ -841,6 +847,7 @@
             draggableFood.style.top = foodDrag.y + 'px';
         }
 
+        /* 【修复】pointerdown 不再立即触发追逐，只记录起点 */
         draggableFood.addEventListener('pointerdown', function(e) {
             if (foodDrag.caught) return;
             if (petState.eating) return;
@@ -858,8 +865,11 @@
             const rect = draggableFood.getBoundingClientRect();
             foodDrag.offsetX = e.clientX - rect.left;
             foodDrag.offsetY = e.clientY - rect.top;
+            foodDrag.startX = e.clientX;
+            foodDrag.startY = e.clientY;
             foodDrag.pointerId = e.pointerId;
             foodDrag.dragging = true;
+            foodDrag.moved = false;
 
             draggableFood.classList.add('dragging');
             try { draggableFood.setPointerCapture(e.pointerId); } catch (err) {}
@@ -867,17 +877,27 @@
             if (!foodDrag.active) {
                 floatFood();
             }
-
-            petState.running = false;
-            pet.classList.remove('running');
-            petState.chasingFood = true;
-            petState.nextMeowAt = performance.now() + 200;
-            say('小鱼干！等我！', 1000);
         });
 
+        /* 【修复】真正拖动时才让猫球开始追 */
         draggableFood.addEventListener('pointermove', function(e) {
             if (!foodDrag.dragging) return;
             if (e.pointerId !== foodDrag.pointerId) return;
+
+            if (!foodDrag.moved) {
+                const moved = Math.hypot(e.clientX - foodDrag.startX, e.clientY - foodDrag.startY);
+                if (moved >= DRAG_START_THRESHOLD) {
+                    foodDrag.moved = true;
+
+                    // 此时才开始让猫球追
+                    petState.running = false;
+                    pet.classList.remove('running');
+                    petState.chasingFood = true;
+                    petState.nextMeowAt = performance.now() + 200;
+                    say('小鱼干！等我！', 1000);
+                }
+            }
+
             moveFoodTo(e.clientX, e.clientY);
         });
 
@@ -906,8 +926,12 @@
                     resetFoodToSlot();
                     petState.chasingFood = false;
                     setRandomIdleDirection();
+                    return;
                 }
             }
+
+            // 用户松手：如果猫球还没追到，也保持 chasingFood 让猫球继续追过去
+            // （这里不做任何事，animate 会继续追）
         }
 
         draggableFood.addEventListener('pointerup', endFoodDrag);
@@ -967,6 +991,7 @@
             foodDrag.caught = false;
             foodDrag.dragging = false;
             foodDrag.pointerId = null;
+            foodDrag.moved = false;
 
             const count = getFoodCount();
             setFoodCount(Math.max(0, count - 1));
@@ -1091,7 +1116,7 @@
         const FORTUNE_KEY        = 'catball_fortune_v1';
         const FORTUNE_STREAK_KEY = 'catball_fortune_streak_v1';
         const FORTUNE_UID_KEY    = 'catball_fortune_uid_v1';
-        const FORTUNE_VERSION    = 2;   // 数据版本；旧版数据会自动重建为 1 宜 1 忌
+        const FORTUNE_VERSION    = 2;
 
         const FORTUNE_LEVELS = [
             { name: '大吉',   weight: 8,  cls: 'lv-daji' },
@@ -1104,7 +1129,6 @@
             { name: '？？？', weight: 2,  cls: 'lv-mystery' }
         ];
 
-        /* 项目池：只保留项目名 */
         const FORTUNE_ITEMS = [
             '画猫球', '玩小恐龙', '运动', '陪猫玩', '熬夜', '换头像',
             '慢跑', '浇花', '刷短视频', '玩纸牌', '口算', '背课文',
@@ -1156,7 +1180,6 @@
             return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
         }
 
-        // 随机取 2 个不重复项目（一个进宜、一个进忌）
         function pickTwoItems(rand) {
             const pool = FORTUNE_ITEMS.slice();
             for (let i = pool.length - 1; i > 0; i--) {
@@ -1168,7 +1191,6 @@
             return [pool[0], pool[1]];
         }
 
-        // 严格 1 宜 + 1 忌（大吉/大凶/？？？ 除外）
         function generateFortune(dateStr) {
             const uid = getFortuneUid();
             const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
@@ -1183,8 +1205,8 @@
                 bads = ['诸事不宜'];
             } else if (lv.name !== '？？？') {
                 const picked = pickTwoItems(rand);
-                goods = [picked[0]];   // 只有 1 条宜
-                bads = [picked[1]];    // 只有 1 条忌
+                goods = [picked[0]];
+                bads = [picked[1]];
             }
 
             return { v: FORTUNE_VERSION, date: dateStr, level: lv.name, cls: lv.cls, goods: goods, bads: bads };
@@ -1198,7 +1220,6 @@
                 if (!f || f.date !== todayStr() || !f.level || !f.cls) return null;
                 if (!Array.isArray(f.goods) || !Array.isArray(f.bads)) return null;
 
-                // 旧版本数据：保留“已签到”状态，重建为 1 宜 1 忌
                 if (f.v !== FORTUNE_VERSION) {
                     const fresh = generateFortune(f.date);
                     setTodayFortune(fresh);
@@ -1236,14 +1257,12 @@
             return 0;
         }
 
-        // 兼容旧数据：元素可能是字符串，也可能是 {name, desc}
         function fortuneItemName(en) {
             if (typeof en === 'string') return en;
             if (en && typeof en.name === 'string') return en.name;
             return '';
         }
 
-        // 生成一行：标签 + 项目名（只取 1 条）
         function buildFortuneRow(type, label, entry) {
             const name = fortuneItemName(entry);
             if (!name) return null;
@@ -1293,9 +1312,8 @@
 
             fortuneLinesEl.innerHTML = '';
 
-            if (f.level === '？？？') return;   // 什么也不写
+            if (f.level === '？？？') return;
 
-            // 严格只取第 1 条宜 / 第 1 条忌
             if (f.goods && f.goods.length) {
                 const row = buildFortuneRow('good', '宜', f.goods[0]);
                 if (row) fortuneLinesEl.appendChild(row);
