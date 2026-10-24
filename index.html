@@ -318,8 +318,9 @@
         .fortune-lines {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px 20px;
+            gap: 10px 24px;
             font-size: 14px;
+            align-items: flex-start;
         }
 
         .fortune-hint {
@@ -327,14 +328,22 @@
             font-size: 13px;
         }
 
-        .fortune-item {
+        .fortune-group {
+            flex: 1 1 180px;
+            min-width: 160px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .fortune-group-head {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-weight: 600;
+            margin-bottom: 2px;
         }
 
-        .fortune-item .lbl {
+        .fortune-group-head .lbl {
             display: inline-block;
             width: 20px;
             height: 20px;
@@ -344,6 +353,16 @@
             font-size: 12px;
             font-weight: 700;
         }
+
+        .fortune-entry {
+            padding-left: 26px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #4a5568;
+        }
+
+        .fortune-entry .ft-name { font-weight: 700; }
+        .fortune-entry .ft-desc { font-weight: 500; }
 
         .fortune-good { color: #2f8a2f; }
         .fortune-good .lbl { background: #e3f5e3; }
@@ -1112,18 +1131,24 @@
             { name: '？？？', weight: 2,  cls: 'lv-mystery' }
         ];
 
-        const FORTUNE_GOOD = [
-            '撸猫', '投喂小鱼干', '晒太阳', '钻进纸箱', '给猫球梳毛', '打呼噜',
-            '追激光笔', '蹭腿', '踩奶', '观察窗外的小鸟', '安静地喵一声',
-            '在键盘上睡觉', '囤猫粮', '陪猫球玩逗猫棒', '午后打个盹',
-            '收下猫主子的踩奶', '对着月亮喵喵叫', '给猫球让出沙发'
-        ];
-
-        const FORTUNE_BAD = [
-            '给猫洗澡', '剪指甲', '深夜跑酷', '抓沙发', '打翻水杯', '踩猫尾巴',
-            '抢猫粮', '强行抱抱', '喂巧克力', '对着猫学狗叫', '挪动猫窝',
-            '直视猫咪的眼睛', '深夜开吸尘器', '摸猫肚子', '把猫从纸箱里赶出来',
-            '空调直吹猫', '湿着手摸猫', '在猫面前独吞小鱼干'
+        /* 项目池：每个项目带一条“宜”描述和一条“忌”描述 */
+        const FORTUNE_ITEMS = [
+            { name: '画猫球',     good: '画的很精彩',       bad: '完全没灵感' },
+            { name: '玩小恐龙',   good: '轻松破纪录',       bad: '手忙脚乱' },
+            { name: '运动',       good: '放松身心',         bad: '累4了' },
+            { name: '陪猫玩',     good: '猫猫超喜欢你的！', bad: '猫很不耐烦' },
+            { name: '熬夜',       good: '事情终究可以完成的', bad: '第二天困得不行' },
+            { name: '换头像',     good: '选中超合适的',     bad: '挑来挑去不满意' },
+            { name: '慢跑',       good: '呼吸平稳轻松',     bad: '跑两步就喘粗气' },
+            { name: '浇花',       good: '小花生机勃勃',     bad: '水浇多烂根啦' },
+            { name: '刷短视频',   good: '刷到超多有趣内容', bad: '一晃浪费好久' },
+            { name: '玩纸牌',     good: '把把有好牌',       bad: '次次都垫底' },
+            { name: '口算',       good: '秒出答案超顺',     bad: '脑子反应慢吞吞' },
+            { name: '背课文',     good: '读两遍就记住',     bad: '转头全部忘光' },
+            { name: '刷习题',     good: '思路一下打通',     bad: '题目全看不懂' },
+            { name: '上oj刷题',   good: 'ACACACAK！',       bad: 'WA PA TLE MLE RE CE SE' },
+            { name: '养仙人球',   good: '圆滚滚',           bad: '扎到手' },
+            { name: '打游戏',     good: '爽！！',           bad: '耽误学业' }
         ];
 
         const fortuneLevelEl  = document.getElementById('fortuneLevel');
@@ -1171,24 +1196,45 @@
             return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
         }
 
+        // 洗牌取前 4 个不重复项目：2 宜 + 2 忌
+        function pickFortuneItems(rand) {
+            const pool = FORTUNE_ITEMS.slice();
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(rand() * (i + 1));
+                const tmp = pool[i];
+                pool[i] = pool[j];
+                pool[j] = tmp;
+            }
+            const goods = [
+                { name: pool[0].name, desc: pool[0].good },
+                { name: pool[1].name, desc: pool[1].good }
+            ];
+            const bads = [
+                { name: pool[2].name, desc: pool[2].bad },
+                { name: pool[3].name, desc: pool[3].bad }
+            ];
+            return { goods: goods, bads: bads };
+        }
+
         function generateFortune(dateStr) {
             const uid = getFortuneUid();
             const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
             const lv = pickFortuneLevel(rand);
 
-            let good = '';
-            let bad = '';
+            let goods = [];
+            let bads = [];
 
             if (lv.name === '大吉') {
-                good = '诸事皆宜';
+                goods = [{ name: '诸事皆宜', desc: '' }];
             } else if (lv.name === '大凶') {
-                bad = '诸事不宜';
+                bads = [{ name: '诸事不宜', desc: '' }];
             } else if (lv.name !== '？？？') {
-                good = FORTUNE_GOOD[Math.floor(rand() * FORTUNE_GOOD.length)];
-                bad = FORTUNE_BAD[Math.floor(rand() * FORTUNE_BAD.length)];
+                const picked = pickFortuneItems(rand);
+                goods = picked.goods;
+                bads = picked.bads;
             }
 
-            return { date: dateStr, level: lv.name, cls: lv.cls, good: good, bad: bad };
+            return { date: dateStr, level: lv.name, cls: lv.cls, goods: goods, bads: bads };
         }
 
         function getTodayFortune() {
@@ -1196,7 +1242,10 @@
             if (!raw) return null;
             try {
                 const f = JSON.parse(raw);
-                if (f && f.date === todayStr() && f.level && f.cls) return f;
+                if (f && f.date === todayStr() && f.level && f.cls &&
+                    Array.isArray(f.goods) && Array.isArray(f.bads)) {
+                    return f;
+                }
             } catch (e) { /* 数据异常视作未签到 */ }
             return null;
         }
@@ -1227,17 +1276,40 @@
             return 0;
         }
 
-        function makeFortuneLine(type, text) {
-            const item = document.createElement('span');
-            item.className = 'fortune-item fortune-' + type;
+        // 生成一组「宜」或「忌」：标题 + 若干条 项目 -描述
+        function buildFortuneGroup(type, label, entries) {
+            const group = document.createElement('div');
+            group.className = 'fortune-group fortune-' + type;
 
+            const head = document.createElement('div');
+            head.className = 'fortune-group-head';
             const lbl = document.createElement('span');
             lbl.className = 'lbl';
-            lbl.textContent = type === 'good' ? '宜' : '忌';
+            lbl.textContent = label;
+            head.appendChild(lbl);
+            group.appendChild(head);
 
-            item.appendChild(lbl);
-            item.appendChild(document.createTextNode(text));
-            return item;
+            entries.forEach(function(en) {
+                const row = document.createElement('div');
+                row.className = 'fortune-entry';
+
+                const nameEl = document.createElement('span');
+                nameEl.className = 'ft-name';
+                nameEl.textContent = en.name;
+                row.appendChild(nameEl);
+
+                if (en.desc) {
+                    row.appendChild(document.createTextNode(' - '));
+                    const descEl = document.createElement('span');
+                    descEl.className = 'ft-desc';
+                    descEl.textContent = en.desc;
+                    row.appendChild(descEl);
+                }
+
+                group.appendChild(row);
+            });
+
+            return group;
         }
 
         function renderFortune() {
@@ -1247,19 +1319,8 @@
 
             fortuneDateEl.textContent = today;
 
-            if (f) {
-                fortuneLevelEl.textContent = f.level;
-                fortuneLevelEl.className = 'fortune-level ' + f.cls;
-                fortuneLinesEl.innerHTML = '';
-
-                if (f.level !== '？？？') {
-                    if (f.good) fortuneLinesEl.appendChild(makeFortuneLine('good', f.good));
-                    if (f.bad)  fortuneLinesEl.appendChild(makeFortuneLine('bad', f.bad));
-                }
-
-                fortuneSignBtn.style.display = 'none';
-                fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 连续签到 ${streakDisplay} 天` : '';
-            } else {
+            if (!f) {
+                // 未签到：隐藏运势内容，显示签到按钮
                 fortuneLevelEl.textContent = '？';
                 fortuneLevelEl.className = 'fortune-level lv-pending';
 
@@ -1271,6 +1332,24 @@
 
                 fortuneSignBtn.style.display = '';
                 fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 已连续签到 ${streakDisplay} 天` : '';
+                return;
+            }
+
+            // 已签到：显示运势
+            fortuneLevelEl.textContent = f.level;
+            fortuneLevelEl.className = 'fortune-level ' + f.cls;
+            fortuneSignBtn.style.display = 'none';
+            fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 连续签到 ${streakDisplay} 天` : '';
+
+            fortuneLinesEl.innerHTML = '';
+
+            if (f.level === '？？？') return;   // 什么也不写
+
+            if (f.goods && f.goods.length) {
+                fortuneLinesEl.appendChild(buildFortuneGroup('good', '宜', f.goods));
+            }
+            if (f.bads && f.bads.length) {
+                fortuneLinesEl.appendChild(buildFortuneGroup('bad', '忌', f.bads));
             }
         }
 
