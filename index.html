@@ -721,9 +721,7 @@
         const draggableFood   = document.getElementById('draggableFood');
 
         const FOOD_SIZE       = 34;
-        /* 【修复】42 → 24：猫球中心与食物中心距离小于 24 才算真正碰到 */
         const CATCH_DISTANCE  = 24;
-        /* 【修复】用户从按下到真正拖动超过这个距离才开始追，避免一按下就触发 */
         const DRAG_START_THRESHOLD = 6;
         const EAT_PHRASES     = ['啊呜', '咔嚓咔嚓', '吧唧吧唧', '喵呜~', '好吃！', '嚼嚼嚼...', '啊呜啊呜'];
 
@@ -786,9 +784,9 @@
             pointerId: null,
             offsetX: 0,
             offsetY: 0,
-            startX: 0,          // 按下时的 clientX（用于判断是否真的开始拖动）
+            startX: 0,
             startY: 0,
-            moved: false,       // 是否已经发生过拖动
+            moved: false,
             x: 0,
             y: 0
         };
@@ -847,7 +845,6 @@
             draggableFood.style.top = foodDrag.y + 'px';
         }
 
-        /* 【修复】pointerdown 不再立即触发追逐，只记录起点 */
         draggableFood.addEventListener('pointerdown', function(e) {
             if (foodDrag.caught) return;
             if (petState.eating) return;
@@ -879,7 +876,6 @@
             }
         });
 
-        /* 【修复】真正拖动时才让猫球开始追 */
         draggableFood.addEventListener('pointermove', function(e) {
             if (!foodDrag.dragging) return;
             if (e.pointerId !== foodDrag.pointerId) return;
@@ -889,7 +885,6 @@
                 if (moved >= DRAG_START_THRESHOLD) {
                     foodDrag.moved = true;
 
-                    // 此时才开始让猫球追
                     petState.running = false;
                     pet.classList.remove('running');
                     petState.chasingFood = true;
@@ -929,9 +924,6 @@
                     return;
                 }
             }
-
-            // 用户松手：如果猫球还没追到，也保持 chasingFood 让猫球继续追过去
-            // （这里不做任何事，animate 会继续追）
         }
 
         draggableFood.addEventListener('pointerup', endFoodDrag);
@@ -1357,6 +1349,63 @@
         }, 60 * 1000);
 
         renderFortune();
+
+        /* =========================================================
+           URL 重置入口
+           ?reset=1     → 忘记今天喂过（保留猫粮/运势/签到/用户ID）
+                          如果猫粮为 0，会自动补到 1，方便立即再喂一次
+           ?reset=all   → 清空所有 catball_ 开头的本地数据（完全初始化）
+           ========================================================= */
+        (function handleResetParam() {
+            let params;
+            try { params = new URLSearchParams(location.search); } catch (e) { return; }
+            if (!params.has('reset')) return;
+
+            const mode = (params.get('reset') || '1').toLowerCase();
+            let didReset = false;
+
+            if (mode === 'all') {
+                try {
+                    const keys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (k && k.indexOf('catball_') === 0) keys.push(k);
+                    }
+                    keys.forEach(function(k) {
+                        try { localStorage.removeItem(k); } catch (e) {}
+                    });
+                    didReset = true;
+                } catch (e) { /* 忽略 */ }
+            } else {
+                try {
+                    localStorage.removeItem(FEED_DATE_KEY);
+                    didReset = true;
+                } catch (e) { /* 忽略 */ }
+
+                // 猫粮不足 1 时补到 1，保证可以立刻喂
+                if (getFoodCount() < 1) {
+                    try { localStorage.setItem(FOOD_KEY, '1'); } catch (e) {}
+                }
+            }
+
+            // 清掉地址栏的 reset 参数，避免刷新反复触发
+            try {
+                const url = new URL(location.href);
+                url.searchParams.delete('reset');
+                history.replaceState(null, '', url.pathname + url.search + url.hash);
+            } catch (e) { /* 忽略 */ }
+
+            // 刷新 UI
+            updateFoodUI();
+            renderFortune();
+
+            // 猫球提示一下
+            if (didReset) {
+                setTimeout(function() {
+                    say(mode === 'all' ? '全部数据已重置喵~' : '喂食记录已重置喵~', 2400);
+                }, 800);
+            }
+        })();
     </script>
 </body>
 </html>
