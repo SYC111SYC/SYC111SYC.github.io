@@ -205,6 +205,7 @@
         .fortune-level.lv-xiong     { color: #4a5568; background: #f0f2f5; border-color: #b8c0cc; }
         .fortune-level.lv-daxiong   { color: #2d3748; background: #e8eaee; border-color: #9aa3b0; }
         .fortune-level.lv-mystery   { color: #8e44ad; background: #f8f2ff; border-color: #d3b3ef; letter-spacing: 0; }
+        .fortune-level.lv-pending   { color: #9aa3b0; background: #f5f7fa; border-color: #d5dbe4; }
 
         .fortune-main {
             flex: 1 1 200px;
@@ -223,11 +224,22 @@
             font-variant-numeric: tabular-nums;
         }
 
+        .fortune-streak {
+            margin-left: 10px;
+            color: #e07a2f;
+            font-weight: 600;
+        }
+
         .fortune-lines {
             display: flex;
             flex-wrap: wrap;
             gap: 6px 20px;
             font-size: 14px;
+        }
+
+        .fortune-hint {
+            color: #a0a8b8;
+            font-size: 13px;
         }
 
         .fortune-item {
@@ -253,9 +265,26 @@
         .fortune-bad { color: #c0392b; }
         .fortune-bad .lbl { background: #fdeaea; }
 
+        .fortune-sign-btn {
+            margin-left: auto;
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #8fb0ff;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .fortune-sign-btn:hover { background: #6f97ff; }
+        .fortune-sign-btn:active { transform: scale(0.96); }
+
         @media (max-width: 500px) {
             .daily-fortune-card { gap: 10px; }
             .fortune-level { min-width: 72px; font-size: 20px; padding: 8px 10px; }
+            .fortune-sign-btn { margin-left: 0; width: 100%; }
         }
     </style>
 </head>
@@ -282,9 +311,12 @@
     <div class="daily-fortune-card" id="dailyFortune">
         <div class="fortune-level" id="fortuneLevel">…</div>
         <div class="fortune-main">
-            <div class="fortune-head">🔮 今日运势<span class="fortune-date" id="fortuneDate"></span></div>
+            <div class="fortune-head">
+                🔮 今日运势<span class="fortune-date" id="fortuneDate"></span><span class="fortune-streak" id="fortuneStreak"></span>
+            </div>
             <div class="fortune-lines" id="fortuneLines"></div>
         </div>
+        <button class="fortune-sign-btn" id="fortuneSignBtn" type="button">签到抽运势</button>
     </div>
 
     <div class="search-container">
@@ -579,6 +611,16 @@
             return `${y}-${m}-${day}`;
         }
 
+        // 本地“昨天”（用于连续签到判定）
+        function yesterdayStr() {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
         function getFoodCount() {
             const raw = parseInt(safeGet(FOOD_KEY) || '0', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 0;
@@ -694,9 +736,11 @@
         updateFoodUI();
 
         /* =========================================================
-           新增：每日运势（数据存在浏览器本地）
+           新增：每日运势（需签到，数据存在浏览器本地，每个用户独立）
            ========================================================= */
-        const FORTUNE_KEY = 'catball_fortune_v1';
+        const FORTUNE_KEY        = 'catball_fortune_v1';         // 当天运势 {date, level, cls, good, bad}
+        const FORTUNE_STREAK_KEY = 'catball_fortune_streak_v1';  // 连续签到 {last, count}
+        const FORTUNE_UID_KEY    = 'catball_fortune_uid_v1';     // 用户唯一标识（保证每人不同）
 
         // 等级与权重（总和 100）
         const FORTUNE_LEVELS = [
@@ -726,9 +770,21 @@
             '空调直吹猫', '湿着手摸猫', '在猫面前独吞小鱼干'
         ];
 
-        const fortuneLevelEl = document.getElementById('fortuneLevel');
-        const fortuneDateEl  = document.getElementById('fortuneDate');
-        const fortuneLinesEl = document.getElementById('fortuneLines');
+        const fortuneLevelEl  = document.getElementById('fortuneLevel');
+        const fortuneDateEl   = document.getElementById('fortuneDate');
+        const fortuneStreakEl = document.getElementById('fortuneStreak');
+        const fortuneLinesEl  = document.getElementById('fortuneLines');
+        const fortuneSignBtn  = document.getElementById('fortuneSignBtn');
+
+        // 用户唯一标识（首次访问生成并持久化）
+        function getFortuneUid() {
+            let uid = safeGet(FORTUNE_UID_KEY);
+            if (!uid) {
+                uid = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+                safeSet(FORTUNE_UID_KEY, uid);
+            }
+            return uid;
+        }
 
         // 字符串 → 32 位种子（FNV-1a）
         function fortuneSeed(str) {
@@ -762,8 +818,10 @@
             return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
         }
 
+        // 生成运势：种子 = 用户唯一 ID + 日期 → 每人不同、同人同日固定
         function generateFortune(dateStr) {
-            const rand = makeRand(fortuneSeed('catball::' + dateStr));
+            const uid = getFortuneUid();
+            const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
             const lv = pickFortuneLevel(rand);
 
             let good = '';
@@ -781,19 +839,43 @@
             return { date: dateStr, level: lv.name, cls: lv.cls, good: good, bad: bad };
         }
 
-        // 读取（当天已抽过就直接用本地的，否则生成并写入本地）
-        function loadFortune() {
-            const today = todayStr();
+        // 今日已签到则返回运势对象，否则返回 null
+        function getTodayFortune() {
             const raw = safeGet(FORTUNE_KEY);
-            if (raw) {
-                try {
-                    const saved = JSON.parse(raw);
-                    if (saved && saved.date === today && saved.level && saved.cls) return saved;
-                } catch (e) { /* 数据异常则重新生成 */ }
-            }
-            const fresh = generateFortune(today);
-            safeSet(FORTUNE_KEY, JSON.stringify(fresh));
-            return fresh;
+            if (!raw) return null;
+            try {
+                const f = JSON.parse(raw);
+                if (f && f.date === todayStr() && f.level && f.cls) return f;
+            } catch (e) { /* 数据异常视作未签到 */ }
+            return null;
+        }
+
+        function setTodayFortune(f) {
+            safeSet(FORTUNE_KEY, JSON.stringify(f));
+        }
+
+        // 连续签到数据
+        function getStreak() {
+            const raw = safeGet(FORTUNE_STREAK_KEY);
+            if (!raw) return { last: '', count: 0 };
+            try {
+                const s = JSON.parse(raw);
+                if (s && typeof s.last === 'string' && Number.isFinite(s.count) && s.count >= 0) return s;
+            } catch (e) { /* 忽略 */ }
+            return { last: '', count: 0 };
+        }
+
+        function setStreak(s) {
+            safeSet(FORTUNE_STREAK_KEY, JSON.stringify(s));
+        }
+
+        // 当前展示的连续天数（未签到时用于提示“已连续 N 天”）
+        function currentStreakDisplay() {
+            const s = getStreak();
+            const today = todayStr();
+            if (s.last === today) return s.count;
+            if (s.last === yesterdayStr()) return s.count;   // 还在连续中
+            return 0;                                        // 已断签
         }
 
         function makeFortuneLine(type, text) {
@@ -810,22 +892,76 @@
         }
 
         function renderFortune() {
-            const f = loadFortune();
+            const today = todayStr();
+            const f = getTodayFortune();
+            const streakDisplay = currentStreakDisplay();
 
-            fortuneLevelEl.textContent = f.level;
-            fortuneLevelEl.className = 'fortune-level ' + f.cls;
-            fortuneDateEl.textContent = f.date;
-            fortuneLinesEl.innerHTML = '';
+            fortuneDateEl.textContent = today;
 
-            if (f.level === '？？？') return;   // 什么也不写
+            if (f) {
+                // 已签到：显示运势
+                fortuneLevelEl.textContent = f.level;
+                fortuneLevelEl.className = 'fortune-level ' + f.cls;
+                fortuneLinesEl.innerHTML = '';
 
-            if (f.good) fortuneLinesEl.appendChild(makeFortuneLine('good', f.good));
-            if (f.bad)  fortuneLinesEl.appendChild(makeFortuneLine('bad', f.bad));
+                if (f.level !== '？？？') {
+                    if (f.good) fortuneLinesEl.appendChild(makeFortuneLine('good', f.good));
+                    if (f.bad)  fortuneLinesEl.appendChild(makeFortuneLine('bad', f.bad));
+                }
+
+                fortuneSignBtn.style.display = 'none';
+                fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 连续签到 ${streakDisplay} 天` : '';
+            } else {
+                // 未签到：隐藏运势内容，显示签到按钮
+                fortuneLevelEl.textContent = '？';
+                fortuneLevelEl.className = 'fortune-level lv-pending';
+
+                fortuneLinesEl.innerHTML = '';
+                const hint = document.createElement('span');
+                hint.className = 'fortune-hint';
+                hint.textContent = '点击右侧按钮签到，抽取今日运势~';
+                fortuneLinesEl.appendChild(hint);
+
+                fortuneSignBtn.style.display = '';
+                fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 已连续签到 ${streakDisplay} 天` : '';
+            }
         }
 
+        // 签到：抽运势 + 更新连续天数
+        function signFortune() {
+            const today = todayStr();
+            const yesterday = yesterdayStr();
+            const s = getStreak();
+
+            let newCount;
+            if (s.last === today) {
+                newCount = s.count;              // 今天已签（理论到不了这里）
+            } else if (s.last === yesterday) {
+                newCount = s.count + 1;          // 昨天也签了 → 连续 +1
+            } else {
+                newCount = 1;                    // 断签 / 首次 → 重置为 1
+            }
+
+            setStreak({ last: today, count: newCount });
+            setTodayFortune(generateFortune(today));
+
+            renderFortune();
+            say('签到成功！喵~ 🔮', 1500);
+        }
+
+        fortuneSignBtn.addEventListener('click', signFortune);
+
+        /* 跨标签页同步（其他标签签到后本页刷新运势） */
+        window.addEventListener('storage', function(e) {
+            if (e.key === FORTUNE_KEY || e.key === FORTUNE_STREAK_KEY) {
+                renderFortune();
+            }
+        });
+
+        /* 初始化 */
         renderFortune();
 
-        /* 跨午夜自动换新运势 */
+        /* 跨午夜自动切换为“未签到”状态 */
         let lastFortuneDate = todayStr();
         setInterval(function () {
             const cur = todayStr();
