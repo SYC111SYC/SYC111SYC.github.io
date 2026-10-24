@@ -318,7 +318,7 @@
         .fortune-lines {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px 24px;
+            gap: 6px 24px;
             font-size: 14px;
             align-items: flex-start;
         }
@@ -329,18 +329,14 @@
         }
 
         .fortune-group {
-            flex: 1 1 180px;
-            min-width: 160px;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .fortune-group-head {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            margin-bottom: 2px;
         }
 
         .fortune-group-head .lbl {
@@ -355,14 +351,10 @@
         }
 
         .fortune-entry {
-            padding-left: 26px;
-            font-size: 13px;
-            line-height: 1.55;
-            color: #4a5568;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.5;
         }
-
-        .fortune-entry .ft-name { font-weight: 700; }
-        .fortune-entry .ft-desc { font-weight: 500; }
 
         .fortune-good { color: #2f8a2f; }
         .fortune-good .lbl { background: #e3f5e3; }
@@ -547,7 +539,7 @@
             nextMeowAt: 0,
             nextReturnSpeechAt: 0,
             lastTime: 0,
-            /* 新增：追逐 / 吃 状态 */
+            /* 追逐 / 吃 状态 */
             chasingFood: false,
             eating: false,
             nextEatSpeechAt: 0
@@ -1131,24 +1123,11 @@
             { name: '？？？', weight: 2,  cls: 'lv-mystery' }
         ];
 
-        /* 项目池：每个项目带一条“宜”描述和一条“忌”描述 */
+        /* 项目池：只保留项目名 */
         const FORTUNE_ITEMS = [
-            { name: '画猫球',     good: '画的很精彩',       bad: '完全没灵感' },
-            { name: '玩小恐龙',   good: '轻松破纪录',       bad: '手忙脚乱' },
-            { name: '运动',       good: '放松身心',         bad: '累4了' },
-            { name: '陪猫玩',     good: '猫猫超喜欢你的！', bad: '猫很不耐烦' },
-            { name: '熬夜',       good: '事情终究可以完成的', bad: '第二天困得不行' },
-            { name: '换头像',     good: '选中超合适的',     bad: '挑来挑去不满意' },
-            { name: '慢跑',       good: '呼吸平稳轻松',     bad: '跑两步就喘粗气' },
-            { name: '浇花',       good: '小花生机勃勃',     bad: '水浇多烂根啦' },
-            { name: '刷短视频',   good: '刷到超多有趣内容', bad: '一晃浪费好久' },
-            { name: '玩纸牌',     good: '把把有好牌',       bad: '次次都垫底' },
-            { name: '口算',       good: '秒出答案超顺',     bad: '脑子反应慢吞吞' },
-            { name: '背课文',     good: '读两遍就记住',     bad: '转头全部忘光' },
-            { name: '刷习题',     good: '思路一下打通',     bad: '题目全看不懂' },
-            { name: '上oj刷题',   good: 'ACACACAK！',       bad: 'WA PA TLE MLE RE CE SE' },
-            { name: '养仙人球',   good: '圆滚滚',           bad: '扎到手' },
-            { name: '打游戏',     good: '爽！！',           bad: '耽误学业' }
+            '画猫球', '玩小恐龙', '运动', '陪猫玩', '熬夜', '换头像',
+            '慢跑', '浇花', '刷短视频', '玩纸牌', '口算', '背课文',
+            '刷习题', '上oj刷题', '养仙人球', '打游戏'
         ];
 
         const fortuneLevelEl  = document.getElementById('fortuneLevel');
@@ -1196,8 +1175,8 @@
             return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
         }
 
-        // 洗牌取前 4 个不重复项目：2 宜 + 2 忌
-        function pickFortuneItems(rand) {
+        // 随机取 2 个不重复项目
+        function pickTwoItems(rand) {
             const pool = FORTUNE_ITEMS.slice();
             for (let i = pool.length - 1; i > 0; i--) {
                 const j = Math.floor(rand() * (i + 1));
@@ -1205,15 +1184,7 @@
                 pool[i] = pool[j];
                 pool[j] = tmp;
             }
-            const goods = [
-                { name: pool[0].name, desc: pool[0].good },
-                { name: pool[1].name, desc: pool[1].good }
-            ];
-            const bads = [
-                { name: pool[2].name, desc: pool[2].bad },
-                { name: pool[3].name, desc: pool[3].bad }
-            ];
-            return { goods: goods, bads: bads };
+            return [pool[0], pool[1]];
         }
 
         function generateFortune(dateStr) {
@@ -1225,13 +1196,13 @@
             let bads = [];
 
             if (lv.name === '大吉') {
-                goods = [{ name: '诸事皆宜', desc: '' }];
+                goods = ['诸事皆宜'];
             } else if (lv.name === '大凶') {
-                bads = [{ name: '诸事不宜', desc: '' }];
+                bads = ['诸事不宜'];
             } else if (lv.name !== '？？？') {
-                const picked = pickFortuneItems(rand);
-                goods = picked.goods;
-                bads = picked.bads;
+                const picked = pickTwoItems(rand);
+                goods = [picked[0]];
+                bads = [picked[1]];
             }
 
             return { date: dateStr, level: lv.name, cls: lv.cls, goods: goods, bads: bads };
@@ -1276,12 +1247,19 @@
             return 0;
         }
 
-        // 生成一组「宜」或「忌」：标题 + 若干条 项目 -描述
+        // 兼容旧数据结构：元素可能是字符串，也可能是 {name, desc}
+        function fortuneItemName(en) {
+            if (typeof en === 'string') return en;
+            if (en && typeof en.name === 'string') return en.name;
+            return '';
+        }
+
+        // 生成一组「宜」或「忌」：标签 + 项目
         function buildFortuneGroup(type, label, entries) {
             const group = document.createElement('div');
             group.className = 'fortune-group fortune-' + type;
 
-            const head = document.createElement('div');
+            const head = document.createElement('span');
             head.className = 'fortune-group-head';
             const lbl = document.createElement('span');
             lbl.className = 'lbl';
@@ -1290,22 +1268,12 @@
             group.appendChild(head);
 
             entries.forEach(function(en) {
-                const row = document.createElement('div');
+                const name = fortuneItemName(en);
+                if (!name) return;
+
+                const row = document.createElement('span');
                 row.className = 'fortune-entry';
-
-                const nameEl = document.createElement('span');
-                nameEl.className = 'ft-name';
-                nameEl.textContent = en.name;
-                row.appendChild(nameEl);
-
-                if (en.desc) {
-                    row.appendChild(document.createTextNode(' - '));
-                    const descEl = document.createElement('span');
-                    descEl.className = 'ft-desc';
-                    descEl.textContent = en.desc;
-                    row.appendChild(descEl);
-                }
-
+                row.textContent = name;
                 group.appendChild(row);
             });
 
