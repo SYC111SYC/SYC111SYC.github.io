@@ -89,11 +89,11 @@
             transform: translateY(0);
         }
 
-        /* ---------- 标题 + 黑板 ---------- */
+        /* ---------- 标题 + 小黑板 ---------- */
         .header-brand {
             display: inline-flex;
             align-items: center;
-            gap: 16px;
+            gap: 10px;
             vertical-align: middle;
             flex-wrap: wrap;
         }
@@ -104,17 +104,16 @@
             flex-direction: column;
             justify-content: center;
             align-items: stretch;
-            min-width: 280px;
-            max-width: 340px;
-            min-height: 140px;
-            padding: 10px 14px;
+            width: 190px;
+            min-height: 92px;
+            padding: 6px 9px;
             background:
                 radial-gradient(circle at 20% 30%, rgba(255,255,255,0.06) 0%, transparent 40%),
                 radial-gradient(circle at 80% 70%, rgba(255,255,255,0.05) 0%, transparent 40%),
                 linear-gradient(135deg, #2c4a3a, #1e3628);
-            border: 6px solid #8a6a3f;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 0 40px rgba(0, 0, 0, 0.3);
+            border: 4px solid #8a6a3f;
+            border-radius: 8px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22), inset 0 0 26px rgba(0, 0, 0, 0.3);
             color: #e8f2eb;
             font-family: 'Comic Sans MS', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             cursor: pointer;
@@ -135,48 +134,50 @@
 
         .bb-idle {
             text-align: center;
-            line-height: 1.5;
+            line-height: 1.4;
         }
 
         .bb-title {
-            font-size: 16px;
+            font-size: 12px;
             font-weight: 700;
-            letter-spacing: 1px;
-            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
         }
 
         .bb-hint {
-            font-size: 13px;
+            font-size: 10px;
             color: #b8d4c4;
         }
 
         .bb-question {
-            font-size: 22px;
+            font-size: 15px;
             font-weight: 700;
             text-align: center;
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-            text-shadow: 0 0 6px rgba(220, 255, 230, 0.3);
+            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 4px rgba(220, 255, 230, 0.3);
+            white-space: nowrap;
         }
 
         .bb-options {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 6px;
+            gap: 4px;
             width: 100%;
         }
 
         .bb-option {
-            padding: 6px 10px;
-            border: 1.5px solid rgba(230, 245, 235, 0.7);
+            padding: 3px 4px;
+            border: 1px solid rgba(230, 245, 235, 0.7);
             background: rgba(255, 255, 255, 0.08);
             color: #e8f2eb;
-            border-radius: 6px;
-            font-size: 15px;
+            border-radius: 4px;
+            font-size: 11px;
             font-weight: 600;
             cursor: pointer;
             font-family: inherit;
             transition: background 0.15s ease, transform 0.1s ease;
+            line-height: 1.2;
         }
 
         .bb-option:hover {
@@ -200,18 +201,21 @@
         }
 
         .bb-progress {
-            margin-top: 8px;
-            font-size: 12px;
+            margin-top: 5px;
+            font-size: 9px;
             color: #b8d4c4;
-            letter-spacing: 1px;
+            letter-spacing: 0.3px;
             text-align: center;
+            line-height: 1.3;
         }
 
         @media (max-width: 700px) {
-            .blackboard {
-                min-width: 0;
+            .header-brand {
+                display: flex;
                 width: 100%;
-                max-width: 100%;
+            }
+            .blackboard {
+                width: 100%;
             }
         }
 
@@ -632,7 +636,6 @@
             chasingFood: false,
             eating: false,
             nextEatSpeechAt: 0,
-            /* 黑板模式 */
             goingToBoard: false,
             atBoard: false,
             boardTargetX: 0,
@@ -689,7 +692,6 @@
             const delta = (timestamp - petState.lastTime) / 16.67;
             petState.lastTime = timestamp;
 
-            /* ---------- 前往黑板 ---------- */
             if (petState.goingToBoard) {
                 const dx = petState.boardTargetX - petState.x;
                 const dy = petState.boardTargetY - petState.y;
@@ -713,11 +715,9 @@
                         petState.nextMeowAt = timestamp + 900;
                     }
                 }
-            /* ---------- 在黑板旁站着 ---------- */
             } else if (petState.atBoard) {
                 petState.vx = 0;
                 petState.vy = 0;
-            /* ---------- 追逐食物 ---------- */
             } else if (petState.chasingFood && foodDrag.active && !foodDrag.caught) {
                 const fc = getFoodCenter();
                 const pcx = petState.x + petWrap.offsetWidth / 2;
@@ -814,7 +814,6 @@
         }
 
         pet.addEventListener('click', function() {
-            // 在黑板旁 / 正在去黑板时，点击猫球 = 离开黑板，并乱跑一下
             if (petState.atBoard || petState.goingToBoard) {
                 leaveBoard();
                 say('好吧，下次再玩~喵', 1200);
@@ -864,7 +863,7 @@
         const FEED_DATE_KEY   = 'catball_feed_date_v1';
         const READ_POSTS_KEY  = 'catball_read_posts_v1';
 
-        const MIN_FOOD        = 4;   // 一顿 4 个猫粮
+        const MIN_FOOD        = 4;
 
         const foodCountEl     = document.getElementById('foodCount');
         const feedStatusEl    = document.getElementById('feedStatus');
@@ -929,7 +928,6 @@
             }, 350);
         }
 
-        /* ---------- 今日已读帖子（每篇只 +1 猫粮） ---------- */
         function getReadPostsToday() {
             const raw = safeGet(READ_POSTS_KEY);
             if (!raw) return { date: todayStr(), ids: [] };
@@ -951,7 +949,6 @@
             return true;
         }
 
-        /* ---------- 食物拖拽状态 ---------- */
         const foodDrag = {
             active: false,
             dragging: false,
@@ -1032,7 +1029,6 @@
                 return;
             }
 
-            // 开始拖动猫粮 → 让猫球离开黑板
             if (petState.atBoard || petState.goingToBoard) {
                 leaveBoard();
             }
@@ -1243,7 +1239,6 @@
             }
         }
 
-        /* 浏览帖子 → 今日每篇 +1 猫粮（同一篇一天只 +1） */
         document.getElementById('postList').addEventListener('click', function(e) {
             const link = e.target.closest('a[href*="post.html"]');
             if (!link) return;
@@ -1674,8 +1669,6 @@
 
         /* =========================================================
            URL 重置入口
-           ?reset=1     → 忘记今天喂过；猫粮不足 4 时补到 4，方便立即再喂一次
-           ?reset=all   → 清空所有 catball_ 开头的本地数据（完全初始化）
            ========================================================= */
         (function handleResetParam() {
             let params;
