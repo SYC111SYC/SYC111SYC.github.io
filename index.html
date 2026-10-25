@@ -315,46 +315,6 @@
             font-weight: 600;
         }
 
-        .fortune-lines {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            font-size: 14px;
-        }
-
-        .fortune-hint {
-            color: #a0a8b8;
-            font-size: 13px;
-        }
-
-        .fortune-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            line-height: 1.5;
-        }
-
-        .fortune-row .lbl {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            line-height: 20px;
-            text-align: center;
-            border-radius: 5px;
-            font-size: 12px;
-            font-weight: 700;
-            flex: 0 0 auto;
-        }
-
-        .fortune-good { color: #2f8a2f; }
-        .fortune-good .lbl { background: #e3f5e3; }
-        .fortune-bad { color: #c0392b; }
-        .fortune-bad .lbl { background: #fdeaea; }
-
-        .fortune-name {
-            font-weight: 700;
-        }
-
         .fortune-sign-btn {
             margin-left: auto;
             padding: 8px 18px;
@@ -405,7 +365,6 @@
             <div class="fortune-head">
                 🔮 今日运势<span class="fortune-date" id="fortuneDate"></span><span class="fortune-streak" id="fortuneStreak"></span>
             </div>
-            <div class="fortune-lines" id="fortuneLines"></div>
         </div>
         <button class="fortune-sign-btn" id="fortuneSignBtn" type="button">签到抽运势</button>
     </div>
@@ -860,7 +819,6 @@
 
             e.preventDefault();
 
-            // 先在槽位里取位置，再浮到 body（顺序很重要）
             const rect = draggableFood.getBoundingClientRect();
             foodDrag.offsetX = e.clientX - rect.left;
             foodDrag.offsetY = e.clientY - rect.top;
@@ -882,10 +840,8 @@
             if (!foodDrag.dragging) return;
             if (e.pointerId !== foodDrag.pointerId) return;
 
-            // 立即跟手
             moveFoodTo(e.clientX, e.clientY);
 
-            // 用户真的开始拖了，猫球才追
             if (!foodDrag.moved) {
                 const moved = Math.hypot(e.clientX - foodDrag.startX, e.clientY - foodDrag.startY);
                 if (moved >= DRAG_START_THRESHOLD) {
@@ -1101,12 +1057,11 @@
         updateFoodUI();
 
         /* =========================================================
-           每日运势（严格 1 宜 + 1 忌）
+           每日运势（只显示等级与连续签到，不再显示宜忌）
            ========================================================= */
         const FORTUNE_KEY        = 'catball_fortune_v1';
         const FORTUNE_STREAK_KEY = 'catball_fortune_streak_v1';
         const FORTUNE_UID_KEY    = 'catball_fortune_uid_v1';
-        const FORTUNE_VERSION    = 2;
 
         const FORTUNE_LEVELS = [
             { name: '大吉',   weight: 8,  cls: 'lv-daji' },
@@ -1119,16 +1074,9 @@
             { name: '？？？', weight: 2,  cls: 'lv-mystery' }
         ];
 
-        const FORTUNE_ITEMS = [
-            '画猫球', '玩小恐龙', '运动', '陪猫玩', '熬夜', '换头像',
-            '慢跑', '浇花', '刷短视频', '玩纸牌', '口算', '背课文',
-            '刷习题', '上oj刷题', '养仙人球', '打游戏'
-        ];
-
         const fortuneLevelEl  = document.getElementById('fortuneLevel');
         const fortuneDateEl   = document.getElementById('fortuneDate');
         const fortuneStreakEl = document.getElementById('fortuneStreak');
-        const fortuneLinesEl  = document.getElementById('fortuneLines');
         const fortuneSignBtn  = document.getElementById('fortuneSignBtn');
 
         function getFortuneUid() {
@@ -1170,36 +1118,11 @@
             return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
         }
 
-        function pickTwoItems(rand) {
-            const pool = FORTUNE_ITEMS.slice();
-            for (let i = pool.length - 1; i > 0; i--) {
-                const j = Math.floor(rand() * (i + 1));
-                const tmp = pool[i];
-                pool[i] = pool[j];
-                pool[j] = tmp;
-            }
-            return [pool[0], pool[1]];
-        }
-
         function generateFortune(dateStr) {
             const uid = getFortuneUid();
             const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
             const lv = pickFortuneLevel(rand);
-
-            let goods = [];
-            let bads = [];
-
-            if (lv.name === '大吉') {
-                goods = ['诸事皆宜'];
-            } else if (lv.name === '大凶') {
-                bads = ['诸事不宜'];
-            } else if (lv.name !== '？？？') {
-                const picked = pickTwoItems(rand);
-                goods = [picked[0]];
-                bads = [picked[1]];
-            }
-
-            return { v: FORTUNE_VERSION, date: dateStr, level: lv.name, cls: lv.cls, goods: goods, bads: bads };
+            return { date: dateStr, level: lv.name, cls: lv.cls };
         }
 
         function getTodayFortune() {
@@ -1208,13 +1131,6 @@
             try {
                 const f = JSON.parse(raw);
                 if (!f || f.date !== todayStr() || !f.level || !f.cls) return null;
-                if (!Array.isArray(f.goods) || !Array.isArray(f.bads)) return null;
-
-                if (f.v !== FORTUNE_VERSION) {
-                    const fresh = generateFortune(f.date);
-                    setTodayFortune(fresh);
-                    return fresh;
-                }
                 return f;
             } catch (e) {
                 return null;
@@ -1247,32 +1163,6 @@
             return 0;
         }
 
-        function fortuneItemName(en) {
-            if (typeof en === 'string') return en;
-            if (en && typeof en.name === 'string') return en.name;
-            return '';
-        }
-
-        function buildFortuneRow(type, label, entry) {
-            const name = fortuneItemName(entry);
-            if (!name) return null;
-
-            const row = document.createElement('div');
-            row.className = 'fortune-row fortune-' + type;
-
-            const lbl = document.createElement('span');
-            lbl.className = 'lbl';
-            lbl.textContent = label;
-            row.appendChild(lbl);
-
-            const nameEl = document.createElement('span');
-            nameEl.className = 'fortune-name';
-            nameEl.textContent = name;
-            row.appendChild(nameEl);
-
-            return row;
-        }
-
         function renderFortune() {
             const today = todayStr();
             const f = getTodayFortune();
@@ -1284,12 +1174,6 @@
                 fortuneLevelEl.textContent = '？';
                 fortuneLevelEl.className = 'fortune-level lv-pending';
 
-                fortuneLinesEl.innerHTML = '';
-                const hint = document.createElement('span');
-                hint.className = 'fortune-hint';
-                hint.textContent = '点击右侧按钮签到，抽取今日运势~';
-                fortuneLinesEl.appendChild(hint);
-
                 fortuneSignBtn.style.display = '';
                 fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 已连续签到 ${streakDisplay} 天` : '';
                 return;
@@ -1299,19 +1183,6 @@
             fortuneLevelEl.className = 'fortune-level ' + f.cls;
             fortuneSignBtn.style.display = 'none';
             fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 连续签到 ${streakDisplay} 天` : '';
-
-            fortuneLinesEl.innerHTML = '';
-
-            if (f.level === '？？？') return;
-
-            if (f.goods && f.goods.length) {
-                const row = buildFortuneRow('good', '宜', f.goods[0]);
-                if (row) fortuneLinesEl.appendChild(row);
-            }
-            if (f.bads && f.bads.length) {
-                const row = buildFortuneRow('bad', '忌', f.bads[0]);
-                if (row) fortuneLinesEl.appendChild(row);
-            }
         }
 
         function signFortune() {
