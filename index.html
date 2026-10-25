@@ -89,6 +89,132 @@
             transform: translateY(0);
         }
 
+        /* ---------- 标题 + 黑板 ---------- */
+        .header-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 16px;
+            vertical-align: middle;
+            flex-wrap: wrap;
+        }
+
+        .blackboard {
+            position: relative;
+            display: inline-flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: stretch;
+            min-width: 280px;
+            max-width: 340px;
+            min-height: 140px;
+            padding: 10px 14px;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(255,255,255,0.06) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(255,255,255,0.05) 0%, transparent 40%),
+                linear-gradient(135deg, #2c4a3a, #1e3628);
+            border: 6px solid #8a6a3f;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 0 40px rgba(0, 0, 0, 0.3);
+            color: #e8f2eb;
+            font-family: 'Comic Sans MS', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: transform 0.15s ease;
+        }
+
+        .blackboard.shake {
+            animation: bb-shake 0.3s ease;
+        }
+
+        @keyframes bb-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-3px) rotate(-0.5deg); }
+            75% { transform: translateX(3px) rotate(0.5deg); }
+        }
+
+        .bb-idle {
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .bb-title {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .bb-hint {
+            font-size: 13px;
+            color: #b8d4c4;
+        }
+
+        .bb-question {
+            font-size: 22px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            text-shadow: 0 0 6px rgba(220, 255, 230, 0.3);
+        }
+
+        .bb-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .bb-option {
+            padding: 6px 10px;
+            border: 1.5px solid rgba(230, 245, 235, 0.7);
+            background: rgba(255, 255, 255, 0.08);
+            color: #e8f2eb;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .bb-option:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .bb-option:active {
+            transform: scale(0.96);
+        }
+
+        .bb-option.correct {
+            background: rgba(120, 220, 130, 0.35);
+            border-color: #7ed684;
+            color: #eaffee;
+        }
+
+        .bb-option.wrong {
+            background: rgba(230, 100, 100, 0.35);
+            border-color: #e67878;
+            color: #fff1f1;
+        }
+
+        .bb-progress {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #b8d4c4;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+
+        @media (max-width: 700px) {
+            .blackboard {
+                min-width: 0;
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+
         /* ---------- 猫粮状态栏 ---------- */
         .pet-food-bar {
             display: flex;
@@ -340,7 +466,20 @@
 </head>
 <body>
     <header>
-        <h1>猫球小站</h1>
+        <div class="header-brand">
+            <h1>猫球小站</h1>
+            <div class="blackboard" id="blackboard" role="button" aria-label="小黑板" title="敲我 3 下召唤猫球">
+                <div class="bb-idle" id="bbIdle">
+                    <div class="bb-title">📋 小黑板</div>
+                    <div class="bb-hint">敲我 3 下召唤猫球</div>
+                </div>
+                <div class="bb-quiz" id="bbQuiz" style="display:none;">
+                    <div class="bb-question" id="bbQuestion">—</div>
+                    <div class="bb-options" id="bbOptions"></div>
+                    <div class="bb-progress" id="bbProgress"></div>
+                </div>
+            </div>
+        </div>
         <nav>
             <a href="index.html">首页</a>
             <a href="download.html">文件分享</a>
@@ -492,7 +631,12 @@
             lastTime: 0,
             chasingFood: false,
             eating: false,
-            nextEatSpeechAt: 0
+            nextEatSpeechAt: 0,
+            /* 黑板模式 */
+            goingToBoard: false,
+            atBoard: false,
+            boardTargetX: 0,
+            boardTargetY: 0
         };
 
         function randomRange(min, max) {
@@ -545,7 +689,36 @@
             const delta = (timestamp - petState.lastTime) / 16.67;
             petState.lastTime = timestamp;
 
-            if (petState.chasingFood && foodDrag.active && !foodDrag.caught) {
+            /* ---------- 前往黑板 ---------- */
+            if (petState.goingToBoard) {
+                const dx = petState.boardTargetX - petState.x;
+                const dy = petState.boardTargetY - petState.y;
+                const dist = Math.hypot(dx, dy) || 1;
+
+                if (dist < 12) {
+                    petState.x = petState.boardTargetX;
+                    petState.y = petState.boardTargetY;
+                    petState.vx = 0;
+                    petState.vy = 0;
+                    petState.goingToBoard = false;
+                    petState.atBoard = true;
+                    startBoardQuiz();
+                } else {
+                    const speed = 13;
+                    petState.vx = (dx / dist) * speed;
+                    petState.vy = (dy / dist) * speed;
+
+                    if (timestamp > petState.nextMeowAt) {
+                        say('喵~', 500);
+                        petState.nextMeowAt = timestamp + 900;
+                    }
+                }
+            /* ---------- 在黑板旁站着 ---------- */
+            } else if (petState.atBoard) {
+                petState.vx = 0;
+                petState.vy = 0;
+            /* ---------- 追逐食物 ---------- */
+            } else if (petState.chasingFood && foodDrag.active && !foodDrag.caught) {
                 const fc = getFoodCenter();
                 const pcx = petState.x + petWrap.offsetWidth / 2;
                 const pcy = petState.y + petWrap.offsetHeight / 2;
@@ -641,6 +814,21 @@
         }
 
         pet.addEventListener('click', function() {
+            // 在黑板旁 / 正在去黑板时，点击猫球 = 离开黑板，并乱跑一下
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+                say('好吧，下次再玩~喵', 1200);
+                petState.running = true;
+                petState.runUntil = performance.now() + 3000;
+                pet.classList.add('running');
+                petState.nextMeowAt = performance.now() + 200;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = randomRange(8, 12);
+                petState.vx = Math.cos(angle) * speed;
+                petState.vy = Math.sin(angle) * speed;
+                return;
+            }
+
             petState.running = true;
             petState.runUntil = performance.now() + 10000;
             pet.classList.add('running');
@@ -660,7 +848,11 @@
 
         window.addEventListener('resize', setPetPosition);
         window.addEventListener('scroll', function() {
-            if (!petState.running && !petState.chasingFood && !petState.eating && isPetOutsideViewport()) {
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+            }
+            if (!petState.running && !petState.chasingFood && !petState.eating &&
+                !petState.atBoard && !petState.goingToBoard && isPetOutsideViewport()) {
                 petState.nextReturnSpeechAt = performance.now();
             }
         }, { passive: true });
@@ -670,6 +862,9 @@
            ========================================================= */
         const FOOD_KEY        = 'catball_food_v1';
         const FEED_DATE_KEY   = 'catball_feed_date_v1';
+        const READ_POSTS_KEY  = 'catball_read_posts_v1';
+
+        const MIN_FOOD        = 4;   // 一顿 4 个猫粮
 
         const foodCountEl     = document.getElementById('foodCount');
         const feedStatusEl    = document.getElementById('feedStatus');
@@ -678,9 +873,7 @@
         const draggableFood   = document.getElementById('draggableFood');
 
         const FOOD_SIZE       = 34;
-        /* 猫球中心到食物中心距离小于这个值才判定"碰到" */
         const CATCH_DISTANCE  = 24;
-        /* 用户拖动超过这个距离，猫球才开始追 */
         const DRAG_START_THRESHOLD = 6;
         const EAT_PHRASES     = ['啊呜', '咔嚓咔嚓', '吧唧吧唧', '喵呜~', '好吃！', '嚼嚼嚼...', '啊呜啊呜'];
 
@@ -736,6 +929,29 @@
             }, 350);
         }
 
+        /* ---------- 今日已读帖子（每篇只 +1 猫粮） ---------- */
+        function getReadPostsToday() {
+            const raw = safeGet(READ_POSTS_KEY);
+            if (!raw) return { date: todayStr(), ids: [] };
+            try {
+                const data = JSON.parse(raw);
+                if (data && data.date === todayStr() && Array.isArray(data.ids)) {
+                    return data;
+                }
+            } catch (e) { /* 忽略 */ }
+            return { date: todayStr(), ids: [] };
+        }
+
+        function markPostReadOnce(id) {
+            const data = getReadPostsToday();
+            if (data.ids.indexOf(id) >= 0) return false;
+            data.ids.push(id);
+            data.date = todayStr();
+            safeSet(READ_POSTS_KEY, JSON.stringify(data));
+            return true;
+        }
+
+        /* ---------- 食物拖拽状态 ---------- */
         const foodDrag = {
             active: false,
             dragging: false,
@@ -804,7 +1020,6 @@
             draggableFood.style.top = foodDrag.y + 'px';
         }
 
-        /* ---------- 拖动开始：不再使用 setPointerCapture ---------- */
         draggableFood.addEventListener('pointerdown', function(e) {
             if (foodDrag.caught) return;
             if (petState.eating) return;
@@ -812,9 +1027,14 @@
                 say('今天已经吃过啦，明天再来~', 1800);
                 return;
             }
-            if (getFoodCount() < 1) {
-                say('还没有猫粮…去看看帖子攒猫粮喵~', 2200);
+            if (getFoodCount() < MIN_FOOD) {
+                say(`猫粮不够，还差 ${MIN_FOOD - getFoodCount()} 个喵~`, 2200);
                 return;
+            }
+
+            // 开始拖动猫粮 → 让猫球离开黑板
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
             }
 
             e.preventDefault();
@@ -835,7 +1055,6 @@
             }
         });
 
-        /* ---------- 全局 pointermove：保证拖到任何位置都能收到 ---------- */
         document.addEventListener('pointermove', function(e) {
             if (!foodDrag.dragging) return;
             if (e.pointerId !== foodDrag.pointerId) return;
@@ -855,7 +1074,6 @@
             }
         });
 
-        /* ---------- 全局 pointerup / pointercancel ---------- */
         function onGlobalPointerEnd(e) {
             if (!foodDrag.dragging) return;
             if (e.pointerId !== foodDrag.pointerId) return;
@@ -885,7 +1103,6 @@
                     return;
                 }
             }
-            // 否则食物停在原地，猫球继续追过去（chasingFood 保持 true）
         }
 
         function catchFood() {
@@ -941,7 +1158,7 @@
             foodDrag.moved = false;
 
             const count = getFoodCount();
-            setFoodCount(Math.max(0, count - 1));
+            setFoodCount(Math.max(0, count - MIN_FOOD));
             safeSet(FEED_DATE_KEY, todayStr());
             updateFoodUI();
 
@@ -963,11 +1180,15 @@
                 say('我今天已经吃过啦，明天再来~', 1800);
                 return;
             }
-            if (getFoodCount() < 1) {
-                say('还没有猫粮…去看看帖子攒猫粮喵~', 2200);
+            if (getFoodCount() < MIN_FOOD) {
+                say(`猫粮不够，还差 ${MIN_FOOD - getFoodCount()} 个喵~`, 2200);
                 return;
             }
             if (foodDrag.active || petState.eating) return;
+
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+            }
 
             floatFood();
 
@@ -998,7 +1219,7 @@
             } else {
                 foodSlotEl.classList.remove('empty');
             }
-            if (!foodDrag.active && fed && count > 0) {
+            if (!foodDrag.active && fed) {
                 foodSlotEl.classList.add('locked');
             } else {
                 foodSlotEl.classList.remove('locked');
@@ -1009,11 +1230,11 @@
                 feedStatusEl.classList.add('fed');
                 feedBtn.disabled = true;
                 feedBtn.textContent = '今天喂过啦';
-            } else if (count < 1) {
-                feedStatusEl.textContent = '还没有猫粮（浏览帖子可 +1）';
+            } else if (count < MIN_FOOD) {
+                feedStatusEl.textContent = `还差 ${MIN_FOOD - count} 个猫粮才能喂（一顿 4 个）`;
                 feedStatusEl.classList.remove('fed');
                 feedBtn.disabled = true;
-                feedBtn.textContent = '猫粮不足';
+                feedBtn.textContent = `还差 ${MIN_FOOD - count} 个`;
             } else {
                 feedStatusEl.textContent = '拖动猫粮喂我，或点喂猫~';
                 feedStatusEl.classList.remove('fed');
@@ -1022,9 +1243,21 @@
             }
         }
 
+        /* 浏览帖子 → 今日每篇 +1 猫粮（同一篇一天只 +1） */
         document.getElementById('postList').addEventListener('click', function(e) {
             const link = e.target.closest('a[href*="post.html"]');
             if (!link) return;
+
+            let id = '';
+            try {
+                const url = new URL(link.href, location.href);
+                id = url.searchParams.get('id') || '';
+            } catch (err) {
+                const m = (link.getAttribute('href') || '').match(/id=([^&]+)/);
+                if (m) id = decodeURIComponent(m[1]);
+            }
+            if (!id) return;
+            if (!markPostReadOnce(id)) return;
             addFood(1);
         });
 
@@ -1057,7 +1290,227 @@
         updateFoodUI();
 
         /* =========================================================
-           每日运势（只显示等级与连续签到，不再显示宜忌）
+           黑板答题系统
+           ========================================================= */
+        const blackboard   = document.getElementById('blackboard');
+        const bbIdle       = document.getElementById('bbIdle');
+        const bbQuiz       = document.getElementById('bbQuiz');
+        const bbQuestion   = document.getElementById('bbQuestion');
+        const bbOptions    = document.getElementById('bbOptions');
+        const bbProgress   = document.getElementById('bbProgress');
+
+        const BLACKBOARD_TAP_REQUIRED = 3;
+        let blackboardTaps = 0;
+
+        const quizState = {
+            active: false,
+            correctCount: 0,
+            totalForReward: 5,
+            locked: false,
+            current: null
+        };
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function generateQuestion() {
+            const types = ['+', '-', '×', '÷'];
+            const type = types[Math.floor(Math.random() * types.length)];
+
+            let a, b, answer, qText;
+
+            if (type === '+') {
+                a = randInt(10, 99);
+                b = randInt(10, 99);
+                answer = a + b;
+                qText = `${a} + ${b} = ?`;
+            } else if (type === '-') {
+                a = randInt(10, 99);
+                b = randInt(10, 99);
+                if (a < b) { const t = a; a = b; b = t; }
+                answer = a - b;
+                qText = `${a} - ${b} = ?`;
+            } else if (type === '×') {
+                a = randInt(10, 99);
+                b = randInt(2, 9);
+                answer = a * b;
+                qText = `${a} × ${b} = ?`;
+            } else {
+                b = randInt(2, 9);
+                if (Math.floor(99 / b) < 10) b = 2;
+                answer = randInt(10, Math.floor(99 / b));
+                a = b * answer;
+                qText = `${a} ÷ ${b} = ?`;
+            }
+
+            const opts = new Set([answer]);
+            let guard = 0;
+            while (opts.size < 4 && guard++ < 200) {
+                const range = Math.max(3, Math.round(answer * 0.15));
+                let delta = randInt(1, range);
+                if (Math.random() < 0.5) delta = -delta;
+                const v = answer + delta;
+                if (v >= 0 && v !== answer) opts.add(v);
+            }
+            let pad = 1;
+            while (opts.size < 4) {
+                const v = answer + pad;
+                if (v !== answer) opts.add(v);
+                pad++;
+                if (pad > 50) break;
+            }
+
+            const arr = Array.from(opts);
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tmp = arr[i];
+                arr[i] = arr[j];
+                arr[j] = tmp;
+            }
+
+            return { qText: qText, answer: answer, options: arr };
+        }
+
+        function renderQuestion() {
+            if (!quizState.active) return;
+
+            const q = generateQuestion();
+            quizState.current = q;
+            quizState.locked = false;
+
+            bbQuestion.textContent = q.qText;
+            bbProgress.textContent = `答对 ${quizState.correctCount} / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+            bbOptions.innerHTML = '';
+
+            q.options.forEach(function(v) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'bb-option';
+                btn.textContent = v;
+                btn.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    handleAnswer(btn, v);
+                });
+                bbOptions.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(btn, value) {
+            if (!quizState.active || quizState.locked) return;
+            if (!quizState.current) return;
+
+            if (value === quizState.current.answer) {
+                quizState.locked = true;
+                btn.classList.add('correct');
+                quizState.correctCount++;
+                bbProgress.textContent = `答对 ${quizState.correctCount} / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+                say('答对啦喵！', 800);
+
+                setTimeout(function() {
+                    if (!quizState.active) return;
+
+                    if (quizState.correctCount >= quizState.totalForReward) {
+                        quizState.correctCount = 0;
+                        addFood(1);
+                        say('答对5题！奖励1个猫粮！喵呜~', 2000);
+                        bbProgress.textContent = `答对 0 / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+                        setTimeout(renderQuestion, 700);
+                    } else {
+                        renderQuestion();
+                    }
+                }, 500);
+            } else {
+                btn.classList.add('wrong');
+                say('喵？再想想~', 900);
+                setTimeout(function() {
+                    btn.classList.remove('wrong');
+                }, 600);
+            }
+        }
+
+        function startBoardQuiz() {
+            quizState.active = true;
+            quizState.correctCount = 0;
+            quizState.locked = false;
+            quizState.current = null;
+
+            bbIdle.style.display = 'none';
+            bbQuiz.style.display = '';
+            bbProgress.textContent = `答对 0 / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+
+            renderQuestion();
+            say('我们来算算术吧喵！', 1400);
+        }
+
+        function hideBoardQuiz() {
+            quizState.active = false;
+            quizState.locked = false;
+            quizState.current = null;
+            bbQuiz.style.display = 'none';
+            bbIdle.style.display = '';
+            bbProgress.textContent = '';
+            bbOptions.innerHTML = '';
+        }
+
+        function leaveBoard() {
+            const wasActive = petState.atBoard || petState.goingToBoard;
+            petState.atBoard = false;
+            petState.goingToBoard = false;
+            blackboardTaps = 0;
+            hideBoardQuiz();
+            if (wasActive) {
+                setRandomIdleDirection();
+            }
+            return wasActive;
+        }
+
+        function attractPetToBoard() {
+            if (petState.atBoard || petState.goingToBoard) return;
+            if (petState.eating) {
+                say('我在吃饭呢喵~', 1200);
+                return;
+            }
+            if (petState.chasingFood || foodDrag.active) return;
+
+            const rect = blackboard.getBoundingClientRect();
+            const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
+            const maxY = Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8);
+
+            const tx = rect.right + window.scrollX - 24;
+            const ty = rect.bottom + window.scrollY - 16;
+
+            petState.boardTargetX = clamp(tx, 8, maxX);
+            petState.boardTargetY = clamp(ty, 8, maxY);
+
+            petState.running = false;
+            pet.classList.remove('running');
+            petState.goingToBoard = true;
+            petState.nextMeowAt = performance.now() + 200;
+            say('小黑板叫我啦？喵！', 1200);
+        }
+
+        blackboard.addEventListener('click', function(e) {
+            if (e.target.closest('.bb-option')) return;
+            if (petState.atBoard) return;
+            if (petState.goingToBoard) return;
+            if (petState.eating) return;
+
+            blackboardTaps++;
+            blackboard.classList.remove('shake');
+            void blackboard.offsetWidth;
+            blackboard.classList.add('shake');
+
+            if (blackboardTaps >= BLACKBOARD_TAP_REQUIRED) {
+                blackboardTaps = 0;
+                attractPetToBoard();
+            } else {
+                say(`再敲 ${BLACKBOARD_TAP_REQUIRED - blackboardTaps} 下喵~`, 900);
+            }
+        });
+
+        /* =========================================================
+           每日运势
            ========================================================= */
         const FORTUNE_KEY        = 'catball_fortune_v1';
         const FORTUNE_STREAK_KEY = 'catball_fortune_streak_v1';
@@ -1221,6 +1674,8 @@
 
         /* =========================================================
            URL 重置入口
+           ?reset=1     → 忘记今天喂过；猫粮不足 4 时补到 4，方便立即再喂一次
+           ?reset=all   → 清空所有 catball_ 开头的本地数据（完全初始化）
            ========================================================= */
         (function handleResetParam() {
             let params;
@@ -1248,8 +1703,8 @@
                     didReset = true;
                 } catch (e) { /* 忽略 */ }
 
-                if (getFoodCount() < 1) {
-                    try { localStorage.setItem(FOOD_KEY, '1'); } catch (e) {}
+                if (getFoodCount() < MIN_FOOD) {
+                    try { localStorage.setItem(FOOD_KEY, String(MIN_FOOD)); } catch (e) {}
                 }
             }
 
