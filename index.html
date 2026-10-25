@@ -10,6 +10,7 @@
             margin: 0;
             position: relative;
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
         .pet-wrap {
@@ -82,6 +83,19 @@
             border-left: 1px solid rgba(0, 0, 0, 0.08);
             border-bottom: 1px solid rgba(0, 0, 0, 0.08);
             transform: rotate(45deg);
+        }
+
+        .pet-speech.left {
+            left: auto;
+            right: 72px;
+        }
+
+        .pet-speech.left::before {
+            left: auto;
+            right: -8px;
+            border-left: none;
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
+            transform: rotate(-45deg);
         }
 
         .pet-speech.visible {
@@ -651,6 +665,19 @@
         }
 
         function say(text, duration = 1400) {
+            // 自动判断气泡方向
+            const petRight = petState.x + petWrap.offsetWidth;
+            const viewportRight = window.scrollX + window.innerWidth;
+            const spaceRight = viewportRight - petRight;
+            // 气泡预估宽度（max-width + padding + 边距）
+            const speechTotalWidth = 210;
+
+            if (spaceRight < speechTotalWidth) {
+                petSpeech.classList.add('left');
+            } else {
+                petSpeech.classList.remove('left');
+            }
+
             petSpeech.textContent = text;
             petSpeech.classList.add('visible');
             clearTimeout(speechTimer);
@@ -845,7 +872,19 @@
         petWrap.style.opacity = '1';
         requestAnimationFrame(animate);
 
-        window.addEventListener('resize', setPetPosition);
+        window.addEventListener('resize', function() {
+            setPetPosition();
+            // 修正黑板召唤目标位置
+            if (petState.atBoard || petState.goingToBoard) {
+                const rect = blackboard.getBoundingClientRect();
+                const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
+                const maxY = Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8);
+                if (window.innerWidth <= 700) {
+                    petState.boardTargetX = clamp(rect.left + window.scrollX + 12, 8, maxX);
+                    petState.boardTargetY = clamp(rect.bottom + window.scrollY + 10, 8, maxY);
+                }
+            }
+        });
         window.addEventListener('scroll', function() {
             if (petState.atBoard || petState.goingToBoard) {
                 leaveBoard();
@@ -1472,8 +1511,15 @@
             const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
             const maxY = Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8);
 
-            const tx = rect.right + window.scrollX - 24;
-            const ty = rect.bottom + window.scrollY - 16;
+            let tx, ty;
+            // 窄屏（黑板占满宽度）时，猫球定位到黑板下方
+            if (window.innerWidth <= 700) {
+                tx = rect.left + window.scrollX + 12;
+                ty = rect.bottom + window.scrollY + 10;
+            } else {
+                tx = rect.right + window.scrollX - 24;
+                ty = rect.bottom + window.scrollY - 16;
+            }
 
             petState.boardTargetX = clamp(tx, 8, maxX);
             petState.boardTargetY = clamp(ty, 8, maxY);
