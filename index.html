@@ -13,6 +13,90 @@
             overflow-x: hidden;
         }
 
+        /* ---------- 安全锁定层 ---------- */
+        .lock-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f5f7fa, #e4e8ef);
+            backdrop-filter: blur(8px);
+            padding: 20px;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .lock-card {
+            width: 100%;
+            max-width: 380px;
+            padding: 32px 28px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+            text-align: center;
+        }
+
+        .lock-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .lock-desc {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .lock-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+            margin-bottom: 16px;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .lock-input:focus {
+            border-color: #8fb0ff;
+            box-shadow: 0 0 0 3px rgba(143, 176, 255, 0.2);
+        }
+
+        .lock-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #8fb0ff;
+            color: #fff;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .lock-btn:hover {
+            background: #6f97ff;
+        }
+
+        .lock-btn:active {
+            transform: scale(0.98);
+        }
+
+        .lock-tip {
+            margin-top: 14px;
+            font-size: 13px;
+            min-height: 18px;
+            color: #e53e3e;
+        }
+
         .pet-wrap {
             position: absolute;
             left: 0;
@@ -483,6 +567,17 @@
     </style>
 </head>
 <body>
+    <!-- 安全锁定层 -->
+    <div id="lockScreen" class="lock-screen">
+        <div class="lock-card">
+            <div class="lock-title">🔒 访问受限</div>
+            <div class="lock-desc">很抱歉，现在不是本站的服务时间<br>工作日 10:00 - 17:15 期间暂停访问</div>
+            <input type="password" id="lockKeyInput" class="lock-input" placeholder="请输入站长密钥解锁">
+            <button id="lockUnlockBtn" class="lock-btn" type="button">解锁访问</button>
+            <div id="lockTip" class="lock-tip"></div>
+        </div>
+    </div>
+
     <header>
         <div class="header-brand">
             <h1>猫球小站</h1>
@@ -563,6 +658,121 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="js/main.js"></script>
     <script>
+        /* =========================================================
+           安全锁系统
+           ========================================================= */
+        const CORRECT_KEY_HASH = '209810201699e6e8c5d142008571494ea0b12e05c8dff301b406001aa48046f3';
+        const UNLOCK_TOKEN_KEY = 'catball_unlock_token_v1';
+        const LOCK_START_MIN = 10 * 60;   // 10:00
+        const LOCK_END_MIN = 20 * 60 + 15; // 17:15
+
+        const lockScreen = document.getElementById('lockScreen');
+        const lockKeyInput = document.getElementById('lockKeyInput');
+        const lockUnlockBtn = document.getElementById('lockUnlockBtn');
+        const lockTip = document.getElementById('lockTip');
+
+        // 安全读写本地存储
+        function lockSafeGet(key) {
+            try { return localStorage.getItem(key); } catch (e) { return null; }
+        }
+        function lockSafeSet(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) {}
+        }
+
+        // 获取当日日期字符串
+        function lockTodayStr() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        // 计算字符串的 SHA-256 哈希
+        async function sha256(str) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // 判断当前是否为锁定时间（工作日 10:00-17:15）
+        function isLockTime() {
+            const now = new Date();
+            const day = now.getDay(); // 0=周日, 1-5=周一到周五, 6=周六
+            if (day < 1 || day > 5) return false; // 周末不锁定
+            
+            const minutes = now.getHours() * 60 + now.getMinutes();
+            return minutes >= LOCK_START_MIN && minutes <= LOCK_END_MIN;
+        }
+
+        // 检查是否已解锁（当天有效）
+        async function isUnlocked() {
+            const raw = lockSafeGet(UNLOCK_TOKEN_KEY);
+            if (!raw) return false;
+            try {
+                const data = JSON.parse(raw);
+                if (data.date !== lockTodayStr()) return false;
+                return data.hash === CORRECT_KEY_HASH;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // 显示/隐藏锁定层
+        function showLock(show) {
+            lockScreen.style.display = show ? 'flex' : 'none';
+        }
+
+        // 执行解锁
+        async function tryUnlock() {
+            const input = lockKeyInput.value.trim();
+            if (!input) {
+                lockTip.textContent = '请输入密钥';
+                return;
+            }
+            
+            const inputHash = await sha256(input);
+            if (inputHash === CORRECT_KEY_HASH) {
+                const data = { date: lockTodayStr(), hash: inputHash };
+                lockSafeSet(UNLOCK_TOKEN_KEY, JSON.stringify(data));
+                lockTip.textContent = '';
+                showLock(false);
+            } else {
+                lockTip.textContent = '密钥错误，请重试';
+                lockKeyInput.value = '';
+                lockKeyInput.focus();
+            }
+        }
+
+        // 定时检查时间，自动处理锁定/解锁
+        async function checkLockStatus() {
+            if (!isLockTime()) {
+                showLock(false);
+                return;
+            }
+            
+            const unlocked = await isUnlocked();
+            if (!unlocked) {
+                showLock(true);
+            } else {
+                showLock(false);
+            }
+        }
+
+        // 事件绑定
+        lockUnlockBtn.addEventListener('click', tryUnlock);
+        lockKeyInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                tryUnlock();
+            }
+        });
+
+        // 初始化 + 每分钟检查
+        checkLockStatus();
+        setInterval(checkLockStatus, 60 * 1000);
+
         /* =========================================================
            文章加载 / 渲染 / 搜索 / 折叠
            ========================================================= */
