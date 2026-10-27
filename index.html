@@ -564,6 +564,109 @@
             .fortune-level { min-width: 72px; font-size: 20px; padding: 8px 10px; }
             .fortune-sign-btn { margin-left: 0; width: 100%; }
         }
+
+        /* ---------- 逗猫棒 ---------- */
+        .wand-slot {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            border: 2px dashed rgba(160, 130, 220, 0.55);
+            background: rgba(255, 255, 255, 0.55);
+            flex: 0 0 auto;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .wand-slot.empty {
+            border-color: rgba(160, 130, 220, 0.25);
+            background: rgba(250, 250, 255, 0.4);
+        }
+
+        .wand-slot.empty .draggable-wand {
+            display: none;
+        }
+
+        .draggable-wand {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 19px;
+            line-height: 1;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            background: radial-gradient(circle at 35% 35%, #f3e9ff, #dcc8ff 55%, #b79ce8);
+            box-shadow: 0 2px 6px rgba(120, 90, 180, 0.35);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .draggable-wand:hover {
+            transform: scale(1.1);
+        }
+
+        .draggable-wand.dragging {
+            cursor: grabbing;
+            transform: scale(1.15);
+            box-shadow: 0 6px 14px rgba(120, 90, 180, 0.5);
+        }
+
+        .draggable-wand.floating {
+            position: absolute;
+            z-index: 10000;
+            margin: 0;
+            transition: none;
+            box-shadow: 0 8px 18px rgba(120, 90, 180, 0.5);
+        }
+
+        /* ---------- 帖子排序 ---------- */
+        .sort-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .sort-bar .sort-label {
+            color: #8a94a6;
+            margin-right: 2px;
+        }
+
+        .sort-btn {
+            padding: 5px 14px;
+            border: 1px solid #d6dde8;
+            background: #fff;
+            border-radius: 16px;
+            color: #55607a;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease,
+                        border-color 0.15s ease, transform 0.1s ease;
+        }
+
+        .sort-btn:hover {
+            border-color: #8fb0ff;
+            color: #3d6bdc;
+        }
+
+        .sort-btn:active {
+            transform: scale(0.96);
+        }
+
+        .sort-btn.active {
+            background: #8fb0ff;
+            border-color: #8fb0ff;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -608,6 +711,9 @@
         <div class="food-slot" id="foodSlot">
             <div class="draggable-food" id="draggableFood" title="拖动我去喂猫">🍖</div>
         </div>
+        <div class="wand-slot" id="wandSlot">
+            <div class="draggable-wand" id="draggableWand" title="拖动我逗猫球玩 🪄">🪄</div>
+        </div>
         <button class="pet-food-btn" id="feedBtn" type="button">喂猫 🐱</button>
     </div>
 
@@ -623,6 +729,12 @@
 
     <div class="search-container">
         <input type="text" id="searchInput" placeholder="搜索帖子标题或内容...">
+        <div class="sort-bar" id="sortBar">
+            <span class="sort-label">排序：</span>
+            <button type="button" class="sort-btn active" data-sort="new">🕒 最新</button>
+            <button type="button" class="sort-btn" data-sort="title">🔤 名称</button>
+            <button type="button" class="sort-btn" data-sort="id">🔢 编号</button>
+        </div>
         <p id="searchTip"></p>
     </div>
 
@@ -774,7 +886,7 @@
         setInterval(checkLockStatus, 60 * 1000);
 
         /* =========================================================
-           文章加载 / 渲染 / 搜索 / 折叠
+           文章加载 / 渲染 / 搜索 / 排序 / 折叠
            ========================================================= */
         let allPosts = [];
 
@@ -782,7 +894,7 @@
             .then(res => res.json())
             .then(data => {
                 allPosts = data.posts;
-                renderPosts(allPosts);
+                applyFilterAndSort();
             })
             .catch(err => {
                 document.getElementById('postList').innerHTML = '<p class="error">加载失败，请检查 posts.json 语法是否正确</p>';
@@ -810,21 +922,98 @@
 
         const searchInput = document.getElementById('searchInput');
         const searchTip = document.getElementById('searchTip');
-        searchInput.addEventListener('input', function() {
-            const keyword = this.value.trim().toLowerCase();
-            if (!keyword) {
-                searchTip.textContent = '';
-                renderPosts(allPosts);
-                return;
+        const sortBar = document.getElementById('sortBar');
+        const SORT_KEY = 'catball_post_sort_v1';
+
+        let currentSort = 'new';        // new | title | id
+        let currentKeyword = '';
+
+        // 读取上次选择
+        try {
+            const savedSort = localStorage.getItem(SORT_KEY);
+            if (savedSort && ['new', 'title', 'id'].indexOf(savedSort) >= 0) {
+                currentSort = savedSort;
             }
-            const filtered = allPosts.filter(post =>
-                post.title.toLowerCase().includes(keyword) ||
-                post.summary.toLowerCase().includes(keyword) ||
-                post.content.toLowerCase().includes(keyword)
-            );
-            renderPosts(filtered);
-            searchTip.textContent = `找到 ${filtered.length} 篇相关帖子`;
+        } catch (e) { /* 忽略 */ }
+
+        function sortPosts(posts, mode) {
+            const list = posts.slice();
+
+            if (mode === 'title') {
+                list.sort((a, b) =>
+                    String(a.title || '').localeCompare(
+                        String(b.title || ''), 'zh-Hans-CN',
+                        { numeric: true, sensitivity: 'base' }
+                    )
+                );
+            } else if (mode === 'id') {
+                list.sort((a, b) => {
+                    const na = Number(a.id);
+                    const nb = Number(b.id);
+                    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+                    return String(a.id).localeCompare(
+                        String(b.id), 'zh-Hans-CN', { numeric: true }
+                    );
+                });
+            } else {
+                // 默认：新的在前（日期倒序，同日期按编号倒序）
+                list.sort((a, b) => {
+                    const d = String(b.date || '').localeCompare(String(a.date || ''));
+                    if (d !== 0) return d;
+                    const na = Number(a.id);
+                    const nb = Number(b.id);
+                    if (Number.isFinite(na) && Number.isFinite(nb)) return nb - na;
+                    return 0;
+                });
+            }
+            return list;
+        }
+
+        function applyFilterAndSort() {
+            let list = allPosts;
+
+            if (currentKeyword) {
+                const kw = currentKeyword.toLowerCase();
+                list = list.filter(post =>
+                    String(post.title || '').toLowerCase().includes(kw) ||
+                    String(post.summary || '').toLowerCase().includes(kw) ||
+                    String(post.content || '').toLowerCase().includes(kw)
+                );
+            }
+
+            const sorted = sortPosts(list, currentSort);
+            renderPosts(sorted);
+
+            searchTip.textContent = currentKeyword
+                ? `找到 ${sorted.length} 篇相关帖子`
+                : '';
+        }
+
+        function updateSortButtons() {
+            const btns = sortBar.querySelectorAll('.sort-btn');
+            btns.forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.sort === currentSort);
+            });
+        }
+
+        sortBar.addEventListener('click', function (e) {
+            const btn = e.target.closest('.sort-btn');
+            if (!btn) return;
+            const mode = btn.dataset.sort;
+            if (!mode || mode === currentSort) return;
+
+            currentSort = mode;
+            try { localStorage.setItem(SORT_KEY, mode); } catch (err) {}
+            updateSortButtons();
+            applyFilterAndSort();
         });
+
+        searchInput.addEventListener('input', function () {
+            currentKeyword = this.value.trim().toLowerCase();
+            applyFilterAndSort();
+        });
+
+        updateSortButtons();
 
         const foldToggle = document.getElementById('foldToggle');
         const foldContent = document.getElementById('foldContent');
@@ -860,6 +1049,8 @@
             chasingFood: false,
             eating: false,
             nextEatSpeechAt: 0,
+            chasingWand: false,
+            nextWandSpeechAt: 0,
             goingToBoard: false,
             atBoard: false,
             boardTargetX: 0,
@@ -955,6 +1146,31 @@
             } else if (petState.atBoard) {
                 petState.vx = 0;
                 petState.vy = 0;
+            } else if (petState.chasingWand && wandDrag.active) {
+                const wc = getWandCenter();
+                const pcx = petState.x + petWrap.offsetWidth / 2;
+                const pcy = petState.y + petWrap.offsetHeight / 2;
+                const dx = wc.x - pcx;
+                const dy = wc.y - pcy;
+                const dist = Math.hypot(dx, dy) || 1;
+
+                if (dist > WAND_CATCH_DISTANCE) {
+                    petState.vx = (dx / dist) * WAND_SPEED;
+                    petState.vy = (dy / dist) * WAND_SPEED;
+                } else {
+                    petState.vx = 0;
+                    petState.vy = 0;
+                }
+
+                if (timestamp > petState.nextWandSpeechAt) {
+                    if (dist <= WAND_CATCH_DISTANCE) {
+                        say(WAND_CATCH_PHRASES[Math.floor(Math.random() * WAND_CATCH_PHRASES.length)], 900);
+                        petState.nextWandSpeechAt = timestamp + 2200;
+                    } else {
+                        say(WAND_PHRASES[Math.floor(Math.random() * WAND_PHRASES.length)], 800);
+                        petState.nextWandSpeechAt = timestamp + 1800;
+                    }
+                }
             } else if (petState.chasingFood && foodDrag.active && !foodDrag.caught) {
                 const fc = getFoodCenter();
                 const pcx = petState.x + petWrap.offsetWidth / 2;
@@ -1281,6 +1497,9 @@
             if (petState.atBoard || petState.goingToBoard) {
                 leaveBoard();
             }
+            if (wandDrag.active) {
+                resetWandToSlot();
+            }
 
             e.preventDefault();
 
@@ -1434,6 +1653,9 @@
             if (petState.atBoard || petState.goingToBoard) {
                 leaveBoard();
             }
+            if (wandDrag.active) {
+                resetWandToSlot();
+            }
 
             floatFood();
 
@@ -1532,6 +1754,178 @@
         }, 60 * 1000);
 
         updateFoodUI();
+
+        /* =========================================================
+           逗猫棒系统
+           ========================================================= */
+        const wandSlotEl = document.getElementById('wandSlot');
+        const draggableWand = document.getElementById('draggableWand');
+
+        const WAND_SIZE = 34;
+        const WAND_CATCH_DISTANCE = 30;
+        const WAND_SPEED = 9.5;
+
+        const WAND_PHRASES = [
+            '喵！逗猫棒！',
+            '等我等我！',
+            '喵呜~ 抓到啦！',
+            '嘿咻嘿咻~',
+            '别跑！喵！'
+        ];
+        const WAND_CATCH_PHRASES = [
+            '抓到啦喵！',
+            '喵！咬住！',
+            '哈哈，抓住你了！',
+            '这个归我了喵~'
+        ];
+
+        const wandDrag = {
+            active: false,
+            dragging: false,
+            pointerId: null,
+            offsetX: 0,
+            offsetY: 0,
+            startX: 0,
+            startY: 0,
+            moved: false,
+            x: 0,
+            y: 0
+        };
+
+        function getWandCenter() {
+            return {
+                x: wandDrag.x + WAND_SIZE / 2,
+                y: wandDrag.y + WAND_SIZE / 2
+            };
+        }
+
+        function updateWandUI() {
+            if (wandDrag.active) {
+                wandSlotEl.classList.add('empty');
+            } else {
+                wandSlotEl.classList.remove('empty');
+            }
+        }
+
+        function floatWand() {
+            const rect = draggableWand.getBoundingClientRect();
+            wandDrag.x = rect.left + window.scrollX;
+            wandDrag.y = rect.top + window.scrollY;
+
+            document.body.appendChild(draggableWand);
+            draggableWand.classList.add('floating');
+            draggableWand.style.left = wandDrag.x + 'px';
+            draggableWand.style.top = wandDrag.y + 'px';
+            draggableWand.style.transform = '';
+
+            wandDrag.active = true;
+            updateWandUI();
+        }
+
+        function resetWandToSlot() {
+            draggableWand.classList.remove('floating', 'dragging');
+            draggableWand.style.transition = 'none';
+            draggableWand.style.left = '';
+            draggableWand.style.top = '';
+            draggableWand.style.transform = '';
+            wandSlotEl.appendChild(draggableWand);
+            void draggableWand.offsetWidth;
+            draggableWand.style.transition = '';
+
+            wandDrag.active = false;
+            wandDrag.dragging = false;
+            wandDrag.pointerId = null;
+            wandDrag.moved = false;
+
+            petState.chasingWand = false;
+
+            if (!petState.eating && !petState.running &&
+                !petState.chasingFood && !petState.atBoard && !petState.goingToBoard) {
+                setRandomIdleDirection();
+            }
+            updateWandUI();
+        }
+
+        function moveWandTo(clientX, clientY) {
+            wandDrag.x = clientX + window.scrollX - wandDrag.offsetX;
+            wandDrag.y = clientY + window.scrollY - wandDrag.offsetY;
+
+            const maxX = Math.max(0, document.documentElement.scrollWidth - WAND_SIZE);
+            const maxY = Math.max(0, document.documentElement.scrollHeight - WAND_SIZE);
+            wandDrag.x = clamp(wandDrag.x, 0, maxX);
+            wandDrag.y = clamp(wandDrag.y, 0, maxY);
+
+            draggableWand.style.left = wandDrag.x + 'px';
+            draggableWand.style.top = wandDrag.y + 'px';
+        }
+
+        draggableWand.addEventListener('pointerdown', function (e) {
+            if (petState.eating) {
+                say('吃饭呢，等下再玩喵~', 1500);
+                return;
+            }
+
+            e.preventDefault();
+
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+            }
+            if (foodDrag.active && !foodDrag.caught) {
+                resetFoodToSlot();
+                petState.chasingFood = false;
+            }
+
+            const rect = draggableWand.getBoundingClientRect();
+            wandDrag.offsetX = e.clientX - rect.left;
+            wandDrag.offsetY = e.clientY - rect.top;
+            wandDrag.startX = e.clientX;
+            wandDrag.startY = e.clientY;
+            wandDrag.pointerId = e.pointerId;
+            wandDrag.dragging = true;
+            wandDrag.moved = false;
+
+            draggableWand.classList.add('dragging');
+
+            if (!wandDrag.active) {
+                floatWand();
+            }
+        });
+
+        document.addEventListener('pointermove', function (e) {
+            if (!wandDrag.dragging) return;
+            if (e.pointerId !== wandDrag.pointerId) return;
+
+            moveWandTo(e.clientX, e.clientY);
+
+            if (!wandDrag.moved) {
+                const moved = Math.hypot(
+                    e.clientX - wandDrag.startX,
+                    e.clientY - wandDrag.startY
+                );
+                if (moved >= DRAG_START_THRESHOLD) {
+                    wandDrag.moved = true;
+                    petState.running = false;
+                    pet.classList.remove('running');
+                    petState.chasingWand = true;
+                    petState.nextWandSpeechAt = performance.now() + 300;
+                    say('逗猫棒！我来啦喵！', 1000);
+                }
+            }
+        });
+
+        function onWandPointerEnd(e) {
+            if (!wandDrag.dragging) return;
+            if (e.pointerId !== wandDrag.pointerId) return;
+            wandDrag.dragging = false;
+            draggableWand.classList.remove('dragging');
+            wandDrag.pointerId = null;
+            resetWandToSlot();
+        }
+
+        document.addEventListener('pointerup', onWandPointerEnd);
+        document.addEventListener('pointercancel', onWandPointerEnd);
+
+        updateWandUI();
 
         /* =========================================================
            黑板答题系统
@@ -1716,6 +2110,7 @@
                 return;
             }
             if (petState.chasingFood || foodDrag.active) return;
+            if (petState.chasingWand || wandDrag.active) return;
 
             const rect = blackboard.getBoundingClientRect();
             const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
