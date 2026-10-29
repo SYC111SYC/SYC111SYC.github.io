@@ -596,7 +596,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 19px;
+            padding: 0;
             line-height: 1;
             cursor: grab;
             user-select: none;
@@ -605,6 +605,11 @@
             box-shadow: 0 2px 6px rgba(120, 90, 180, 0.35);
             transition: transform 0.12s ease, box-shadow 0.12s ease;
             -webkit-tap-highlight-color: transparent;
+        }
+
+        .draggable-wand svg {
+            display: block;
+            pointer-events: none;
         }
 
         .draggable-wand:hover {
@@ -712,7 +717,25 @@
             <div class="draggable-food" id="draggableFood" title="拖动我去喂猫">🍖</div>
         </div>
         <div class="wand-slot" id="wandSlot">
-            <div class="draggable-wand" id="draggableWand" title="拖动我逗猫球玩 🪄">🪄</div>
+            <div class="draggable-wand" id="draggableWand" title="拖动我逗猫球玩">
+                <!-- 用 SVG 代替 emoji，避免 Windows 10 缺字显示方框 -->
+                <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" focusable="false">
+                    <!-- 杆 -->
+                    <line x1="5" y1="28" x2="20" y2="13"
+                          stroke="#b5813c" stroke-width="2.8" stroke-linecap="round"/>
+                    <!-- 杆头 -->
+                    <circle cx="20" cy="13" r="1.8" fill="#8a5e22"/>
+                    <!-- 挂线 -->
+                    <path d="M20 13 Q 24 8, 25.6 13.4"
+                          fill="none" stroke="#c8b8e8" stroke-width="1.3" stroke-linecap="round"/>
+                    <!-- 毛球 -->
+                    <circle cx="26" cy="15" r="5" fill="#f3e2ff" stroke="#b79ce8" stroke-width="1.3"/>
+                    <!-- 高光 -->
+                    <circle cx="24.2" cy="13.4" r="1.3" fill="#ffffff"/>
+                    <!-- 小铃铛 -->
+                    <circle cx="26" cy="15" r="1.6" fill="#ffcc4d" stroke="#d9a01a" stroke-width="0.6"/>
+                </svg>
+            </div>
         </div>
         <button class="pet-food-btn" id="feedBtn" type="button">喂猫 🐱</button>
     </div>
@@ -1945,7 +1968,8 @@
             correctCount: 0,
             totalForReward: 5,
             locked: false,
-            current: null
+            current: null,
+            wrongStreak: 0
         };
 
         function randInt(min, max) {
@@ -2040,6 +2064,7 @@
 
             if (value === quizState.current.answer) {
                 quizState.locked = true;
+                quizState.wrongStreak = 0;
                 btn.classList.add('correct');
                 quizState.correctCount++;
                 bbProgress.textContent = `答对 ${quizState.correctCount} / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
@@ -2059,11 +2084,34 @@
                     }
                 }, 500);
             } else {
+                // 答错：锁定当前题，累计连错次数
+                quizState.locked = true;
+                quizState.wrongStreak++;
                 btn.classList.add('wrong');
-                say('喵？再想想~', 900);
-                setTimeout(function() {
-                    btn.classList.remove('wrong');
-                }, 600);
+
+                if (quizState.wrongStreak >= 2) {
+                    // 连错两次 → 退出黑板，防止乱点刷分
+                    say('连错两次啦，不玩了喵~', 1600);
+                    setTimeout(function() {
+                        if (!quizState.active) return;
+                        leaveBoard();
+                        say('我去跑一跑！', 1200);
+                        petState.running = true;
+                        petState.runUntil = performance.now() + 3000;
+                        pet.classList.add('running');
+                        petState.nextMeowAt = performance.now() + 250;
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = randomRange(8, 12);
+                        petState.vx = Math.cos(angle) * speed;
+                        petState.vy = Math.sin(angle) * speed;
+                    }, 900);
+                } else {
+                    say('喵？再想想~', 900);
+                    setTimeout(function() {
+                        btn.classList.remove('wrong');
+                        quizState.locked = false;
+                    }, 600);
+                }
             }
         }
 
@@ -2072,6 +2120,7 @@
             quizState.correctCount = 0;
             quizState.locked = false;
             quizState.current = null;
+            quizState.wrongStreak = 0;
 
             bbIdle.style.display = 'none';
             bbQuiz.style.display = '';
@@ -2085,6 +2134,7 @@
             quizState.active = false;
             quizState.locked = false;
             quizState.current = null;
+            quizState.wrongStreak = 0;
             bbQuiz.style.display = 'none';
             bbIdle.style.display = '';
             bbProgress.textContent = '';
