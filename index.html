@@ -126,6 +126,54 @@
             will-change: transform;
         }
 
+        .pet-cosmetic {
+            position: absolute;
+            z-index: 1;
+            display: none;
+            pointer-events: none;
+        }
+
+        .pet-cosmetic.active {
+            display: block;
+        }
+
+        .pet-sign {
+            top: -4px;
+            left: 50%;
+            padding: 2px 8px;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            background: linear-gradient(110deg, #ff5577, #ffbf3f, #55d878, #4ab8ff, #b45cff, #ff5577);
+            background-size: 250% 100%;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+            line-height: 1.4;
+            white-space: nowrap;
+            transform: translateX(-50%);
+            animation: sign-rainbow 2.4s linear infinite;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        @keyframes sign-rainbow {
+            to { background-position: 250% 0; }
+        }
+
+        .pet-ingot {
+            top: -10px;
+            left: 50%;
+            width: 38px;
+            height: 30px;
+            transform: translateX(-50%);
+        }
+
+        .pet-scooter {
+            left: 8px;
+            bottom: -3px;
+            width: 76px;
+            height: 30px;
+        }
+
         .pet:hover {
             transform: scale(1.08);
             filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.22));
@@ -189,11 +237,227 @@
 
         /* ---------- 标题 + 小黑板 ---------- */
         .header-brand {
-            display: inline-flex;
+            display: flex;
             align-items: center;
             gap: 10px;
             vertical-align: middle;
             flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .header-brand h1 {
+            margin: 0;
+        }
+
+        .header-brand.vip-brand h1 {
+            color: #c58a16;
+            text-shadow: 0 1px 0 #fff0b3;
+        }
+
+        .vip-badge {
+            display: none;
+            margin-left: 6px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #ffe58f, #d99a18);
+            color: #6a4100;
+            font-size: 11px;
+            vertical-align: middle;
+        }
+
+        .header-brand.vip-brand .vip-badge {
+            display: inline-block;
+        }
+
+        .economy-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .economy-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border: 1px solid #d6dde8;
+            border-radius: 8px;
+            background: #fff;
+            color: #45516a;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .economy-toggle:hover {
+            border-color: #8fb0ff;
+            color: #3d6bdc;
+        }
+
+        .economy-toggle svg {
+            width: 20px;
+            height: 20px;
+            flex: 0 0 auto;
+        }
+
+        .economy-panel {
+            flex: 1 0 100%;
+            padding: 14px;
+            border: 1px solid #dfe5ef;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 4px 14px rgba(35, 55, 90, 0.1);
+        }
+
+        .economy-panel[hidden] {
+            display: none;
+        }
+
+        .economy-panel-head,
+        .economy-panel-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .economy-panel-head {
+            margin-bottom: 12px;
+        }
+
+        .economy-panel-head h2 {
+            margin: 0;
+            font-size: 17px;
+        }
+
+        .economy-close {
+            border: 0;
+            background: transparent;
+            color: #68748a;
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        .economy-balance {
+            margin-bottom: 10px;
+            color: #8a5b00;
+            font-weight: 700;
+        }
+
+        .economy-products {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+            gap: 8px;
+        }
+
+        .economy-product {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border: 1px solid #e6eaf1;
+            border-radius: 10px;
+            background: #fbfcfe;
+            color: #344054;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .economy-product:hover:not(:disabled) {
+            border-color: #9db8f5;
+            background: #f5f8ff;
+        }
+
+        .economy-product:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .economy-product svg {
+            width: 36px;
+            height: 36px;
+            flex: 0 0 auto;
+        }
+
+        .economy-product-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .economy-product-copy strong {
+            font-size: 13px;
+        }
+
+        .economy-product-copy small {
+            color: #758096;
+            font-size: 11px;
+        }
+
+        .economy-section {
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #edf0f5;
+        }
+
+        .economy-section h3 {
+            margin: 0 0 8px;
+            font-size: 14px;
+        }
+
+        .economy-controls {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .economy-controls input,
+        .economy-controls select {
+            min-height: 36px;
+            padding: 6px 9px;
+            border: 1px solid #d6dde8;
+            border-radius: 7px;
+            background: #fff;
+            color: #344054;
+        }
+
+        .economy-action-btn,
+        .wardrobe-choice {
+            padding: 7px 12px;
+            border: 0;
+            border-radius: 7px;
+            background: #8fb0ff;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .economy-action-btn:disabled,
+        .wardrobe-choice:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .economy-message {
+            min-height: 20px;
+            margin: 8px 0 0;
+            color: #68748a;
+            font-size: 12px;
+        }
+
+        .economy-message.error {
+            color: #c53030;
+        }
+
+        .wardrobe-choices {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .wardrobe-choice.active {
+            background: #3f8f58;
         }
 
         .blackboard {
@@ -314,6 +578,13 @@
             }
             .blackboard {
                 width: 100%;
+            }
+            .economy-actions {
+                width: 100%;
+            }
+            .economy-toggle {
+                flex: 1;
+                justify-content: center;
             }
         }
 
@@ -688,7 +959,7 @@
 
     <header>
         <div class="header-brand">
-            <h1>猫球小站</h1>
+            <h1 id="siteTitle">猫球小站<span class="vip-badge">VIP</span></h1>
             <div class="blackboard" id="blackboard" role="button" aria-label="小黑板" title="敲我 3 下召唤猫球">
                 <div class="bb-idle" id="bbIdle">
                     <div class="bb-title">📋 小黑板</div>
@@ -700,6 +971,77 @@
                     <div class="bb-progress" id="bbProgress"></div>
                 </div>
             </div>
+            <div class="economy-actions">
+                <button class="economy-toggle" id="shopToggle" type="button" aria-expanded="false" aria-controls="economyPanel">
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path d="M5 12h22l-2 16H7L5 12Z" fill="#9bc5ff" stroke="#416caa" stroke-width="2"/>
+                        <path d="M11 12V8a5 5 0 0 1 10 0v4" fill="none" stroke="#416caa" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M11 18h10M16 15v7" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    商店
+                </button>
+                <button class="economy-toggle" id="wardrobeToggle" type="button" aria-expanded="false" aria-controls="economyPanel">
+                    <svg viewBox="0 0 32 32" aria-hidden="true">
+                        <path d="M6 5h20v23H6z" fill="#d8c4ff" stroke="#7655a8" stroke-width="2"/>
+                        <path d="M16 5v23M13 16h1M19 16h1" stroke="#7655a8" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M10 5a6 6 0 0 1 12 0" fill="none" stroke="#7655a8" stroke-width="2"/>
+                    </svg>
+                    更衣室
+                </button>
+            </div>
+            <section class="economy-panel" id="economyPanel" hidden aria-label="商店和更衣室">
+                <div class="economy-panel-head">
+                    <h2 id="economyPanelTitle">商店</h2>
+                    <button class="economy-close" id="economyClose" type="button" aria-label="关闭">×</button>
+                </div>
+                <div class="economy-balance">当前积分：<strong id="pointsCount">0</strong></div>
+                <div id="shopContents">
+                    <div class="economy-products">
+                        <button class="economy-product" type="button" data-product="food" data-cost="3">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 24c0-7 6-12 13-12 6 0 11 4 11 10 0 7-6 11-14 11-6 0-10-3-10-9Z" fill="#f3a43b" stroke="#9a5720" stroke-width="2"/><path d="M14 18c2-2 4-2 6 0m5 0c2-2 4-2 6 0" fill="none" stroke="#ffe0a6" stroke-width="2.5" stroke-linecap="round"/><circle cx="10" cy="9" r="3" fill="#ffca66"/><circle cx="28" cy="7" r="2" fill="#ffca66"/></svg>
+                            <span class="economy-product-copy"><strong>猫粮 · 3积分/份</strong><small>购买1份猫粮</small></span>
+                        </button>
+                        <button class="economy-product" type="button" data-product="sign" data-cost="10">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 9h24v20H8z" rx="4" fill="#ff6aa2" stroke="#6b4c91" stroke-width="2"/><path d="M10 11h20v16H10z" fill="url(#signGradient)"/><defs><linearGradient id="signGradient"><stop stop-color="#ff5c8a"/><stop offset=".25" stop-color="#ffbd4a"/><stop offset=".5" stop-color="#60cf7b"/><stop offset=".75" stop-color="#55b5ff"/><stop offset="1" stop-color="#bd70ff"/></linearGradient></defs><path d="M13 31v4m14-4v4" stroke="#6b4c91" stroke-width="2"/><path d="M12 17h16" stroke="#fff" stroke-width="2"/></svg>
+                            <span class="economy-product-copy"><strong>少见 · 网红灯牌 · 10积分</strong><small>限时15天，可叠加时长</small></span>
+                        </button>
+                        <button class="economy-product" type="button" data-product="scooter" data-cost="28">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="10" cy="29" r="4" fill="#7b61a8"/><circle cx="31" cy="29" r="4" fill="#7b61a8"/><path d="M10 27h17l-5-9h-5m5 0h8l3 9m-3-9v-5" fill="none" stroke="#65a8d7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 18h6" stroke="#ff9d55" stroke-width="3"/></svg>
+                            <span class="economy-product-copy"><strong>稀有 · 滑板车 · 28积分</strong><small>限时15天，装备后移动速度+35%</small></span>
+                        </button>
+                        <button class="economy-product" type="button" data-product="ingot" data-cost="32">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="m6 22 5-11h18l5 11-5 10H11L6 22Z" fill="#f6bd35" stroke="#a76b13" stroke-width="2"/><path d="M11 11l4 7h10l4-7M15 18l-4 14m14-14 4 14M15 18h10" fill="none" stroke="#ffe98b" stroke-width="2"/><path d="M17 25h6" stroke="#fff4b0" stroke-width="2"/></svg>
+                            <span class="economy-product-copy"><strong>史诗 · 幸运元宝 · 32积分</strong><small>15天；装备后大吉概率+60%、二等奖及以上+30%</small></span>
+                        </button>
+                        <button class="economy-product" type="button" data-product="lotteryBasic" data-cost="8">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 6h22v28H9z" fill="#fff3c4" stroke="#d79c28" stroke-width="2"/><path d="M14 12h12m-12 6h12m-12 6h8" stroke="#bd7e17" stroke-width="2" stroke-linecap="round"/><path d="m27 26 2 3 4-6" fill="none" stroke="#59a96a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span class="economy-product-copy"><strong>初级抽奖 · 8积分/次</strong><small>2%+80 · 8%+20 · 15%+10 · 55%+5 · 20%未中奖</small></span>
+                        </button>
+                        <button class="economy-product" type="button" data-product="lotteryAdvanced" data-cost="20">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 24 14l11 1-8 7 3 11-10-6-10 6 3-11-8-7 11-1 4-10Z" fill="#ffcf54" stroke="#b77716" stroke-width="2" stroke-linejoin="round"/><circle cx="20" cy="20" r="4" fill="#fff6bb"/></svg>
+                            <span class="economy-product-copy"><strong>高级抽奖 · 20积分/次</strong><small>2%+120 · 8%+35 · 15%+25 · 55%+10 · 20%未中奖</small></span>
+                        </button>
+                        <button class="economy-product" type="button" data-product="vip" data-cost="45">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="m5 13 9 7 6-13 6 13 9-7-3 21H8L5 13Z" fill="#f5c542" stroke="#a87810" stroke-width="2" stroke-linejoin="round"/><path d="M12 28h16" stroke="#fff4b2" stroke-width="2.5" stroke-linecap="round"/><circle cx="5" cy="12" r="3" fill="#e99c26"/><circle cx="20" cy="6" r="3" fill="#e99c26"/><circle cx="35" cy="12" r="3" fill="#e99c26"/></svg>
+                            <span class="economy-product-copy"><strong>VIP会员 · 45积分/周</strong><small>无限猫粮、免黑板惩罚、金色站名</small></span>
+                        </button>
+                    </div>
+                    <div class="economy-section">
+                        <h3>出售多余猫粮（每天最多3份，每份2积分）</h3>
+                        <div class="economy-controls">
+                            <label for="sellFoodAmount">出售数量</label>
+                            <input id="sellFoodAmount" type="number" min="1" max="3" value="1" inputmode="numeric">
+                            <button class="economy-action-btn" id="sellFoodBtn" type="button">出售</button>
+                            <span id="sellFoodStatus"></span>
+                        </div>
+                    </div>
+                </div>
+                <div id="wardrobeContents" hidden>
+                    <p>同时只能装备一件有效饰品：</p>
+                    <div class="wardrobe-choices" id="wardrobeChoices"></div>
+                </div>
+                <p class="economy-message" id="economyMessage" aria-live="polite"></p>
+            </section>
         </div>
         <nav>
             <a href="index.html">首页</a>
@@ -712,6 +1054,7 @@
 
     <div class="pet-food-bar">
         <span class="pet-food-info">🍖 猫粮：<strong id="foodCount">0</strong></span>
+        <span class="pet-food-info">💎 积分：<strong id="pointsCountBar">0</strong></span>
         <span class="pet-food-status" id="feedStatus">今天还没喂</span>
         <div class="food-slot" id="foodSlot">
             <div class="draggable-food" id="draggableFood" title="拖动我去喂猫">🍖</div>
@@ -786,6 +1129,17 @@
     <main id="postList">加载中...</main>
 
     <div id="petWrap" class="pet-wrap" aria-label="桌宠" title="点击让我乱跑 10 秒">
+        <div class="pet-cosmetic pet-sign" id="petSign">最帅猫球</div>
+        <svg class="pet-cosmetic pet-ingot" id="petIngot" viewBox="0 0 40 40" aria-hidden="true">
+            <path d="m5 23 5-12h20l5 12-5 11H10L5 23Z" fill="#f6bd35" stroke="#a76b13" stroke-width="2"/>
+            <path d="m10 11 5 8h10l5-8M15 19l-5 15m15-15 5 15M15 19h10" fill="none" stroke="#ffe98b" stroke-width="2"/>
+        </svg>
+        <svg class="pet-cosmetic pet-scooter" id="petScooter" viewBox="0 0 80 32" aria-hidden="true">
+            <circle cx="13" cy="25" r="5" fill="#7655a8"/>
+            <circle cx="65" cy="25" r="5" fill="#7655a8"/>
+            <path d="M13 23h43l-13-14H31m12 0h15l10 14m-10-14V3" fill="none" stroke="#65a8d7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M31 9h12" stroke="#ff9d55" stroke-width="4" stroke-linecap="round"/>
+        </svg>
         <div id="pet" class="pet"></div>
         <div id="petSpeech" class="pet-speech" aria-live="polite"></div>
     </div>
@@ -1287,8 +1641,9 @@
                 }
             }
 
-            petState.x += petState.vx * delta;
-            petState.y += petState.vy * delta;
+            const speedMultiplier = isScooterActive() ? 1.35 : 1;
+            petState.x += petState.vx * delta * speedMultiplier;
+            petState.y += petState.vy * delta * speedMultiplier;
             setPetPosition();
             requestAnimationFrame(animate);
         }
@@ -1354,6 +1709,8 @@
         const FOOD_KEY        = 'catball_food_v1';
         const FEED_DATE_KEY   = 'catball_feed_date_v1';
         const READ_POSTS_KEY  = 'catball_read_posts_v1';
+        const ECONOMY_KEY     = 'catball_economy_v1';
+        const SALE_KEY        = 'catball_food_sale_v1';
 
         const MIN_FOOD        = 4;
 
@@ -1372,7 +1729,66 @@
             try { return localStorage.getItem(key); } catch (e) { return null; }
         }
         function safeSet(key, value) {
-            try { localStorage.setItem(key, value); } catch (e) { /* 忽略 */ }
+            try {
+                localStorage.setItem(key, value);
+                return true;
+            } catch (e) {
+                console.error(`无法保存本地数据（${key}）：`, e);
+                return false;
+            }
+        }
+
+        function readEconomy() {
+            try {
+                const data = JSON.parse(safeGet(ECONOMY_KEY) || '{}');
+                const inventory = data.inventory || {};
+                const points = Number(data.points);
+                return {
+                    points: Number.isSafeInteger(points) && points >= 0 ? points : 0,
+                    inventory: {
+                        signUntil: Number.isFinite(inventory.signUntil) ? inventory.signUntil : 0,
+                        scooterUntil: Number.isFinite(inventory.scooterUntil) ? inventory.scooterUntil : 0,
+                        ingotUntil: Number.isFinite(inventory.ingotUntil) ? inventory.ingotUntil : 0,
+                        vipUntil: Number.isFinite(inventory.vipUntil) ? inventory.vipUntil : 0,
+                        equipped: ['sign', 'scooter', 'ingot'].includes(inventory.equipped) ? inventory.equipped : ''
+                    }
+                };
+            } catch (e) {
+                console.error('无法读取积分和商店库存：', e);
+                return {
+                    points: 0,
+                    inventory: { signUntil: 0, scooterUntil: 0, ingotUntil: 0, vipUntil: 0, equipped: '' }
+                };
+            }
+        }
+
+        const economyData = readEconomy();
+        let pointsBalance = economyData.points;
+        let storeInventory = economyData.inventory;
+
+        function persistEconomy(nextPoints, nextInventory) {
+            if (!Number.isSafeInteger(nextPoints) || nextPoints < 0) return false;
+            const nextData = { points: nextPoints, inventory: nextInventory };
+            if (!safeSet(ECONOMY_KEY, JSON.stringify(nextData))) return false;
+            economyData.points = nextPoints;
+            economyData.inventory = nextInventory;
+            pointsBalance = nextPoints;
+            storeInventory = nextInventory;
+            updateFoodUI();
+            if (typeof renderEconomy === 'function') renderEconomy();
+            return true;
+        }
+
+        function isVipActive() {
+            return storeInventory.vipUntil > Date.now();
+        }
+
+        function isScooterActive() {
+            return storeInventory.scooterUntil > Date.now() && storeInventory.equipped === 'scooter';
+        }
+
+        function isIngotActive() {
+            return storeInventory.ingotUntil > Date.now() && storeInventory.equipped === 'ingot';
         }
 
         function todayStr() {
@@ -1512,11 +1928,11 @@
         draggableFood.addEventListener('pointerdown', function(e) {
             if (foodDrag.caught) return;
             if (petState.eating) return;
-            if (hasFedToday()) {
+            if (hasFedToday() && !isVipActive()) {
                 say('今天已经吃过啦，明天再来~', 1800);
                 return;
             }
-            if (getFoodCount() < MIN_FOOD) {
+            if (!isVipActive() && getFoodCount() < MIN_FOOD) {
                 say(`猫粮不够，还差 ${MIN_FOOD - getFoodCount()} 个喵~`, 2200);
                 return;
             }
@@ -1648,9 +2064,12 @@
             foodDrag.pointerId = null;
             foodDrag.moved = false;
 
-            const count = getFoodCount();
-            setFoodCount(Math.max(0, count - MIN_FOOD));
-            safeSet(FEED_DATE_KEY, todayStr());
+            const vip = isVipActive();
+            if (!vip) {
+                const count = getFoodCount();
+                setFoodCount(Math.max(0, count - MIN_FOOD));
+                safeSet(FEED_DATE_KEY, todayStr());
+            }
             updateFoodUI();
 
             petState.running = true;
@@ -1667,11 +2086,11 @@
         }
 
         feedBtn.addEventListener('click', function() {
-            if (hasFedToday()) {
+            if (hasFedToday() && !isVipActive()) {
                 say('我今天已经吃过啦，明天再来~', 1800);
                 return;
             }
-            if (getFoodCount() < MIN_FOOD) {
+            if (!isVipActive() && getFoodCount() < MIN_FOOD) {
                 say(`猫粮不够，还差 ${MIN_FOOD - getFoodCount()} 个喵~`, 2200);
                 return;
             }
@@ -1704,11 +2123,13 @@
 
         function updateFoodUI() {
             const count = getFoodCount();
-            const fed = hasFedToday();
+            const vip = isVipActive();
+            const fed = hasFedToday() && !vip;
 
-            foodCountEl.textContent = count;
+            foodCountEl.textContent = vip ? '∞' : count;
+            document.getElementById('pointsCountBar').textContent = pointsBalance;
 
-            if (foodDrag.active || count < 1) {
+            if (foodDrag.active || (count < 1 && !vip)) {
                 foodSlotEl.classList.add('empty');
             } else {
                 foodSlotEl.classList.remove('empty');
@@ -1724,11 +2145,16 @@
                 feedStatusEl.classList.add('fed');
                 feedBtn.disabled = true;
                 feedBtn.textContent = '今天喂过啦';
-            } else if (count < MIN_FOOD) {
+            } else if (!vip && count < MIN_FOOD) {
                 feedStatusEl.textContent = `还差 ${MIN_FOOD - count} 个猫粮才能喂（一顿 4 个）`;
                 feedStatusEl.classList.remove('fed');
                 feedBtn.disabled = true;
                 feedBtn.textContent = `还差 ${MIN_FOOD - count} 个`;
+            } else if (vip) {
+                feedStatusEl.textContent = 'VIP无限猫粮，可随时喂食';
+                feedStatusEl.classList.add('fed');
+                feedBtn.disabled = false;
+                feedBtn.textContent = 'VIP喂猫 🐱';
             } else {
                 feedStatusEl.textContent = '拖动猫粮喂我，或点喂猫~';
                 feedStatusEl.classList.remove('fed');
@@ -1755,12 +2181,20 @@
         });
 
         window.addEventListener('storage', function(e) {
-            if (e.key === FOOD_KEY || e.key === FEED_DATE_KEY) {
+            if (e.key === FOOD_KEY || e.key === FEED_DATE_KEY || e.key === ECONOMY_KEY) {
+                if (e.key === ECONOMY_KEY) {
+                    const latest = readEconomy();
+                    economyData.points = latest.points;
+                    economyData.inventory = latest.inventory;
+                    pointsBalance = latest.points;
+                    storeInventory = latest.inventory;
+                }
                 if (foodDrag.active && !foodDrag.caught) {
                     resetFoodToSlot();
                     petState.chasingFood = false;
                 }
                 updateFoodUI();
+                renderEconomy();
             }
             if (e.key === FORTUNE_KEY || e.key === FORTUNE_STREAK_KEY) {
                 renderFortune();
@@ -1955,6 +2389,276 @@
         updateWandUI();
 
         /* =========================================================
+           积分、商店与装扮
+           ========================================================= */
+        const economyPanel = document.getElementById('economyPanel');
+        const shopToggle = document.getElementById('shopToggle');
+        const wardrobeToggle = document.getElementById('wardrobeToggle');
+        const economyPanelTitle = document.getElementById('economyPanelTitle');
+        const economyMessage = document.getElementById('economyMessage');
+        const shopContents = document.getElementById('shopContents');
+        const wardrobeContents = document.getElementById('wardrobeContents');
+        const sellFoodAmount = document.getElementById('sellFoodAmount');
+        const sellFoodStatus = document.getElementById('sellFoodStatus');
+        const siteBrand = document.querySelector('.header-brand');
+        let economyPanelMode = 'shop';
+
+        function setEconomyMessage(message, isError = false) {
+            economyMessage.textContent = message;
+            economyMessage.classList.toggle('error', isError);
+        }
+
+        function getSaleData() {
+            try {
+                const data = JSON.parse(safeGet(SALE_KEY) || '{}');
+                return data.date === todayStr() && Number.isInteger(data.count) && data.count >= 0
+                    ? data
+                    : { date: todayStr(), count: 0 };
+            } catch (e) {
+                console.error('无法读取今日猫粮出售记录：', e);
+                return { date: todayStr(), count: 0 };
+            }
+        }
+
+        function remainingDays(expiry) {
+            return Math.max(0, Math.ceil((expiry - Date.now()) / 86400000));
+        }
+
+        function renderPetCosmetics() {
+            const equipped = storeInventory.equipped;
+            document.getElementById('petSign').classList.toggle(
+                'active', equipped === 'sign' && storeInventory.signUntil > Date.now()
+            );
+            document.getElementById('petIngot').classList.toggle(
+                'active', equipped === 'ingot' && isIngotActive()
+            );
+            document.getElementById('petScooter').classList.toggle(
+                'active', equipped === 'scooter' && isScooterActive()
+            );
+            siteBrand.classList.toggle('vip-brand', isVipActive());
+        }
+
+        function saveInventory(nextInventory) {
+            return persistEconomy(pointsBalance, nextInventory);
+        }
+
+        function renderWardrobe() {
+            const choices = document.getElementById('wardrobeChoices');
+            const available = [
+                { id: 'sign', name: '网红灯牌', until: storeInventory.signUntil },
+                { id: 'scooter', name: '滑板车', until: storeInventory.scooterUntil },
+                { id: 'ingot', name: '幸运元宝', until: storeInventory.ingotUntil }
+            ].filter(item => item.until > Date.now());
+            choices.innerHTML = '';
+            const none = document.createElement('button');
+            none.type = 'button';
+            none.className = 'wardrobe-choice' + (storeInventory.equipped ? '' : ' active');
+            none.dataset.equip = '';
+            none.textContent = '不装备';
+            choices.appendChild(none);
+            available.forEach(function(item) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'wardrobe-choice' + (storeInventory.equipped === item.id ? ' active' : '');
+                button.dataset.equip = item.id;
+                button.textContent = `${item.name}（剩余${remainingDays(item.until)}天）`;
+                choices.appendChild(button);
+            });
+        }
+
+        function renderEconomy() {
+            document.getElementById('pointsCount').textContent = pointsBalance;
+            document.getElementById('pointsCountBar').textContent = pointsBalance;
+
+            const now = Date.now();
+            const nextInventory = { ...storeInventory };
+            if (nextInventory.signUntil <= now) nextInventory.signUntil = 0;
+            if (nextInventory.scooterUntil <= now) nextInventory.scooterUntil = 0;
+            if (nextInventory.ingotUntil <= now) nextInventory.ingotUntil = 0;
+            if (nextInventory.vipUntil <= now) nextInventory.vipUntil = 0;
+            if (!nextInventory[`${nextInventory.equipped}Until`]) nextInventory.equipped = '';
+            if (JSON.stringify(nextInventory) !== JSON.stringify(storeInventory)) {
+                if (!saveInventory(nextInventory)) {
+                    setEconomyMessage('限时物品状态保存失败，请检查浏览器存储空间。', true);
+                }
+            }
+
+            document.querySelectorAll('.economy-product').forEach(function(button) {
+                button.disabled = Number(button.dataset.cost) > pointsBalance;
+            });
+            renderPetCosmetics();
+            renderWardrobe();
+
+            const sale = getSaleData();
+            const remainingSales = Math.max(0, 3 - sale.count);
+            const maxSell = Math.min(getFoodCount(), remainingSales);
+            sellFoodAmount.max = String(Math.max(1, maxSell));
+            sellFoodAmount.disabled = maxSell === 0;
+            document.getElementById('sellFoodBtn').disabled = maxSell === 0;
+            sellFoodStatus.textContent = `剩余可售 ${remainingSales} 份 · 猫粮 ${getFoodCount()} 份`;
+        }
+
+        function setEconomyPanel(mode) {
+            if (!economyPanel.hidden && economyPanelMode === mode) {
+                economyPanel.hidden = true;
+                shopToggle.setAttribute('aria-expanded', 'false');
+                wardrobeToggle.setAttribute('aria-expanded', 'false');
+                return;
+            }
+            economyPanelMode = mode;
+            economyPanel.hidden = false;
+            shopContents.hidden = mode !== 'shop';
+            wardrobeContents.hidden = mode !== 'wardrobe';
+            economyPanelTitle.textContent = mode === 'shop' ? '积分商店' : '猫球更衣室';
+            shopToggle.setAttribute('aria-expanded', String(mode === 'shop'));
+            wardrobeToggle.setAttribute('aria-expanded', String(mode === 'wardrobe'));
+            renderEconomy();
+        }
+
+        function changePoints(delta) {
+            if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(pointsBalance + delta) ||
+                pointsBalance + delta < 0) return false;
+            return persistEconomy(pointsBalance + delta, storeInventory);
+        }
+
+        function buyProduct(product, cost) {
+            if (cost > pointsBalance) {
+                setEconomyMessage('积分不足，完成任务获取积分吧。', true);
+                return;
+            }
+
+            if (product === 'lotteryBasic' || product === 'lotteryAdvanced') {
+                const advanced = product === 'lotteryAdvanced';
+                const multiplier = isIngotActive() ? 1.3 : 1;
+                const boostedWeight = multiplier > 1 ? 20 - 25 * (multiplier - 1) : 20;
+                const weights = [2 * multiplier, 8 * multiplier, 15 * multiplier, 55, boostedWeight];
+                let roll = Math.random() * weights.reduce((sum, weight) => sum + weight, 0);
+                let prize = -1;
+                for (let i = 0; i < weights.length; i++) {
+                    if (roll < weights[i]) {
+                        prize = i;
+                        break;
+                    }
+                    roll -= weights[i];
+                }
+                const rewards = advanced ? [120, 35, 25, 10, 0] : [80, 20, 10, 5, 0];
+                const labels = ['特等奖', '一等奖', '二等奖', '三等奖', '未中奖'];
+                const reward = rewards[prize];
+                if (!persistEconomy(pointsBalance - cost + reward, storeInventory)) {
+                    setEconomyMessage('积分保存失败，抽奖未完成。', true);
+                    return;
+                }
+                setEconomyMessage(`${labels[prize]}！${reward ? `获得 ${reward} 积分。` : '下次好运！'}${multiplier > 1 ? '元宝加成生效。' : ''}`);
+                return;
+            }
+
+            if (product === 'food') {
+                const previousFood = getFoodCount();
+                if (!safeSet(FOOD_KEY, String(previousFood + 1))) {
+                    setEconomyMessage('猫粮保存失败，购买未完成。', true);
+                    return;
+                }
+                if (!changePoints(-cost)) {
+                    safeSet(FOOD_KEY, String(previousFood));
+                    setEconomyMessage('积分保存失败，购买未完成。', true);
+                    return;
+                }
+                updateFoodUI();
+                setEconomyMessage('购买成功：猫粮 +1。');
+                return;
+            }
+
+            const nextInventory = { ...storeInventory };
+            const now = Date.now();
+            if (product === 'sign') {
+                nextInventory.signUntil = Math.max(now, nextInventory.signUntil) + 15 * 86400000;
+                nextInventory.equipped = 'sign';
+            } else if (product === 'scooter') {
+                nextInventory.scooterUntil = Math.max(now, nextInventory.scooterUntil) + 15 * 86400000;
+                nextInventory.equipped = 'scooter';
+            } else if (product === 'ingot') {
+                nextInventory.ingotUntil = Math.max(now, nextInventory.ingotUntil) + 15 * 86400000;
+                nextInventory.equipped = 'ingot';
+            } else if (product === 'vip') {
+                nextInventory.vipUntil = Math.max(now, nextInventory.vipUntil) + 7 * 86400000;
+            } else {
+                setEconomyMessage('无法识别该商品。', true);
+                return;
+            }
+
+            if (!persistEconomy(pointsBalance - cost, nextInventory)) {
+                setEconomyMessage('购买数据保存失败，请检查浏览器存储空间。', true);
+                return;
+            }
+            setEconomyMessage(product === 'vip'
+                ? `VIP已开通，剩余 ${remainingDays(nextInventory.vipUntil)} 天。`
+                : '购买成功，饰品已自动装备。');
+        }
+
+        document.getElementById('economyPanel').addEventListener('click', function(e) {
+            const productButton = e.target.closest('.economy-product');
+            if (productButton) {
+                buyProduct(productButton.dataset.product, Number(productButton.dataset.cost));
+                return;
+            }
+            const equipButton = e.target.closest('[data-equip]');
+            if (equipButton) {
+                const nextInventory = { ...storeInventory, equipped: equipButton.dataset.equip };
+                if (saveInventory(nextInventory)) {
+                    setEconomyMessage(equipButton.dataset.equip ? '装扮已更换。' : '已卸下饰品。');
+                } else {
+                    setEconomyMessage('装扮保存失败。', true);
+                }
+            }
+        });
+
+        document.getElementById('sellFoodBtn').addEventListener('click', function() {
+            const sale = getSaleData();
+            const amount = Number(sellFoodAmount.value);
+            const maxSell = Math.min(getFoodCount(), 3 - sale.count);
+            if (!Number.isInteger(amount) || amount < 1 || amount > maxSell) {
+                setEconomyMessage(`请输入 1 到 ${maxSell} 之间的出售数量。`, true);
+                return;
+            }
+
+            const oldFood = getFoodCount();
+            const nextSale = { date: todayStr(), count: sale.count + amount };
+            if (!safeSet(FOOD_KEY, String(oldFood - amount))) {
+                setEconomyMessage('猫粮数据保存失败，出售未完成。', true);
+                return;
+            }
+            if (!safeSet(SALE_KEY, JSON.stringify(nextSale))) {
+                safeSet(FOOD_KEY, String(oldFood));
+                setEconomyMessage('出售记录保存失败，出售未完成。', true);
+                return;
+            }
+            if (!changePoints(amount * 2)) {
+                safeSet(FOOD_KEY, String(oldFood));
+                safeSet(SALE_KEY, JSON.stringify(sale));
+                setEconomyMessage('积分保存失败，出售未完成。', true);
+                return;
+            }
+            updateFoodUI();
+            renderEconomy();
+            setEconomyMessage(`已出售 ${amount} 份猫粮，获得 ${amount * 2} 积分。`);
+        });
+
+        shopToggle.addEventListener('click', function() {
+            setEconomyPanel('shop');
+        });
+        wardrobeToggle.addEventListener('click', function() {
+            setEconomyPanel('wardrobe');
+        });
+        document.getElementById('economyClose').addEventListener('click', function() {
+            economyPanel.hidden = true;
+            shopToggle.setAttribute('aria-expanded', 'false');
+            wardrobeToggle.setAttribute('aria-expanded', 'false');
+        });
+
+        renderEconomy();
+        setInterval(renderEconomy, 60 * 1000);
+
+        /* =========================================================
            黑板答题系统
            ========================================================= */
         const blackboard   = document.getElementById('blackboard');
@@ -1973,8 +2677,13 @@
             totalForReward: 5,
             locked: false,
             current: null,
-            wrongStreak: 0
+            wrongStreak: 0,
+            combo: 0
         };
+
+        function boardProgressText() {
+            return `答对 ${quizState.correctCount} / ${quizState.totalForReward}（每答对5题奖励1猫粮）　连击 ${quizState.combo % 8}/8（每8次+4积分）`;
+        }
 
         function randInt(min, max) {
             return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -2046,7 +2755,7 @@
             quizState.locked = false;
 
             bbQuestion.textContent = q.qText;
-            bbProgress.textContent = `答对 ${quizState.correctCount} / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+            bbProgress.textContent = boardProgressText();
             bbOptions.innerHTML = '';
 
             q.options.forEach(function(v) {
@@ -2071,8 +2780,18 @@
                 quizState.wrongStreak = 0;
                 btn.classList.add('correct');
                 quizState.correctCount++;
-                bbProgress.textContent = `答对 ${quizState.correctCount} / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
-                say('答对啦喵！', 800);
+                quizState.combo++;
+                bbProgress.textContent = boardProgressText();
+                if (quizState.combo % 8 === 0) {
+                    if (changePoints(4)) {
+                        say('连击8次，获得4积分！喵！', 1400);
+                    } else {
+                        setEconomyMessage('积分保存失败，连击奖励未能保存。', true);
+                        say('答对啦喵！', 800);
+                    }
+                } else {
+                    say('答对啦喵！', 800);
+                }
 
                 setTimeout(function() {
                     if (!quizState.active) return;
@@ -2081,7 +2800,7 @@
                         quizState.correctCount = 0;
                         addFood(1);
                         say('答对5题！奖励1个猫粮！喵呜~', 2000);
-                        bbProgress.textContent = `答对 0 / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+                        bbProgress.textContent = boardProgressText();
                         setTimeout(renderQuestion, 700);
                     } else {
                         renderQuestion();
@@ -2090,10 +2809,12 @@
             } else {
                 // 答错：锁定当前题，累计连错次数
                 quizState.locked = true;
-                quizState.wrongStreak++;
+                quizState.wrongStreak = isVipActive() ? 0 : quizState.wrongStreak + 1;
+                quizState.combo = 0;
+                bbProgress.textContent = boardProgressText();
                 btn.classList.add('wrong');
 
-                if (quizState.wrongStreak >= 2) {
+                if (quizState.wrongStreak >= 2 && !isVipActive()) {
                     // 连错两次 → 退出黑板，防止乱点刷分
                     say('连错两次啦，不玩了喵~', 1600);
                     setTimeout(function() {
@@ -2125,10 +2846,11 @@
             quizState.locked = false;
             quizState.current = null;
             quizState.wrongStreak = 0;
+            quizState.combo = 0;
 
             bbIdle.style.display = 'none';
             bbQuiz.style.display = '';
-            bbProgress.textContent = `答对 0 / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+            bbProgress.textContent = boardProgressText();
 
             renderQuestion();
             say('我们来算算术吧喵！', 1400);
@@ -2139,6 +2861,7 @@
             quizState.locked = false;
             quizState.current = null;
             quizState.wrongStreak = 0;
+            quizState.combo = 0;
             bbQuiz.style.display = 'none';
             bbIdle.style.display = '';
             bbProgress.textContent = '';
@@ -2261,20 +2984,30 @@
             };
         }
 
-        function pickFortuneLevel(rand) {
-            const total = FORTUNE_LEVELS.reduce((s, l) => s + l.weight, 0);
+        function pickFortuneLevel(rand, ingotBoost = false) {
+            const greatWeight = ingotBoost ? 8 * 1.6 : 8;
+            const otherWeightMultiplier = ingotBoost ? (100 - greatWeight) / 92 : 1;
+            const levels = FORTUNE_LEVELS.map(function(level) {
+                return {
+                    ...level,
+                    weight: ingotBoost
+                        ? (level.name === '大吉' ? greatWeight : level.weight * otherWeightMultiplier)
+                        : level.weight
+                };
+            });
+            const total = levels.reduce((s, l) => s + l.weight, 0);
             let r = rand() * total;
-            for (const lv of FORTUNE_LEVELS) {
+            for (const lv of levels) {
                 if (r < lv.weight) return lv;
                 r -= lv.weight;
             }
-            return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
+            return levels[levels.length - 1];
         }
 
         function generateFortune(dateStr) {
             const uid = getFortuneUid();
             const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
-            const lv = pickFortuneLevel(rand);
+            const lv = pickFortuneLevel(rand, isIngotActive());
             return { date: dateStr, level: lv.name, cls: lv.cls };
         }
 
@@ -2291,7 +3024,7 @@
         }
 
         function setTodayFortune(f) {
-            safeSet(FORTUNE_KEY, JSON.stringify(f));
+            return safeSet(FORTUNE_KEY, JSON.stringify(f));
         }
 
         function getStreak() {
@@ -2305,7 +3038,7 @@
         }
 
         function setStreak(s) {
-            safeSet(FORTUNE_STREAK_KEY, JSON.stringify(s));
+            return safeSet(FORTUNE_STREAK_KEY, JSON.stringify(s));
         }
 
         function currentStreakDisplay() {
@@ -2339,6 +3072,8 @@
         }
 
         function signFortune() {
+            if (getTodayFortune()) return;
+
             const today = todayStr();
             const yesterday = yesterdayStr();
             const s = getStreak();
@@ -2352,11 +3087,25 @@
                 newCount = 1;
             }
 
-            setStreak({ last: today, count: newCount });
-            setTodayFortune(generateFortune(today));
+            if (!setStreak({ last: today, count: newCount }) ||
+                !setTodayFortune(generateFortune(today))) {
+                setEconomyMessage('签到记录保存失败，请检查浏览器存储空间。', true);
+                return;
+            }
+
+            let rewardMessage = '';
+            if (newCount > 3) {
+                const reward = Math.floor(newCount * 0.5);
+                if (changePoints(reward)) {
+                    setEconomyMessage(`连续签到 ${newCount} 天，获得 ${reward} 积分！`);
+                    rewardMessage = `获得 ${reward} 积分！`;
+                } else {
+                    setEconomyMessage('签到成功，但积分保存失败。', true);
+                }
+            }
 
             renderFortune();
-            say('签到成功！喵~ 🔮', 1500);
+            say(`签到成功！${rewardMessage}喵~ 🔮`, 1800);
         }
 
         fortuneSignBtn.addEventListener('click', signFortune);
@@ -2393,6 +3142,16 @@
                     keys.forEach(function(k) {
                         try { localStorage.removeItem(k); } catch (e) {}
                     });
+                    economyData.points = 0;
+                    economyData.inventory = {
+                        signUntil: 0,
+                        scooterUntil: 0,
+                        ingotUntil: 0,
+                        vipUntil: 0,
+                        equipped: ''
+                    };
+                    pointsBalance = 0;
+                    storeInventory = economyData.inventory;
                     didReset = true;
                 } catch (e) { /* 忽略 */ }
             } else {
@@ -2413,6 +3172,7 @@
             } catch (e) { /* 忽略 */ }
 
             updateFoodUI();
+            renderEconomy();
             renderFortune();
 
             if (didReset) {
@@ -2420,6 +3180,27 @@
                     say(mode === 'all' ? '全部数据已重置喵~' : '喂食记录已重置喵~', 2400);
                 }, 800);
             }
+        })();
+
+        (function handleNewPointsParam() {
+            const params = new URLSearchParams(location.search);
+            if (!params.has('newpoints')) return;
+
+            const amount = Number(params.get('newpoints'));
+            if (!Number.isSafeInteger(amount) || amount <= 0 ||
+                amount > Number.MAX_SAFE_INTEGER - pointsBalance) {
+                setEconomyMessage('newpoints 参数必须是正整数，且不能超过积分上限。', true);
+                console.error('无效的 newpoints 参数。');
+            } else if (persistEconomy(pointsBalance + amount, storeInventory)) {
+                setEconomyPanel('shop');
+                setEconomyMessage(`作弊码生效：增加 ${amount} 积分。`);
+            } else {
+                setEconomyMessage('积分保存失败，newpoints 未生效。', true);
+            }
+
+            params.delete('newpoints');
+            const query = params.toString();
+            history.replaceState(null, '', location.pathname + (query ? `?${query}` : '') + location.hash);
         })();
     </script>
 </body>

@@ -20,7 +20,6 @@
         <!-- Giscus 评论区将在这里加载 -->
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="js/main.js"></script>
     <script>
         // 获取URL中的帖子ID
@@ -31,9 +30,83 @@
 
         const postId = getPostId();
 
-        fetch('posts.json')
-            .then(res => res.json())
-            .then(data => {
+        async function fetchPostsWithRetry() {
+            let lastError;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 20000);
+                try {
+                    const response = await fetch('posts.json', {
+                        cache: 'no-cache',
+                        signal: controller.signal
+                    });
+                    if (!response.ok) {
+                        throw new Error(`posts.json 请求失败：HTTP ${response.status}`);
+                    }
+                    const text = await response.text();
+                    const data = JSON.parse(text);
+                    if (!data || !Array.isArray(data.posts)) {
+                        throw new Error('posts.json 格式无效：缺少 posts 数组');
+                    }
+                    return data;
+                } catch (err) {
+                    lastError = err;
+                    if (attempt < 2) {
+                        await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)));
+                    }
+                } finally {
+                    clearTimeout(timeout);
+                }
+            }
+            throw lastError;
+        }
+
+        function loadMarkedWithRetry() {
+            if (window.marked && typeof window.marked.parse === 'function') {
+                return Promise.resolve(true);
+            }
+            const sources = [
+                'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
+                'https://unpkg.com/marked/marked.min.js'
+            ];
+            return sources.reduce(function(previous, source) {
+                return previous.then(function(loaded) {
+                    if (loaded) return true;
+                    return new Promise(function(resolve) {
+                        const script = document.createElement('script');
+                        const timeout = setTimeout(function() {
+                            script.remove();
+                            resolve(false);
+                        }, 5000);
+                        script.src = source;
+                        script.onload = function() {
+                            clearTimeout(timeout);
+                            resolve(Boolean(window.marked && typeof window.marked.parse === 'function'));
+                        };
+                        script.onerror = function() {
+                            clearTimeout(timeout);
+                            resolve(false);
+                        };
+                        document.head.appendChild(script);
+                    });
+                });
+            }, Promise.resolve(false));
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/[&<>"']/g, function(character) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[character];
+            });
+        }
+
+        Promise.all([fetchPostsWithRetry(), loadMarkedWithRetry()])
+            .then(([data, markdownReady]) => {
                 const post = data.posts.find(p => p.id === postId);
                 const container = document.getElementById('postDetail');
                 
@@ -43,12 +116,24 @@
                 }
 
                 // Markdown 渲染为 HTML
-                const contentHtml = marked.parse(post.content);
+                let contentHtml;
+                let markdownWarning = '';
+                try {
+                    if (!markdownReady || !window.marked || typeof window.marked.parse !== 'function') {
+                        throw new Error('Markdown 渲染器不可用');
+                    }
+                    contentHtml = window.marked.parse(String(post.content || ''));
+                } catch (err) {
+                    console.error('Markdown 渲染失败，改用纯文本显示：', err);
+                    contentHtml = `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(String(post.content || ''))}</pre>`;
+                    markdownWarning = '<p class="error" role="alert">Markdown渲染组件暂不可用，以下以纯文本显示稿件。</p>';
+                }
                 
                 container.innerHTML = `
                     <article class="post-full">
                         <h1 class="post-title">${post.title}</h1>
                         <div class="post-meta">${post.date} · 作者：${post.author}</div>
+                        ${markdownWarning}
                         <div class="post-content">${contentHtml}</div>
                     </article>
                 `;
@@ -60,7 +145,7 @@
                 loadGiscus();
             })
             .catch(err => {
-                document.getElementById('postDetail').innerHTML = '<p class="error">加载失败</p>';
+                document.getElementById('postDetail').innerHTML = '<p class="error">稿件加载失败，请检查网络后刷新。</p>';
                 console.error(err);
             });
 
