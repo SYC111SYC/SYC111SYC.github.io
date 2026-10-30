@@ -2,7 +2,7 @@
     "posts": [
         {
             "id": "post-000",
-            "top": 1,
+            "top": 2,
             "title": "置顶：投稿通道",
             "author": "管理员",
             "date": "2026-10-13",
@@ -62,6 +62,15 @@
             "date": "2026-10-16",
             "summary": "下载链接",
             "content": "👉🏻链接 [点击下载 因式分解自动程序！.exe](files/ysfj.exe)"
+        },
+        {
+            "id": "release-note",
+            "top": 1,
+            "title": "Release Notes - 发布说明",
+            "author": "SYC",
+            "date": "2026-10-13",
+            "summary": "当前版本:202610.1",
+            "content": "## Latest Version: 202610.1\n## Release Notes for 202610.1\n### New Features\n#### Pinned Posts\nPinned posts will always stay at the top regardless of sorting options.\n#### Chalkboard Penalty Mechanism\nTo prevent score farming by random clicking, a penalty rule is added. You will be exited from the chalkboard after two consecutive wrong answers.\n### Fixes\nFixed an issue where some icons displayed incorrectly on older operating systems.\n## 最新版本:202610.1\n## 202610.1 的发布说明 \n### 新功能 \n#### 置顶稿件  \n 现在无论您怎么切换排序方式置顶的稿件总是在最上面  \n#### 小黑板惩罚机制 \n 为了防止乱点刷分，现在加入了惩罚机制，如果连错两次，将会退出黑板  \n### 修复 \n 修复了一些图标在较老的操作系统中显示异常 "
         }
     ]
 }

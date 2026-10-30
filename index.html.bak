@@ -1,0 +1,2426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>猫球小站</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            margin: 0;
+            position: relative;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ---------- 安全锁定层 ---------- */
+        .lock-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f5f7fa, #e4e8ef);
+            backdrop-filter: blur(8px);
+            padding: 20px;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .lock-card {
+            width: 100%;
+            max-width: 380px;
+            padding: 32px 28px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+            text-align: center;
+        }
+
+        .lock-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .lock-desc {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .lock-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 15px;
+            box-sizing: border-box;
+            margin-bottom: 16px;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .lock-input:focus {
+            border-color: #8fb0ff;
+            box-shadow: 0 0 0 3px rgba(143, 176, 255, 0.2);
+        }
+
+        .lock-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #8fb0ff;
+            color: #fff;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .lock-btn:hover {
+            background: #6f97ff;
+        }
+
+        .lock-btn:active {
+            transform: scale(0.98);
+        }
+
+        .lock-tip {
+            margin-top: 14px;
+            font-size: 13px;
+            min-height: 18px;
+            color: #e53e3e;
+        }
+
+        .pet-wrap {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 94px;
+            height: 94px;
+            z-index: 9999;
+            user-select: none;
+            pointer-events: auto;
+            opacity: 0;
+            transform: translate3d(32px, 140px, 0);
+            will-change: transform;
+            transition: opacity 0.2s ease;
+        }
+
+        .pet {
+            position: absolute;
+            left: 12px;
+            top: 12px;
+            width: 72px;
+            height: 72px;
+            cursor: pointer;
+            background: url('images/catball.png') center/contain no-repeat;
+            image-rendering: auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.18));
+            transition: transform 0.15s ease, filter 0.15s ease;
+            will-change: transform;
+        }
+
+        .pet:hover {
+            transform: scale(1.08);
+            filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.22));
+        }
+
+        .pet.running {
+            transform: scale(1.12);
+            filter: drop-shadow(0 8px 16px rgba(255, 120, 120, 0.35));
+        }
+
+        .pet-speech {
+            position: absolute;
+            left: 72px;
+            top: 8px;
+            max-width: 180px;
+            padding: 7px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+            color: #333;
+            font-size: 13px;
+            line-height: 1.3;
+            white-space: nowrap;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            pointer-events: none;
+        }
+
+        .pet-speech::before {
+            content: "";
+            position: absolute;
+            left: -8px;
+            top: 12px;
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.96);
+            border-left: 1px solid rgba(0, 0, 0, 0.08);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            transform: rotate(45deg);
+        }
+
+        .pet-speech.left {
+            left: auto;
+            right: 72px;
+        }
+
+        .pet-speech.left::before {
+            left: auto;
+            right: -8px;
+            border-left: none;
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
+            transform: rotate(-45deg);
+        }
+
+        .pet-speech.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ---------- 标题 + 小黑板 ---------- */
+        .header-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            vertical-align: middle;
+            flex-wrap: wrap;
+        }
+
+        .blackboard {
+            position: relative;
+            display: inline-flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: stretch;
+            width: 190px;
+            min-height: 92px;
+            padding: 6px 9px;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(255,255,255,0.06) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(255,255,255,0.05) 0%, transparent 40%),
+                linear-gradient(135deg, #2c4a3a, #1e3628);
+            border: 4px solid #8a6a3f;
+            border-radius: 8px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22), inset 0 0 26px rgba(0, 0, 0, 0.3);
+            color: #e8f2eb;
+            font-family: 'Comic Sans MS', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: transform 0.15s ease;
+        }
+
+        .blackboard.shake {
+            animation: bb-shake 0.3s ease;
+        }
+
+        @keyframes bb-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-3px) rotate(-0.5deg); }
+            75% { transform: translateX(3px) rotate(0.5deg); }
+        }
+
+        .bb-idle {
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .bb-title {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .bb-hint {
+            font-size: 10px;
+            color: #b8d4c4;
+        }
+
+        .bb-question {
+            font-size: 15px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+            text-shadow: 0 0 4px rgba(220, 255, 230, 0.3);
+            white-space: nowrap;
+        }
+
+        .bb-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            width: 100%;
+        }
+
+        .bb-option {
+            padding: 3px 4px;
+            border: 1px solid rgba(230, 245, 235, 0.7);
+            background: rgba(255, 255, 255, 0.08);
+            color: #e8f2eb;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s ease, transform 0.1s ease;
+            line-height: 1.2;
+        }
+
+        .bb-option:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .bb-option:active {
+            transform: scale(0.96);
+        }
+
+        .bb-option.correct {
+            background: rgba(120, 220, 130, 0.35);
+            border-color: #7ed684;
+            color: #eaffee;
+        }
+
+        .bb-option.wrong {
+            background: rgba(230, 100, 100, 0.35);
+            border-color: #e67878;
+            color: #fff1f1;
+        }
+
+        .bb-progress {
+            margin-top: 5px;
+            font-size: 9px;
+            color: #b8d4c4;
+            letter-spacing: 0.3px;
+            text-align: center;
+            line-height: 1.3;
+        }
+
+        @media (max-width: 700px) {
+            .header-brand {
+                display: flex;
+                width: 100%;
+            }
+            .blackboard {
+                width: 100%;
+            }
+        }
+
+        /* ---------- 猫粮状态栏 ---------- */
+        .pet-food-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            margin: 8px 18px;
+            padding: 8px 14px;
+            background: linear-gradient(135deg, #fff8ec, #ffe9cc);
+            border: 1px solid rgba(210, 160, 90, 0.35);
+            border-radius: 12px;
+            font-size: 14px;
+            color: #6d3a00;
+            box-shadow: 0 2px 8px rgba(180, 120, 40, 0.08);
+        }
+
+        .pet-food-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pet-food-info strong {
+            font-size: 1.15em;
+            color: #d47700;
+            transition: color 0.25s ease, transform 0.25s ease;
+            display: inline-block;
+            min-width: 1em;
+            text-align: center;
+        }
+
+        .pet-food-info strong.flash {
+            color: #ff8800;
+            transform: scale(1.35);
+        }
+
+        .pet-food-status {
+            color: #a06b28;
+            font-size: 13px;
+        }
+
+        .pet-food-status.fed {
+            color: #2f8a2f;
+            font-weight: 600;
+        }
+
+        .pet-food-btn {
+            margin-left: auto;
+            padding: 6px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #ffbf66;
+            color: #3a2200;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .pet-food-btn:hover:not(:disabled) {
+            background: #ffb144;
+        }
+
+        .pet-food-btn:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+
+        .pet-food-btn:disabled {
+            background: #e8dccb;
+            color: #a08b70;
+            cursor: not-allowed;
+        }
+
+        /* 猫粮槽位 */
+        .food-slot {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            border: 2px dashed rgba(210, 160, 90, 0.55);
+            background: rgba(255, 255, 255, 0.55);
+            flex: 0 0 auto;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .food-slot.empty {
+            border-color: rgba(190, 190, 190, 0.5);
+            background: rgba(250, 250, 250, 0.4);
+        }
+
+        .food-slot.empty::after {
+            content: "空";
+            font-size: 12px;
+            color: #b8a888;
+            letter-spacing: 1px;
+        }
+
+        .food-slot.empty .draggable-food {
+            display: none;
+        }
+
+        .food-slot.locked .draggable-food {
+            cursor: not-allowed;
+            filter: grayscale(0.4);
+            opacity: 0.65;
+        }
+
+        .draggable-food {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffe0b0, #ffbf66 55%, #e8963f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            line-height: 1;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            box-shadow: 0 2px 6px rgba(180, 120, 40, 0.35);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .draggable-food:hover {
+            transform: scale(1.1);
+        }
+
+        .draggable-food.dragging {
+            cursor: grabbing;
+            transform: scale(1.15);
+            box-shadow: 0 6px 14px rgba(180, 120, 40, 0.5);
+        }
+
+        .draggable-food.floating {
+            position: absolute;
+            z-index: 10000;
+            margin: 0;
+            transition: none;
+            box-shadow: 0 8px 18px rgba(180, 120, 40, 0.5);
+        }
+
+        .draggable-food.caught {
+            cursor: default;
+            z-index: 9998;
+            box-shadow: 0 0 0 3px rgba(255, 150, 100, 0.45), 0 2px 6px rgba(180, 120, 40, 0.35);
+        }
+
+        .draggable-food.gone {
+            transform: scale(0.1);
+            opacity: 0;
+            transition: transform 0.45s ease, opacity 0.45s ease;
+        }
+
+        @media (max-width: 500px) {
+            .pet-food-btn {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+
+        /* ---------- 每日运势 ---------- */
+        .daily-fortune-card {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px 18px;
+            margin: 8px 18px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #fffdf7, #eef4ff);
+            border: 1px solid rgba(150, 160, 200, 0.28);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(90, 110, 180, 0.08);
+        }
+
+        .fortune-level {
+            flex: 0 0 auto;
+            min-width: 86px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 22px;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: 2px;
+            text-align: center;
+            white-space: nowrap;
+            border: 2px solid transparent;
+        }
+
+        .fortune-level.lv-daji      { color: #d4380d; background: #fff3e8; border-color: #ffb08a; }
+        .fortune-level.lv-zhongji   { color: #d46b08; background: #fff8e6; border-color: #ffd591; }
+        .fortune-level.lv-xiaoji    { color: #ad8b00; background: #fffbe6; border-color: #ffe58f; }
+        .fortune-level.lv-ping      { color: #4a5568; background: #f7f9fc; border-color: #cbd5e0; }
+        .fortune-level.lv-xiaoxiong { color: #3c7a89; background: #eff9fb; border-color: #a8d8e2; }
+        .fortune-level.lv-xiong     { color: #4a5568; background: #f0f2f5; border-color: #b8c0cc; }
+        .fortune-level.lv-daxiong   { color: #2d3748; background: #e8eaee; border-color: #9aa3b0; }
+        .fortune-level.lv-mystery   { color: #8e44ad; background: #f8f2ff; border-color: #d3b3ef; letter-spacing: 0; }
+        .fortune-level.lv-pending   { color: #9aa3b0; background: #f5f7fa; border-color: #d5dbe4; }
+
+        .fortune-main {
+            flex: 1 1 200px;
+            min-width: 0;
+        }
+
+        .fortune-head {
+            font-size: 13px;
+            color: #8a94a6;
+            margin-bottom: 6px;
+        }
+
+        .fortune-date {
+            margin-left: 8px;
+            color: #b0b8c6;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .fortune-streak {
+            margin-left: 10px;
+            color: #e07a2f;
+            font-weight: 600;
+        }
+
+        .fortune-sign-btn {
+            margin-left: auto;
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #8fb0ff;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .fortune-sign-btn:hover { background: #6f97ff; }
+        .fortune-sign-btn:active { transform: scale(0.96); }
+
+        @media (max-width: 500px) {
+            .daily-fortune-card { gap: 10px; }
+            .fortune-level { min-width: 72px; font-size: 20px; padding: 8px 10px; }
+            .fortune-sign-btn { margin-left: 0; width: 100%; }
+        }
+
+        /* ---------- 逗猫棒 ---------- */
+        .wand-slot {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            border: 2px dashed rgba(160, 130, 220, 0.55);
+            background: rgba(255, 255, 255, 0.55);
+            flex: 0 0 auto;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .wand-slot.empty {
+            border-color: rgba(160, 130, 220, 0.25);
+            background: rgba(250, 250, 255, 0.4);
+        }
+
+        .wand-slot.empty .draggable-wand {
+            display: none;
+        }
+
+        .draggable-wand {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+            cursor: grab;
+            user-select: none;
+            touch-action: none;
+            background: radial-gradient(circle at 35% 35%, #f3e9ff, #dcc8ff 55%, #b79ce8);
+            box-shadow: 0 2px 6px rgba(120, 90, 180, 0.35);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .draggable-wand svg {
+            display: block;
+            pointer-events: none;
+        }
+
+        .draggable-wand:hover {
+            transform: scale(1.1);
+        }
+
+        .draggable-wand.dragging {
+            cursor: grabbing;
+            transform: scale(1.15);
+            box-shadow: 0 6px 14px rgba(120, 90, 180, 0.5);
+        }
+
+        .draggable-wand.floating {
+            position: absolute;
+            z-index: 10000;
+            margin: 0;
+            transition: none;
+            box-shadow: 0 8px 18px rgba(120, 90, 180, 0.5);
+        }
+
+        /* ---------- 帖子排序 ---------- */
+        .sort-bar {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .sort-bar .sort-label {
+            color: #8a94a6;
+            margin-right: 2px;
+        }
+
+        .sort-btn {
+            padding: 5px 14px;
+            border: 1px solid #d6dde8;
+            background: #fff;
+            border-radius: 16px;
+            color: #55607a;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease,
+                        border-color 0.15s ease, transform 0.1s ease;
+        }
+
+        .sort-btn:hover {
+            border-color: #8fb0ff;
+            color: #3d6bdc;
+        }
+
+        .sort-btn:active {
+            transform: scale(0.96);
+        }
+
+        .sort-btn.active {
+            background: #8fb0ff;
+            border-color: #8fb0ff;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 安全锁定层 -->
+    <div id="lockScreen" class="lock-screen">
+        <div class="lock-card">
+            <div class="lock-title">🔒 访问受限</div>
+            <div class="lock-desc">很抱歉，现在不是本站的服务时间<br>工作日 10:00 - 17:15 期间暂停访问</div>
+            <input type="password" id="lockKeyInput" class="lock-input" placeholder="请输入站长密钥解锁">
+            <button id="lockUnlockBtn" class="lock-btn" type="button">解锁访问</button>
+            <div id="lockTip" class="lock-tip"></div>
+        </div>
+    </div>
+
+    <header>
+        <div class="header-brand">
+            <h1>猫球小站</h1>
+            <div class="blackboard" id="blackboard" role="button" aria-label="小黑板" title="敲我 3 下召唤猫球">
+                <div class="bb-idle" id="bbIdle">
+                    <div class="bb-title">📋 小黑板</div>
+                    <div class="bb-hint">敲我 3 下召唤猫球</div>
+                </div>
+                <div class="bb-quiz" id="bbQuiz" style="display:none;">
+                    <div class="bb-question" id="bbQuestion">—</div>
+                    <div class="bb-options" id="bbOptions"></div>
+                    <div class="bb-progress" id="bbProgress"></div>
+                </div>
+            </div>
+        </div>
+        <nav>
+            <a href="index.html">首页</a>
+            <a href="download.html">文件分享</a>
+            <a href="rand.html">随机数抽取</a>
+            <a href="calendar.html">日历与倒数日</a>
+            <a href="clock.html">世界时间</a>
+        </nav>
+    </header>
+
+    <div class="pet-food-bar">
+        <span class="pet-food-info">🍖 猫粮：<strong id="foodCount">0</strong></span>
+        <span class="pet-food-status" id="feedStatus">今天还没喂</span>
+        <div class="food-slot" id="foodSlot">
+            <div class="draggable-food" id="draggableFood" title="拖动我去喂猫">🍖</div>
+        </div>
+        <div class="wand-slot" id="wandSlot">
+            <div class="draggable-wand" id="draggableWand" title="拖动我逗猫球玩">
+                <!-- 用 SVG 代替 emoji，避免 Windows 10 缺字显示方框 -->
+                <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" focusable="false">
+                    <!-- 杆 -->
+                    <line x1="5" y1="28" x2="20" y2="13"
+                          stroke="#b5813c" stroke-width="2.8" stroke-linecap="round"/>
+                    <!-- 杆头 -->
+                    <circle cx="20" cy="13" r="1.8" fill="#8a5e22"/>
+                    <!-- 挂线 -->
+                    <path d="M20 13 Q 24 8, 25.6 13.4"
+                          fill="none" stroke="#c8b8e8" stroke-width="1.3" stroke-linecap="round"/>
+                    <!-- 毛球 -->
+                    <circle cx="26" cy="15" r="5" fill="#f3e2ff" stroke="#b79ce8" stroke-width="1.3"/>
+                    <!-- 高光 -->
+                    <circle cx="24.2" cy="13.4" r="1.3" fill="#ffffff"/>
+                    <!-- 小铃铛 -->
+                    <circle cx="26" cy="15" r="1.6" fill="#ffcc4d" stroke="#d9a01a" stroke-width="0.6"/>
+                </svg>
+            </div>
+        </div>
+        <button class="pet-food-btn" id="feedBtn" type="button">喂猫 🐱</button>
+    </div>
+
+    <div class="daily-fortune-card" id="dailyFortune">
+        <div class="fortune-level" id="fortuneLevel">…</div>
+        <div class="fortune-main">
+            <div class="fortune-head">
+                🔮 今日运势<span class="fortune-date" id="fortuneDate"></span><span class="fortune-streak" id="fortuneStreak"></span>
+            </div>
+        </div>
+        <button class="fortune-sign-btn" id="fortuneSignBtn" type="button">签到抽运势</button>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="搜索帖子标题或内容...">
+        <div class="sort-bar" id="sortBar">
+            <span class="sort-label">排序：</span>
+            <button type="button" class="sort-btn active" data-sort="new">🕒 最新</button>
+            <button type="button" class="sort-btn" data-sort="title">🔤 名称</button>
+            <button type="button" class="sort-btn" data-sort="id">🔢 编号</button>
+        </div>
+        <p id="searchTip"></p>
+    </div>
+
+    <div class="post-card foldable-game">
+        <div class="fold-header" id="foldToggle">
+            <span>🎮 游戏中心</span>
+            <span class="fold-arrow">▼</span>
+        </div>
+        <div class="fold-content" id="foldContent">
+            <div class="game-item">
+                <h4>🦖 小恐龙</h4>
+                <p class="game-tip">按 <kbd>空格</kbd> 跳跃，<kbd>↓</kbd> 下蹲</p>
+                <div class="game-viewport">
+                    <iframe
+                        src="https://chromedino.com/embed/"
+                        frameborder="0"
+                        scrolling="no"
+                        class="game-iframe"
+                        title="Chrome小恐龙游戏">
+                    </iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main id="postList">加载中...</main>
+
+    <div id="petWrap" class="pet-wrap" aria-label="桌宠" title="点击让我乱跑 10 秒">
+        <div id="pet" class="pet"></div>
+        <div id="petSpeech" class="pet-speech" aria-live="polite"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        /* =========================================================
+           安全锁系统
+           ========================================================= */
+        const CORRECT_KEY_HASH = '209810201699e6e8c5d142008571494ea0b12e05c8dff301b406001aa48046f3';
+        const UNLOCK_TOKEN_KEY = 'catball_unlock_token_v1';
+        const LOCK_START_MIN = 10 * 60;   // 10:00
+        const LOCK_END_MIN = 17 * 60 + 15; // 17:15
+
+        const lockScreen = document.getElementById('lockScreen');
+        const lockKeyInput = document.getElementById('lockKeyInput');
+        const lockUnlockBtn = document.getElementById('lockUnlockBtn');
+        const lockTip = document.getElementById('lockTip');
+
+        // 安全读写本地存储
+        function lockSafeGet(key) {
+            try { return localStorage.getItem(key); } catch (e) { return null; }
+        }
+        function lockSafeSet(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) {}
+        }
+
+        // 获取当日日期字符串
+        function lockTodayStr() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        // 计算字符串的 SHA-256 哈希
+        async function sha256(str) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // 判断当前是否为锁定时间（工作日 10:00-17:15）
+        function isLockTime() {
+            const now = new Date();
+            const day = now.getDay(); // 0=周日, 1-5=周一到周五, 6=周六
+            if (day < 1 || day > 5) return false; // 周末不锁定
+            
+            const minutes = now.getHours() * 60 + now.getMinutes();
+            return minutes >= LOCK_START_MIN && minutes <= LOCK_END_MIN;
+        }
+
+        // 检查是否已解锁（当天有效）
+        async function isUnlocked() {
+            const raw = lockSafeGet(UNLOCK_TOKEN_KEY);
+            if (!raw) return false;
+            try {
+                const data = JSON.parse(raw);
+                if (data.date !== lockTodayStr()) return false;
+                return data.hash === CORRECT_KEY_HASH;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // 显示/隐藏锁定层
+        function showLock(show) {
+            lockScreen.style.display = show ? 'flex' : 'none';
+        }
+
+        // 执行解锁
+        async function tryUnlock() {
+            const input = lockKeyInput.value.trim();
+            if (!input) {
+                lockTip.textContent = '请输入密钥';
+                return;
+            }
+            
+            const inputHash = await sha256(input);
+            if (inputHash === CORRECT_KEY_HASH) {
+                const data = { date: lockTodayStr(), hash: inputHash };
+                lockSafeSet(UNLOCK_TOKEN_KEY, JSON.stringify(data));
+                lockTip.textContent = '';
+                showLock(false);
+            } else {
+                lockTip.textContent = '密钥错误，请重试';
+                lockKeyInput.value = '';
+                lockKeyInput.focus();
+            }
+        }
+
+        // 定时检查时间，自动处理锁定/解锁
+        async function checkLockStatus() {
+            if (!isLockTime()) {
+                showLock(false);
+                return;
+            }
+            
+            const unlocked = await isUnlocked();
+            if (!unlocked) {
+                showLock(true);
+            } else {
+                showLock(false);
+            }
+        }
+
+        // 事件绑定
+        lockUnlockBtn.addEventListener('click', tryUnlock);
+        lockKeyInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                tryUnlock();
+            }
+        });
+
+        // 初始化 + 每分钟检查
+        checkLockStatus();
+        setInterval(checkLockStatus, 60 * 1000);
+
+        /* =========================================================
+           文章加载 / 渲染 / 搜索 / 排序 / 折叠
+           ========================================================= */
+        let allPosts = [];
+
+        fetch('posts.json')
+            .then(res => res.json())
+            .then(data => {
+                allPosts = data.posts;
+                applyFilterAndSort();
+            })
+            .catch(err => {
+                document.getElementById('postList').innerHTML = '<p class="error">加载失败，请检查 posts.json 语法是否正确</p>';
+                console.error(err);
+            });
+
+        function renderPosts(posts) {
+            const container = document.getElementById('postList');
+            if (posts.length === 0) {
+                container.innerHTML = '<p>没有找到相关帖子</p>';
+                return;
+            }
+            let html = '';
+            posts.forEach(post => {
+                html += `
+                <article class="post-card">
+                    <h2><a href="post.html?id=${post.id}">${post.title}</a></h2>
+                    <div class="post-meta">${post.date} · 作者：${post.author}</div>
+                    <p class="post-summary">${post.summary}</p>
+                </article>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        const searchInput = document.getElementById('searchInput');
+        const searchTip = document.getElementById('searchTip');
+        const sortBar = document.getElementById('sortBar');
+        const SORT_KEY = 'catball_post_sort_v1';
+
+        let currentSort = 'new';        // new | title | id
+        let currentKeyword = '';
+
+        // 读取上次选择
+        try {
+            const savedSort = localStorage.getItem(SORT_KEY);
+            if (savedSort && ['new', 'title', 'id'].indexOf(savedSort) >= 0) {
+                currentSort = savedSort;
+            }
+        } catch (e) { /* 忽略 */ }
+
+        function sortPosts(posts, mode) {
+            const list = posts.slice();
+
+            list.sort((a, b) => {
+                const priorityA = Number(a.top);
+                const priorityB = Number(b.top);
+                const pinnedOrder =
+                    (Number.isFinite(priorityB) ? priorityB : 0) -
+                    (Number.isFinite(priorityA) ? priorityA : 0);
+                if (pinnedOrder !== 0) return pinnedOrder;
+
+                if (mode === 'title') {
+                    return String(a.title || '').localeCompare(
+                        String(b.title || ''), 'zh-Hans-CN',
+                        { numeric: true, sensitivity: 'base' }
+                    );
+                }
+                if (mode === 'id') {
+                    const na = Number(a.id);
+                    const nb = Number(b.id);
+                    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+                    return String(a.id).localeCompare(
+                        String(b.id), 'zh-Hans-CN', { numeric: true }
+                    );
+                }
+
+                // 默认：新的在前（日期倒序，同日期按编号倒序）
+                const d = String(b.date || '').localeCompare(String(a.date || ''));
+                if (d !== 0) return d;
+                const na = Number(a.id);
+                const nb = Number(b.id);
+                if (Number.isFinite(na) && Number.isFinite(nb)) return nb - na;
+                return 0;
+            });
+            return list;
+        }
+
+        function applyFilterAndSort() {
+            let list = allPosts;
+
+            if (currentKeyword) {
+                const kw = currentKeyword.toLowerCase();
+                list = list.filter(post =>
+                    String(post.title || '').toLowerCase().includes(kw) ||
+                    String(post.summary || '').toLowerCase().includes(kw) ||
+                    String(post.content || '').toLowerCase().includes(kw)
+                );
+            }
+
+            const sorted = sortPosts(list, currentSort);
+            renderPosts(sorted);
+
+            searchTip.textContent = currentKeyword
+                ? `找到 ${sorted.length} 篇相关帖子`
+                : '';
+        }
+
+        function updateSortButtons() {
+            const btns = sortBar.querySelectorAll('.sort-btn');
+            btns.forEach(function (btn) {
+                btn.classList.toggle('active', btn.dataset.sort === currentSort);
+            });
+        }
+
+        sortBar.addEventListener('click', function (e) {
+            const btn = e.target.closest('.sort-btn');
+            if (!btn) return;
+            const mode = btn.dataset.sort;
+            if (!mode || mode === currentSort) return;
+
+            currentSort = mode;
+            try { localStorage.setItem(SORT_KEY, mode); } catch (err) {}
+            updateSortButtons();
+            applyFilterAndSort();
+        });
+
+        searchInput.addEventListener('input', function () {
+            currentKeyword = this.value.trim().toLowerCase();
+            applyFilterAndSort();
+        });
+
+        updateSortButtons();
+
+        const foldToggle = document.getElementById('foldToggle');
+        const foldContent = document.getElementById('foldContent');
+        const foldArrow = foldToggle.querySelector('.fold-arrow');
+        foldToggle.addEventListener('click', function() {
+            const isOpen = foldContent.classList.toggle('open');
+            foldArrow.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
+
+        /* =========================================================
+           桌宠系统
+           ========================================================= */
+        const petWrap = document.getElementById('petWrap');
+        const pet = document.getElementById('pet');
+        const petSpeech = document.getElementById('petSpeech');
+        let speechTimer = null;
+
+        const idlePhrases = ['喵~', '喵呜~', '欢迎！', '我是猫球。', '哈哈，快来陪我玩！'];
+        const returnPhrases = ['等等我！', '不要抛弃我！', '我回来了，慢点！'];
+
+        const petState = {
+            x: 32,
+            y: 140,
+            vx: 1,
+            vy: 0.6,
+            running: false,
+            runUntil: 0,
+            idleTimer: 0,
+            nextIdleSpeechAt: 0,
+            nextMeowAt: 0,
+            nextReturnSpeechAt: 0,
+            lastTime: 0,
+            chasingFood: false,
+            eating: false,
+            nextEatSpeechAt: 0,
+            chasingWand: false,
+            nextWandSpeechAt: 0,
+            goingToBoard: false,
+            atBoard: false,
+            boardTargetX: 0,
+            boardTargetY: 0
+        };
+
+        function randomRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function clamp(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        function say(text, duration = 1400) {
+            // 自动判断气泡方向
+            const petRight = petState.x + petWrap.offsetWidth;
+            const viewportRight = window.scrollX + window.innerWidth;
+            const spaceRight = viewportRight - petRight;
+            // 气泡预估宽度（max-width + padding + 边距）
+            const speechTotalWidth = 210;
+
+            if (spaceRight < speechTotalWidth) {
+                petSpeech.classList.add('left');
+            } else {
+                petSpeech.classList.remove('left');
+            }
+
+            petSpeech.textContent = text;
+            petSpeech.classList.add('visible');
+            clearTimeout(speechTimer);
+            speechTimer = setTimeout(() => {
+                petSpeech.classList.remove('visible');
+            }, duration);
+        }
+
+        function setRandomIdleDirection() {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = randomRange(0.5, 1.1);
+            petState.vx = Math.cos(angle) * speed;
+            petState.vy = Math.sin(angle) * speed;
+            petState.idleTimer = randomRange(60, 170);
+        }
+
+        function setPetPosition() {
+            const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
+            const maxY = Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8);
+            petState.x = clamp(petState.x, 8, maxX);
+            petState.y = clamp(petState.y, 8, maxY);
+            petWrap.style.transform = `translate3d(${petState.x}px, ${petState.y}px, 0)`;
+        }
+
+        function isPetOutsideViewport() {
+            const left = petState.x;
+            const top = petState.y;
+            const right = left + petWrap.offsetWidth;
+            const bottom = top + petWrap.offsetHeight;
+
+            return right < window.scrollX - 20 ||
+                left > window.scrollX + window.innerWidth + 20 ||
+                bottom < window.scrollY - 20 ||
+                top > window.scrollY + window.innerHeight + 20;
+        }
+
+        function animate(timestamp) {
+            if (!petState.lastTime) petState.lastTime = timestamp;
+            const delta = (timestamp - petState.lastTime) / 16.67;
+            petState.lastTime = timestamp;
+
+            if (petState.goingToBoard) {
+                const dx = petState.boardTargetX - petState.x;
+                const dy = petState.boardTargetY - petState.y;
+                const dist = Math.hypot(dx, dy) || 1;
+
+                if (dist < 12) {
+                    petState.x = petState.boardTargetX;
+                    petState.y = petState.boardTargetY;
+                    petState.vx = 0;
+                    petState.vy = 0;
+                    petState.goingToBoard = false;
+                    petState.atBoard = true;
+                    startBoardQuiz();
+                } else {
+                    const speed = 13;
+                    petState.vx = (dx / dist) * speed;
+                    petState.vy = (dy / dist) * speed;
+
+                    if (timestamp > petState.nextMeowAt) {
+                        say('喵~', 500);
+                        petState.nextMeowAt = timestamp + 900;
+                    }
+                }
+            } else if (petState.atBoard) {
+                petState.vx = 0;
+                petState.vy = 0;
+            } else if (petState.chasingWand && wandDrag.active) {
+                const wc = getWandCenter();
+                const pcx = petState.x + petWrap.offsetWidth / 2;
+                const pcy = petState.y + petWrap.offsetHeight / 2;
+                const dx = wc.x - pcx;
+                const dy = wc.y - pcy;
+                const dist = Math.hypot(dx, dy) || 1;
+
+                if (dist > WAND_CATCH_DISTANCE) {
+                    petState.vx = (dx / dist) * WAND_SPEED;
+                    petState.vy = (dy / dist) * WAND_SPEED;
+                } else {
+                    petState.vx = 0;
+                    petState.vy = 0;
+                }
+
+                if (timestamp > petState.nextWandSpeechAt) {
+                    if (dist <= WAND_CATCH_DISTANCE) {
+                        say(WAND_CATCH_PHRASES[Math.floor(Math.random() * WAND_CATCH_PHRASES.length)], 900);
+                        petState.nextWandSpeechAt = timestamp + 2200;
+                    } else {
+                        say(WAND_PHRASES[Math.floor(Math.random() * WAND_PHRASES.length)], 800);
+                        petState.nextWandSpeechAt = timestamp + 1800;
+                    }
+                }
+            } else if (petState.chasingFood && foodDrag.active && !foodDrag.caught) {
+                const fc = getFoodCenter();
+                const pcx = petState.x + petWrap.offsetWidth / 2;
+                const pcy = petState.y + petWrap.offsetHeight / 2;
+                const dx = fc.x - pcx;
+                const dy = fc.y - pcy;
+                const dist = Math.hypot(dx, dy);
+
+                if (dist < CATCH_DISTANCE) {
+                    catchFood();
+                } else {
+                    const speed = 13;
+                    petState.vx = (dx / dist) * speed;
+                    petState.vy = (dy / dist) * speed;
+
+                    if (timestamp > petState.nextMeowAt) {
+                        say('喵喵~', 700);
+                        petState.nextMeowAt = timestamp + 700;
+                    }
+                }
+            } else if (petState.eating) {
+                petState.vx = 0;
+                petState.vy = 0;
+
+                if (timestamp > petState.nextEatSpeechAt) {
+                    say(EAT_PHRASES[Math.floor(Math.random() * EAT_PHRASES.length)], 520);
+                    petState.nextEatSpeechAt = timestamp + 300 + Math.random() * 300;
+                }
+            } else if (petState.running) {
+                if (timestamp > petState.runUntil) {
+                    petState.running = false;
+                    pet.classList.remove('running');
+                    setRandomIdleDirection();
+                } else {
+                    if (timestamp > petState.nextMeowAt) {
+                        say('喵喵~', 700);
+                        petState.nextMeowAt = timestamp + 550;
+                    }
+
+                    petState.vx += randomRange(-2.4, 2.4) * delta;
+                    petState.vy += randomRange(-2.4, 2.4) * delta;
+                    const length = Math.hypot(petState.vx, petState.vy) || 1;
+                    const maxSpeed = 11.5;
+                    if (length > maxSpeed) {
+                        petState.vx = (petState.vx / length) * maxSpeed;
+                        petState.vy = (petState.vy / length) * maxSpeed;
+                    }
+                }
+            } else if (isPetOutsideViewport()) {
+                if (timestamp > petState.nextReturnSpeechAt) {
+                    say(returnPhrases[Math.floor(Math.random() * returnPhrases.length)], 1500);
+                    petState.nextReturnSpeechAt = timestamp + 2200;
+                }
+
+                const centerX = window.scrollX + window.innerWidth * 0.5;
+                const centerY = window.scrollY + window.innerHeight * 0.5;
+                const targetX = clamp(centerX - petWrap.offsetWidth / 2, 8, Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8));
+                const targetY = clamp(centerY - petWrap.offsetHeight / 2, 8, Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8));
+                const dx = targetX - petState.x;
+                const dy = targetY - petState.y;
+                const distance = Math.hypot(dx, dy) || 1;
+                const speed = 13;
+                petState.vx = (dx / distance) * speed;
+                petState.vy = (dy / distance) * speed;
+
+                if (distance < 18) {
+                    petState.vx = 0;
+                    petState.vy = 0;
+                    setRandomIdleDirection();
+                }
+            } else {
+                petState.idleTimer -= delta;
+                if (petState.idleTimer <= 0) {
+                    setRandomIdleDirection();
+                }
+
+                petState.vx *= 0.96;
+                petState.vy *= 0.96;
+                if (Math.hypot(petState.vx, petState.vy) < 0.35) {
+                    setRandomIdleDirection();
+                }
+
+                if (timestamp > petState.nextIdleSpeechAt) {
+                    const text = idlePhrases[Math.floor(Math.random() * idlePhrases.length)];
+                    say(text, 1400);
+                    petState.nextIdleSpeechAt = timestamp + randomRange(2800, 5200);
+                }
+            }
+
+            petState.x += petState.vx * delta;
+            petState.y += petState.vy * delta;
+            setPetPosition();
+            requestAnimationFrame(animate);
+        }
+
+        pet.addEventListener('click', function() {
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+                say('好吧，下次再玩~喵', 1200);
+                petState.running = true;
+                petState.runUntil = performance.now() + 3000;
+                pet.classList.add('running');
+                petState.nextMeowAt = performance.now() + 200;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = randomRange(8, 12);
+                petState.vx = Math.cos(angle) * speed;
+                petState.vy = Math.sin(angle) * speed;
+                return;
+            }
+
+            petState.running = true;
+            petState.runUntil = performance.now() + 10000;
+            pet.classList.add('running');
+            petState.nextMeowAt = performance.now() + 200;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = randomRange(8, 12);
+            petState.vx = Math.cos(angle) * speed;
+            petState.vy = Math.sin(angle) * speed;
+            say('喵喵喵！', 900);
+        });
+
+        setRandomIdleDirection();
+        setPetPosition();
+        petState.nextIdleSpeechAt = performance.now() + 1500;
+        petWrap.style.opacity = '1';
+        requestAnimationFrame(animate);
+
+        window.addEventListener('resize', function() {
+            setPetPosition();
+            // 修正黑板召唤目标位置
+            if (petState.atBoard || petState.goingToBoard) {
+                const rect = blackboard.getBoundingClientRect();
+                const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
+                const maxY = Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8);
+                if (window.innerWidth <= 700) {
+                    petState.boardTargetX = clamp(rect.left + window.scrollX + 12, 8, maxX);
+                    petState.boardTargetY = clamp(rect.bottom + window.scrollY + 10, 8, maxY);
+                }
+            }
+        });
+        window.addEventListener('scroll', function() {
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+            }
+            if (!petState.running && !petState.chasingFood && !petState.eating &&
+                !petState.atBoard && !petState.goingToBoard && isPetOutsideViewport()) {
+                petState.nextReturnSpeechAt = performance.now();
+            }
+        }, { passive: true });
+
+        /* =========================================================
+           猫粮系统（含拖拽喂猫）
+           ========================================================= */
+        const FOOD_KEY        = 'catball_food_v1';
+        const FEED_DATE_KEY   = 'catball_feed_date_v1';
+        const READ_POSTS_KEY  = 'catball_read_posts_v1';
+
+        const MIN_FOOD        = 4;
+
+        const foodCountEl     = document.getElementById('foodCount');
+        const feedStatusEl    = document.getElementById('feedStatus');
+        const feedBtn         = document.getElementById('feedBtn');
+        const foodSlotEl      = document.getElementById('foodSlot');
+        const draggableFood   = document.getElementById('draggableFood');
+
+        const FOOD_SIZE       = 34;
+        const CATCH_DISTANCE  = 24;
+        const DRAG_START_THRESHOLD = 6;
+        const EAT_PHRASES     = ['啊呜', '咔嚓咔嚓', '吧唧吧唧', '喵呜~', '好吃！', '嚼嚼嚼...', '啊呜啊呜'];
+
+        function safeGet(key) {
+            try { return localStorage.getItem(key); } catch (e) { return null; }
+        }
+        function safeSet(key, value) {
+            try { localStorage.setItem(key, value); } catch (e) { /* 忽略 */ }
+        }
+
+        function todayStr() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function yesterdayStr() {
+            const d = new Date();
+            d.setDate(d.getDate() - 1);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function getFoodCount() {
+            const raw = parseInt(safeGet(FOOD_KEY) || '0', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 0;
+        }
+
+        function setFoodCount(n) {
+            const safe = Math.max(0, Math.floor(Number(n) || 0));
+            safeSet(FOOD_KEY, String(safe));
+            updateFoodUI();
+        }
+
+        function addFood(n = 1) {
+            setFoodCount(getFoodCount() + n);
+            flashFoodCount();
+        }
+
+        function hasFedToday() {
+            return safeGet(FEED_DATE_KEY) === todayStr();
+        }
+
+        function flashFoodCount() {
+            foodCountEl.classList.add('flash');
+            clearTimeout(flashFoodCount._t);
+            flashFoodCount._t = setTimeout(() => {
+                foodCountEl.classList.remove('flash');
+            }, 350);
+        }
+
+        function getReadPostsToday() {
+            const raw = safeGet(READ_POSTS_KEY);
+            if (!raw) return { date: todayStr(), ids: [] };
+            try {
+                const data = JSON.parse(raw);
+                if (data && data.date === todayStr() && Array.isArray(data.ids)) {
+                    return data;
+                }
+            } catch (e) { /* 忽略 */ }
+            return { date: todayStr(), ids: [] };
+        }
+
+        function markPostReadOnce(id) {
+            const data = getReadPostsToday();
+            if (data.ids.indexOf(id) >= 0) return false;
+            data.ids.push(id);
+            data.date = todayStr();
+            safeSet(READ_POSTS_KEY, JSON.stringify(data));
+            return true;
+        }
+
+        const foodDrag = {
+            active: false,
+            dragging: false,
+            caught: false,
+            pointerId: null,
+            offsetX: 0,
+            offsetY: 0,
+            startX: 0,
+            startY: 0,
+            moved: false,
+            x: 0,
+            y: 0
+        };
+
+        function getFoodCenter() {
+            return {
+                x: foodDrag.x + FOOD_SIZE / 2,
+                y: foodDrag.y + FOOD_SIZE / 2
+            };
+        }
+
+        function floatFood() {
+            const rect = draggableFood.getBoundingClientRect();
+            foodDrag.x = rect.left + window.scrollX;
+            foodDrag.y = rect.top + window.scrollY;
+
+            document.body.appendChild(draggableFood);
+            draggableFood.classList.add('floating');
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+            draggableFood.style.transform = '';
+
+            foodDrag.active = true;
+            updateFoodUI();
+        }
+
+        function resetFoodToSlot() {
+            draggableFood.classList.remove('floating', 'caught', 'dragging', 'gone');
+            draggableFood.style.transition = 'none';
+            draggableFood.style.left = '';
+            draggableFood.style.top = '';
+            draggableFood.style.transform = '';
+            draggableFood.style.opacity = '';
+            foodSlotEl.appendChild(draggableFood);
+            void draggableFood.offsetWidth;
+            draggableFood.style.transition = '';
+
+            foodDrag.active = false;
+            foodDrag.dragging = false;
+            foodDrag.caught = false;
+            foodDrag.pointerId = null;
+            foodDrag.moved = false;
+            updateFoodUI();
+        }
+
+        function moveFoodTo(clientX, clientY) {
+            foodDrag.x = clientX + window.scrollX - foodDrag.offsetX;
+            foodDrag.y = clientY + window.scrollY - foodDrag.offsetY;
+
+            const maxX = Math.max(0, document.documentElement.scrollWidth - FOOD_SIZE);
+            const maxY = Math.max(0, document.documentElement.scrollHeight - FOOD_SIZE);
+            foodDrag.x = clamp(foodDrag.x, 0, maxX);
+            foodDrag.y = clamp(foodDrag.y, 0, maxY);
+
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+        }
+
+        draggableFood.addEventListener('pointerdown', function(e) {
+            if (foodDrag.caught) return;
+            if (petState.eating) return;
+            if (hasFedToday()) {
+                say('今天已经吃过啦，明天再来~', 1800);
+                return;
+            }
+            if (getFoodCount() < MIN_FOOD) {
+                say(`猫粮不够，还差 ${MIN_FOOD - getFoodCount()} 个喵~`, 2200);
+                return;
+            }
+
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+            }
+            if (wandDrag.active) {
+                resetWandToSlot();
+            }
+
+            e.preventDefault();
+
+            const rect = draggableFood.getBoundingClientRect();
+            foodDrag.offsetX = e.clientX - rect.left;
+            foodDrag.offsetY = e.clientY - rect.top;
+            foodDrag.startX = e.clientX;
+            foodDrag.startY = e.clientY;
+            foodDrag.pointerId = e.pointerId;
+            foodDrag.dragging = true;
+            foodDrag.moved = false;
+
+            draggableFood.classList.add('dragging');
+
+            if (!foodDrag.active) {
+                floatFood();
+            }
+        });
+
+        document.addEventListener('pointermove', function(e) {
+            if (!foodDrag.dragging) return;
+            if (e.pointerId !== foodDrag.pointerId) return;
+
+            moveFoodTo(e.clientX, e.clientY);
+
+            if (!foodDrag.moved) {
+                const moved = Math.hypot(e.clientX - foodDrag.startX, e.clientY - foodDrag.startY);
+                if (moved >= DRAG_START_THRESHOLD) {
+                    foodDrag.moved = true;
+                    petState.running = false;
+                    pet.classList.remove('running');
+                    petState.chasingFood = true;
+                    petState.nextMeowAt = performance.now() + 200;
+                    say('小鱼干！等我！', 1000);
+                }
+            }
+        });
+
+        function onGlobalPointerEnd(e) {
+            if (!foodDrag.dragging) return;
+            if (e.pointerId !== foodDrag.pointerId) return;
+            endFoodDrag(e);
+        }
+        document.addEventListener('pointerup', onGlobalPointerEnd);
+        document.addEventListener('pointercancel', onGlobalPointerEnd);
+
+        function endFoodDrag(e) {
+            foodDrag.dragging = false;
+            draggableFood.classList.remove('dragging');
+            foodDrag.pointerId = null;
+
+            if (!foodDrag.caught && foodDrag.active) {
+                const slotRect = foodSlotEl.getBoundingClientRect();
+                const slotCx = slotRect.left + slotRect.width / 2;
+                const slotCy = slotRect.top + slotRect.height / 2;
+                const foodRect = draggableFood.getBoundingClientRect();
+                const foodCx = foodRect.left + foodRect.width / 2;
+                const foodCy = foodRect.top + foodRect.height / 2;
+                const distToSlot = Math.hypot(foodCx - slotCx, foodCy - slotCy);
+
+                if (distToSlot < 40) {
+                    resetFoodToSlot();
+                    petState.chasingFood = false;
+                    setRandomIdleDirection();
+                    return;
+                }
+            }
+        }
+
+        function catchFood() {
+            if (!petState.chasingFood) return;
+
+            foodDrag.caught = true;
+            foodDrag.dragging = false;
+            foodDrag.pointerId = null;
+            petState.chasingFood = false;
+            petState.vx = 0;
+            petState.vy = 0;
+
+            draggableFood.classList.remove('dragging');
+            draggableFood.classList.add('caught');
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+
+            startEating();
+        }
+
+        function startEating() {
+            petState.eating = true;
+            petState.vx = 0;
+            petState.vy = 0;
+            petState.nextEatSpeechAt = performance.now() + 600;
+
+            say('啊呜~', 650);
+
+            setTimeout(() => {
+                draggableFood.classList.add('gone');
+            }, 1200);
+
+            setTimeout(finishEating, 1800);
+        }
+
+        function finishEating() {
+            petState.eating = false;
+
+            draggableFood.classList.remove('gone', 'caught', 'floating', 'dragging');
+            draggableFood.style.transition = 'none';
+            draggableFood.style.left = '';
+            draggableFood.style.top = '';
+            draggableFood.style.transform = '';
+            draggableFood.style.opacity = '';
+            foodSlotEl.appendChild(draggableFood);
+            void draggableFood.offsetWidth;
+            draggableFood.style.transition = '';
+
+            foodDrag.active = false;
+            foodDrag.caught = false;
+            foodDrag.dragging = false;
+            foodDrag.pointerId = null;
+            foodDrag.moved = false;
+
+            const count = getFoodCount();
+            setFoodCount(Math.max(0, count - MIN_FOOD));
+            safeSet(FEED_DATE_KEY, todayStr());
+            updateFoodUI();
+
+            petState.running = true;
+            petState.runUntil = performance.now() + 3000;
+            pet.classList.add('running');
+            petState.nextMeowAt = performance.now() + 250;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = randomRange(9, 12);
+            petState.vx = Math.cos(angle) * speed;
+            petState.vy = Math.sin(angle) * speed;
+
+            say('好吃！最喜欢你啦喵~', 1800);
+            setTimeout(() => say('喵呜~ 🍖', 1200), 1900);
+        }
+
+        feedBtn.addEventListener('click', function() {
+            if (hasFedToday()) {
+                say('我今天已经吃过啦，明天再来~', 1800);
+                return;
+            }
+            if (getFoodCount() < MIN_FOOD) {
+                say(`猫粮不够，还差 ${MIN_FOOD - getFoodCount()} 个喵~`, 2200);
+                return;
+            }
+            if (foodDrag.active || petState.eating) return;
+
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+            }
+            if (wandDrag.active) {
+                resetWandToSlot();
+            }
+
+            floatFood();
+
+            const targetX = petState.x + 140 + Math.random() * 80;
+            const targetY = petState.y - 60 + Math.random() * 120;
+            const maxX = Math.max(0, document.documentElement.scrollWidth - FOOD_SIZE);
+            const maxY = Math.max(0, document.documentElement.scrollHeight - FOOD_SIZE);
+            foodDrag.x = clamp(targetX, 0, maxX);
+            foodDrag.y = clamp(targetY, 0, maxY);
+            draggableFood.style.left = foodDrag.x + 'px';
+            draggableFood.style.top = foodDrag.y + 'px';
+
+            petState.running = false;
+            pet.classList.remove('running');
+            petState.chasingFood = true;
+            petState.nextMeowAt = performance.now() + 200;
+            say('小鱼干！等我！', 1000);
+        });
+
+        function updateFoodUI() {
+            const count = getFoodCount();
+            const fed = hasFedToday();
+
+            foodCountEl.textContent = count;
+
+            if (foodDrag.active || count < 1) {
+                foodSlotEl.classList.add('empty');
+            } else {
+                foodSlotEl.classList.remove('empty');
+            }
+            if (!foodDrag.active && fed) {
+                foodSlotEl.classList.add('locked');
+            } else {
+                foodSlotEl.classList.remove('locked');
+            }
+
+            if (fed) {
+                feedStatusEl.textContent = '今日已喂 ✅（明天再来）';
+                feedStatusEl.classList.add('fed');
+                feedBtn.disabled = true;
+                feedBtn.textContent = '今天喂过啦';
+            } else if (count < MIN_FOOD) {
+                feedStatusEl.textContent = `还差 ${MIN_FOOD - count} 个猫粮才能喂（一顿 4 个）`;
+                feedStatusEl.classList.remove('fed');
+                feedBtn.disabled = true;
+                feedBtn.textContent = `还差 ${MIN_FOOD - count} 个`;
+            } else {
+                feedStatusEl.textContent = '拖动猫粮喂我，或点喂猫~';
+                feedStatusEl.classList.remove('fed');
+                feedBtn.disabled = false;
+                feedBtn.textContent = '喂猫 🐱';
+            }
+        }
+
+        document.getElementById('postList').addEventListener('click', function(e) {
+            const link = e.target.closest('a[href*="post.html"]');
+            if (!link) return;
+
+            let id = '';
+            try {
+                const url = new URL(link.href, location.href);
+                id = url.searchParams.get('id') || '';
+            } catch (err) {
+                const m = (link.getAttribute('href') || '').match(/id=([^&]+)/);
+                if (m) id = decodeURIComponent(m[1]);
+            }
+            if (!id) return;
+            if (!markPostReadOnce(id)) return;
+            addFood(1);
+        });
+
+        window.addEventListener('storage', function(e) {
+            if (e.key === FOOD_KEY || e.key === FEED_DATE_KEY) {
+                if (foodDrag.active && !foodDrag.caught) {
+                    resetFoodToSlot();
+                    petState.chasingFood = false;
+                }
+                updateFoodUI();
+            }
+            if (e.key === FORTUNE_KEY || e.key === FORTUNE_STREAK_KEY) {
+                renderFortune();
+            }
+        });
+
+        let lastToday = todayStr();
+        setInterval(function() {
+            const cur = todayStr();
+            if (cur !== lastToday) {
+                lastToday = cur;
+                if (foodDrag.active && !foodDrag.caught) {
+                    resetFoodToSlot();
+                    petState.chasingFood = false;
+                }
+                updateFoodUI();
+            }
+        }, 60 * 1000);
+
+        updateFoodUI();
+
+        /* =========================================================
+           逗猫棒系统
+           ========================================================= */
+        const wandSlotEl = document.getElementById('wandSlot');
+        const draggableWand = document.getElementById('draggableWand');
+
+        const WAND_SIZE = 34;
+        const WAND_CATCH_DISTANCE = 30;
+        const WAND_SPEED = 9.5;
+
+        const WAND_PHRASES = [
+            '喵！逗猫棒！',
+            '等我等我！',
+            '喵呜~ 抓到啦！',
+            '嘿咻嘿咻~',
+            '别跑！喵！'
+        ];
+        const WAND_CATCH_PHRASES = [
+            '抓到啦喵！',
+            '喵！咬住！',
+            '哈哈，抓住你了！',
+            '这个归我了喵~'
+        ];
+
+        const wandDrag = {
+            active: false,
+            dragging: false,
+            pointerId: null,
+            offsetX: 0,
+            offsetY: 0,
+            startX: 0,
+            startY: 0,
+            moved: false,
+            x: 0,
+            y: 0
+        };
+
+        function getWandCenter() {
+            return {
+                x: wandDrag.x + WAND_SIZE / 2,
+                y: wandDrag.y + WAND_SIZE / 2
+            };
+        }
+
+        function updateWandUI() {
+            if (wandDrag.active) {
+                wandSlotEl.classList.add('empty');
+            } else {
+                wandSlotEl.classList.remove('empty');
+            }
+        }
+
+        function floatWand() {
+            const rect = draggableWand.getBoundingClientRect();
+            wandDrag.x = rect.left + window.scrollX;
+            wandDrag.y = rect.top + window.scrollY;
+
+            document.body.appendChild(draggableWand);
+            draggableWand.classList.add('floating');
+            draggableWand.style.left = wandDrag.x + 'px';
+            draggableWand.style.top = wandDrag.y + 'px';
+            draggableWand.style.transform = '';
+
+            wandDrag.active = true;
+            updateWandUI();
+        }
+
+        function resetWandToSlot() {
+            draggableWand.classList.remove('floating', 'dragging');
+            draggableWand.style.transition = 'none';
+            draggableWand.style.left = '';
+            draggableWand.style.top = '';
+            draggableWand.style.transform = '';
+            wandSlotEl.appendChild(draggableWand);
+            void draggableWand.offsetWidth;
+            draggableWand.style.transition = '';
+
+            wandDrag.active = false;
+            wandDrag.dragging = false;
+            wandDrag.pointerId = null;
+            wandDrag.moved = false;
+
+            petState.chasingWand = false;
+
+            if (!petState.eating && !petState.running &&
+                !petState.chasingFood && !petState.atBoard && !petState.goingToBoard) {
+                setRandomIdleDirection();
+            }
+            updateWandUI();
+        }
+
+        function moveWandTo(clientX, clientY) {
+            wandDrag.x = clientX + window.scrollX - wandDrag.offsetX;
+            wandDrag.y = clientY + window.scrollY - wandDrag.offsetY;
+
+            const maxX = Math.max(0, document.documentElement.scrollWidth - WAND_SIZE);
+            const maxY = Math.max(0, document.documentElement.scrollHeight - WAND_SIZE);
+            wandDrag.x = clamp(wandDrag.x, 0, maxX);
+            wandDrag.y = clamp(wandDrag.y, 0, maxY);
+
+            draggableWand.style.left = wandDrag.x + 'px';
+            draggableWand.style.top = wandDrag.y + 'px';
+        }
+
+        draggableWand.addEventListener('pointerdown', function (e) {
+            if (petState.eating) {
+                say('吃饭呢，等下再玩喵~', 1500);
+                return;
+            }
+
+            e.preventDefault();
+
+            if (petState.atBoard || petState.goingToBoard) {
+                leaveBoard();
+            }
+            if (foodDrag.active && !foodDrag.caught) {
+                resetFoodToSlot();
+                petState.chasingFood = false;
+            }
+
+            const rect = draggableWand.getBoundingClientRect();
+            wandDrag.offsetX = e.clientX - rect.left;
+            wandDrag.offsetY = e.clientY - rect.top;
+            wandDrag.startX = e.clientX;
+            wandDrag.startY = e.clientY;
+            wandDrag.pointerId = e.pointerId;
+            wandDrag.dragging = true;
+            wandDrag.moved = false;
+
+            draggableWand.classList.add('dragging');
+
+            if (!wandDrag.active) {
+                floatWand();
+            }
+        });
+
+        document.addEventListener('pointermove', function (e) {
+            if (!wandDrag.dragging) return;
+            if (e.pointerId !== wandDrag.pointerId) return;
+
+            moveWandTo(e.clientX, e.clientY);
+
+            if (!wandDrag.moved) {
+                const moved = Math.hypot(
+                    e.clientX - wandDrag.startX,
+                    e.clientY - wandDrag.startY
+                );
+                if (moved >= DRAG_START_THRESHOLD) {
+                    wandDrag.moved = true;
+                    petState.running = false;
+                    pet.classList.remove('running');
+                    petState.chasingWand = true;
+                    petState.nextWandSpeechAt = performance.now() + 300;
+                    say('逗猫棒！我来啦喵！', 1000);
+                }
+            }
+        });
+
+        function onWandPointerEnd(e) {
+            if (!wandDrag.dragging) return;
+            if (e.pointerId !== wandDrag.pointerId) return;
+            wandDrag.dragging = false;
+            draggableWand.classList.remove('dragging');
+            wandDrag.pointerId = null;
+            resetWandToSlot();
+        }
+
+        document.addEventListener('pointerup', onWandPointerEnd);
+        document.addEventListener('pointercancel', onWandPointerEnd);
+
+        updateWandUI();
+
+        /* =========================================================
+           黑板答题系统
+           ========================================================= */
+        const blackboard   = document.getElementById('blackboard');
+        const bbIdle       = document.getElementById('bbIdle');
+        const bbQuiz       = document.getElementById('bbQuiz');
+        const bbQuestion   = document.getElementById('bbQuestion');
+        const bbOptions    = document.getElementById('bbOptions');
+        const bbProgress   = document.getElementById('bbProgress');
+
+        const BLACKBOARD_TAP_REQUIRED = 3;
+        let blackboardTaps = 0;
+
+        const quizState = {
+            active: false,
+            correctCount: 0,
+            totalForReward: 5,
+            locked: false,
+            current: null,
+            wrongStreak: 0
+        };
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function generateQuestion() {
+            const types = ['+', '-', '×', '÷'];
+            const type = types[Math.floor(Math.random() * types.length)];
+
+            let a, b, answer, qText;
+
+            if (type === '+') {
+                a = randInt(10, 99);
+                b = randInt(10, 99);
+                answer = a + b;
+                qText = `${a} + ${b} = ?`;
+            } else if (type === '-') {
+                a = randInt(10, 99);
+                b = randInt(10, 99);
+                if (a < b) { const t = a; a = b; b = t; }
+                answer = a - b;
+                qText = `${a} - ${b} = ?`;
+            } else if (type === '×') {
+                a = randInt(10, 99);
+                b = randInt(2, 9);
+                answer = a * b;
+                qText = `${a} × ${b} = ?`;
+            } else {
+                b = randInt(2, 9);
+                if (Math.floor(99 / b) < 10) b = 2;
+                answer = randInt(10, Math.floor(99 / b));
+                a = b * answer;
+                qText = `${a} ÷ ${b} = ?`;
+            }
+
+            const opts = new Set([answer]);
+            let guard = 0;
+            while (opts.size < 4 && guard++ < 200) {
+                const range = Math.max(3, Math.round(answer * 0.15));
+                let delta = randInt(1, range);
+                if (Math.random() < 0.5) delta = -delta;
+                const v = answer + delta;
+                if (v >= 0 && v !== answer) opts.add(v);
+            }
+            let pad = 1;
+            while (opts.size < 4) {
+                const v = answer + pad;
+                if (v !== answer) opts.add(v);
+                pad++;
+                if (pad > 50) break;
+            }
+
+            const arr = Array.from(opts);
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tmp = arr[i];
+                arr[i] = arr[j];
+                arr[j] = tmp;
+            }
+
+            return { qText: qText, answer: answer, options: arr };
+        }
+
+        function renderQuestion() {
+            if (!quizState.active) return;
+
+            const q = generateQuestion();
+            quizState.current = q;
+            quizState.locked = false;
+
+            bbQuestion.textContent = q.qText;
+            bbProgress.textContent = `答对 ${quizState.correctCount} / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+            bbOptions.innerHTML = '';
+
+            q.options.forEach(function(v) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'bb-option';
+                btn.textContent = v;
+                btn.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    handleAnswer(btn, v);
+                });
+                bbOptions.appendChild(btn);
+            });
+        }
+
+        function handleAnswer(btn, value) {
+            if (!quizState.active || quizState.locked) return;
+            if (!quizState.current) return;
+
+            if (value === quizState.current.answer) {
+                quizState.locked = true;
+                quizState.wrongStreak = 0;
+                btn.classList.add('correct');
+                quizState.correctCount++;
+                bbProgress.textContent = `答对 ${quizState.correctCount} / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+                say('答对啦喵！', 800);
+
+                setTimeout(function() {
+                    if (!quizState.active) return;
+
+                    if (quizState.correctCount >= quizState.totalForReward) {
+                        quizState.correctCount = 0;
+                        addFood(1);
+                        say('答对5题！奖励1个猫粮！喵呜~', 2000);
+                        bbProgress.textContent = `答对 0 / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+                        setTimeout(renderQuestion, 700);
+                    } else {
+                        renderQuestion();
+                    }
+                }, 500);
+            } else {
+                // 答错：锁定当前题，累计连错次数
+                quizState.locked = true;
+                quizState.wrongStreak++;
+                btn.classList.add('wrong');
+
+                if (quizState.wrongStreak >= 2) {
+                    // 连错两次 → 退出黑板，防止乱点刷分
+                    say('连错两次啦，不玩了喵~', 1600);
+                    setTimeout(function() {
+                        if (!quizState.active) return;
+                        leaveBoard();
+                        say('我去跑一跑！', 1200);
+                        petState.running = true;
+                        petState.runUntil = performance.now() + 3000;
+                        pet.classList.add('running');
+                        petState.nextMeowAt = performance.now() + 250;
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = randomRange(8, 12);
+                        petState.vx = Math.cos(angle) * speed;
+                        petState.vy = Math.sin(angle) * speed;
+                    }, 900);
+                } else {
+                    say('喵？再想想~', 900);
+                    setTimeout(function() {
+                        btn.classList.remove('wrong');
+                        quizState.locked = false;
+                    }, 600);
+                }
+            }
+        }
+
+        function startBoardQuiz() {
+            quizState.active = true;
+            quizState.correctCount = 0;
+            quizState.locked = false;
+            quizState.current = null;
+            quizState.wrongStreak = 0;
+
+            bbIdle.style.display = 'none';
+            bbQuiz.style.display = '';
+            bbProgress.textContent = `答对 0 / ${quizState.totalForReward}　（每答对5题奖励1猫粮）`;
+
+            renderQuestion();
+            say('我们来算算术吧喵！', 1400);
+        }
+
+        function hideBoardQuiz() {
+            quizState.active = false;
+            quizState.locked = false;
+            quizState.current = null;
+            quizState.wrongStreak = 0;
+            bbQuiz.style.display = 'none';
+            bbIdle.style.display = '';
+            bbProgress.textContent = '';
+            bbOptions.innerHTML = '';
+        }
+
+        function leaveBoard() {
+            const wasActive = petState.atBoard || petState.goingToBoard;
+            petState.atBoard = false;
+            petState.goingToBoard = false;
+            blackboardTaps = 0;
+            hideBoardQuiz();
+            if (wasActive) {
+                setRandomIdleDirection();
+            }
+            return wasActive;
+        }
+
+        function attractPetToBoard() {
+            if (petState.atBoard || petState.goingToBoard) return;
+            if (petState.eating) {
+                say('我在吃饭呢喵~', 1200);
+                return;
+            }
+            if (petState.chasingFood || foodDrag.active) return;
+            if (petState.chasingWand || wandDrag.active) return;
+
+            const rect = blackboard.getBoundingClientRect();
+            const maxX = Math.max(8, document.body.scrollWidth - petWrap.offsetWidth - 8);
+            const maxY = Math.max(8, document.body.scrollHeight - petWrap.offsetHeight - 8);
+
+            let tx, ty;
+            // 窄屏（黑板占满宽度）时，猫球定位到黑板下方
+            if (window.innerWidth <= 700) {
+                tx = rect.left + window.scrollX + 12;
+                ty = rect.bottom + window.scrollY + 10;
+            } else {
+                tx = rect.right + window.scrollX - 24;
+                ty = rect.bottom + window.scrollY - 16;
+            }
+
+            petState.boardTargetX = clamp(tx, 8, maxX);
+            petState.boardTargetY = clamp(ty, 8, maxY);
+
+            petState.running = false;
+            pet.classList.remove('running');
+            petState.goingToBoard = true;
+            petState.nextMeowAt = performance.now() + 200;
+            say('小黑板叫我啦？喵！', 1200);
+        }
+
+        blackboard.addEventListener('click', function(e) {
+            if (e.target.closest('.bb-option')) return;
+            if (petState.atBoard) return;
+            if (petState.goingToBoard) return;
+            if (petState.eating) return;
+
+            blackboardTaps++;
+            blackboard.classList.remove('shake');
+            void blackboard.offsetWidth;
+            blackboard.classList.add('shake');
+
+            if (blackboardTaps >= BLACKBOARD_TAP_REQUIRED) {
+                blackboardTaps = 0;
+                attractPetToBoard();
+            } else {
+                say(`再敲 ${BLACKBOARD_TAP_REQUIRED - blackboardTaps} 下喵~`, 900);
+            }
+        });
+
+        /* =========================================================
+           每日运势
+           ========================================================= */
+        const FORTUNE_KEY        = 'catball_fortune_v1';
+        const FORTUNE_STREAK_KEY = 'catball_fortune_streak_v1';
+        const FORTUNE_UID_KEY    = 'catball_fortune_uid_v1';
+
+        const FORTUNE_LEVELS = [
+            { name: '大吉',   weight: 8,  cls: 'lv-daji' },
+            { name: '中吉',   weight: 15, cls: 'lv-zhongji' },
+            { name: '小吉',   weight: 20, cls: 'lv-xiaoji' },
+            { name: '平',     weight: 22, cls: 'lv-ping' },
+            { name: '小凶',   weight: 15, cls: 'lv-xiaoxiong' },
+            { name: '凶',     weight: 10, cls: 'lv-xiong' },
+            { name: '大凶',   weight: 8,  cls: 'lv-daxiong' },
+            { name: '？？？', weight: 2,  cls: 'lv-mystery' }
+        ];
+
+        const fortuneLevelEl  = document.getElementById('fortuneLevel');
+        const fortuneDateEl   = document.getElementById('fortuneDate');
+        const fortuneStreakEl = document.getElementById('fortuneStreak');
+        const fortuneSignBtn  = document.getElementById('fortuneSignBtn');
+
+        function getFortuneUid() {
+            let uid = safeGet(FORTUNE_UID_KEY);
+            if (!uid) {
+                uid = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+                safeSet(FORTUNE_UID_KEY, uid);
+            }
+            return uid;
+        }
+
+        function fortuneSeed(str) {
+            let h = 2166136261 >>> 0;
+            for (let i = 0; i < str.length; i++) {
+                h ^= str.charCodeAt(i);
+                h = Math.imul(h, 16777619) >>> 0;
+            }
+            return h >>> 0;
+        }
+
+        function makeRand(seed) {
+            let a = seed >>> 0;
+            return function () {
+                a = (a + 0x6D2B79F5) >>> 0;
+                let t = a;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function pickFortuneLevel(rand) {
+            const total = FORTUNE_LEVELS.reduce((s, l) => s + l.weight, 0);
+            let r = rand() * total;
+            for (const lv of FORTUNE_LEVELS) {
+                if (r < lv.weight) return lv;
+                r -= lv.weight;
+            }
+            return FORTUNE_LEVELS[FORTUNE_LEVELS.length - 1];
+        }
+
+        function generateFortune(dateStr) {
+            const uid = getFortuneUid();
+            const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
+            const lv = pickFortuneLevel(rand);
+            return { date: dateStr, level: lv.name, cls: lv.cls };
+        }
+
+        function getTodayFortune() {
+            const raw = safeGet(FORTUNE_KEY);
+            if (!raw) return null;
+            try {
+                const f = JSON.parse(raw);
+                if (!f || f.date !== todayStr() || !f.level || !f.cls) return null;
+                return f;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function setTodayFortune(f) {
+            safeSet(FORTUNE_KEY, JSON.stringify(f));
+        }
+
+        function getStreak() {
+            const raw = safeGet(FORTUNE_STREAK_KEY);
+            if (!raw) return { last: '', count: 0 };
+            try {
+                const s = JSON.parse(raw);
+                if (s && typeof s.last === 'string' && Number.isFinite(s.count) && s.count >= 0) return s;
+            } catch (e) { /* 忽略 */ }
+            return { last: '', count: 0 };
+        }
+
+        function setStreak(s) {
+            safeSet(FORTUNE_STREAK_KEY, JSON.stringify(s));
+        }
+
+        function currentStreakDisplay() {
+            const s = getStreak();
+            const today = todayStr();
+            if (s.last === today) return s.count;
+            if (s.last === yesterdayStr()) return s.count;
+            return 0;
+        }
+
+        function renderFortune() {
+            const today = todayStr();
+            const f = getTodayFortune();
+            const streakDisplay = currentStreakDisplay();
+
+            fortuneDateEl.textContent = today;
+
+            if (!f) {
+                fortuneLevelEl.textContent = '？';
+                fortuneLevelEl.className = 'fortune-level lv-pending';
+
+                fortuneSignBtn.style.display = '';
+                fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 已连续签到 ${streakDisplay} 天` : '';
+                return;
+            }
+
+            fortuneLevelEl.textContent = f.level;
+            fortuneLevelEl.className = 'fortune-level ' + f.cls;
+            fortuneSignBtn.style.display = 'none';
+            fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 连续签到 ${streakDisplay} 天` : '';
+        }
+
+        function signFortune() {
+            const today = todayStr();
+            const yesterday = yesterdayStr();
+            const s = getStreak();
+
+            let newCount;
+            if (s.last === today) {
+                newCount = s.count;
+            } else if (s.last === yesterday) {
+                newCount = s.count + 1;
+            } else {
+                newCount = 1;
+            }
+
+            setStreak({ last: today, count: newCount });
+            setTodayFortune(generateFortune(today));
+
+            renderFortune();
+            say('签到成功！喵~ 🔮', 1500);
+        }
+
+        fortuneSignBtn.addEventListener('click', signFortune);
+
+        let lastFortuneDate = todayStr();
+        setInterval(function () {
+            const cur = todayStr();
+            if (cur !== lastFortuneDate) {
+                lastFortuneDate = cur;
+                renderFortune();
+            }
+        }, 60 * 1000);
+
+        renderFortune();
+
+        /* =========================================================
+           URL 重置入口
+           ========================================================= */
+        (function handleResetParam() {
+            let params;
+            try { params = new URLSearchParams(location.search); } catch (e) { return; }
+            if (!params.has('reset')) return;
+
+            const mode = (params.get('reset') || '1').toLowerCase();
+            let didReset = false;
+
+            if (mode === 'all') {
+                try {
+                    const keys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (k && k.indexOf('catball_') === 0) keys.push(k);
+                    }
+                    keys.forEach(function(k) {
+                        try { localStorage.removeItem(k); } catch (e) {}
+                    });
+                    didReset = true;
+                } catch (e) { /* 忽略 */ }
+            } else {
+                try {
+                    localStorage.removeItem(FEED_DATE_KEY);
+                    didReset = true;
+                } catch (e) { /* 忽略 */ }
+
+                if (getFoodCount() < MIN_FOOD) {
+                    try { localStorage.setItem(FOOD_KEY, String(MIN_FOOD)); } catch (e) {}
+                }
+            }
+
+            try {
+                const url = new URL(location.href);
+                url.searchParams.delete('reset');
+                history.replaceState(null, '', url.pathname + url.search + url.hash);
+            } catch (e) { /* 忽略 */ }
+
+            updateFoodUI();
+            renderFortune();
+
+            if (didReset) {
+                setTimeout(function() {
+                    say(mode === 'all' ? '全部数据已重置喵~' : '喂食记录已重置喵~', 2400);
+                }, 800);
+            }
+        })();
+    </script>
+</body>
+</html>
