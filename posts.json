@@ -2,6 +2,7 @@
     "posts": [
         {
             "id": "post-000",
+            "top": 1,
             "title": "置顶：投稿通道",
             "author": "管理员",
             "date": "2026-10-13",
@@ -10,14 +11,16 @@
         },
         {
             "id": "post-001",
+            "top": 0,
             "title": "欢迎来到我的发帖站",
             "author": "管理员",
             "date": "2026-10-13",
             "summary": "这是网站的第一篇帖子，介绍网站功能和使用方法。",
-            "content": "# 欢迎来到我的发帖站\n\n这是一个基于 GitHub Pages 搭建的静态发帖网站。\n\n## 功能一览\n- ✅ 支持 Markdown 格式发帖\n- ✅ 首页关键词搜索\n- ✅ Giscus 评论系统，支持 GitHub 账号留言\n- ✅ 完全免费托管，稳定可靠\n\n## 如何发帖\n1. 编辑仓库中的 posts.json 文件\n2. 按照格式新增一条帖子数据\n3. 提交到 GitHub 仓库，等待自动部署\n\n> 提示：所有评论会保存在 GitHub Discussions 中。"
+            "content": "# 欢迎来到我的发帖站\n\n这是一个基于 GitHub Pages 搭建的静态发帖网站。\n\n## 功能一览\n- ✅ 支持 Markdown 格式发帖\n- ✅ 首页关键词搜索\n- ✅ Giscus 评论系统，支持 GitHub 账号留言\n- ✅ 完全免费托管，稳定可靠\n\n## 如何发帖\n1. 编辑仓库中的 posts.json 文件\n2. 按照格式新增一条帖子数据\n3. 提交到 GitHub 仓库，等待自动部署\n\n可通过数字字段 `top` 设置置顶优先级，数值越大越靠前；未设置或设为 0 表示不置顶。\n\n> 提示：所有评论会保存在 GitHub Discussions 中。"
         },
         {
             "id": "post-002",
+            "top": 0,
             "title": "Markdown 使用指南",
             "author": "管理员",
             "date": "2026-10-13",
@@ -26,6 +29,7 @@
         },
         {
             "id": "post-003",
+            "top": 0,
             "title": "意大利语数字",
             "author": "SYC字",
             "date": "2026-10-13",
@@ -34,6 +38,7 @@
         },
         {
             "id": "post-004",
+            "top": 0,
             "title": "代码框架写入器",
             "author": "Syc",
             "date": "2026-10-14",
@@ -42,6 +47,7 @@
         },
         {
             "id": "post-005",
+            "top": 0,
             "title": "《和蔼》",
             "author": "syc",
             "date": "2026-10-14",
@@ -50,6 +56,7 @@
         },
         {
             "id": "post-006",
+            "top": 0,
             "title": "因式分解自动程序",
             "author": "GithubCopilot-GPT6Luna",
             "date": "2026-10-16",

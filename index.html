@@ -962,33 +962,37 @@
         function sortPosts(posts, mode) {
             const list = posts.slice();
 
-            if (mode === 'title') {
-                list.sort((a, b) =>
-                    String(a.title || '').localeCompare(
+            list.sort((a, b) => {
+                const priorityA = Number(a.top);
+                const priorityB = Number(b.top);
+                const pinnedOrder =
+                    (Number.isFinite(priorityB) ? priorityB : 0) -
+                    (Number.isFinite(priorityA) ? priorityA : 0);
+                if (pinnedOrder !== 0) return pinnedOrder;
+
+                if (mode === 'title') {
+                    return String(a.title || '').localeCompare(
                         String(b.title || ''), 'zh-Hans-CN',
                         { numeric: true, sensitivity: 'base' }
-                    )
-                );
-            } else if (mode === 'id') {
-                list.sort((a, b) => {
+                    );
+                }
+                if (mode === 'id') {
                     const na = Number(a.id);
                     const nb = Number(b.id);
                     if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
                     return String(a.id).localeCompare(
                         String(b.id), 'zh-Hans-CN', { numeric: true }
                     );
-                });
-            } else {
+                }
+
                 // 默认：新的在前（日期倒序，同日期按编号倒序）
-                list.sort((a, b) => {
-                    const d = String(b.date || '').localeCompare(String(a.date || ''));
-                    if (d !== 0) return d;
-                    const na = Number(a.id);
-                    const nb = Number(b.id);
-                    if (Number.isFinite(na) && Number.isFinite(nb)) return nb - na;
-                    return 0;
-                });
-            }
+                const d = String(b.date || '').localeCompare(String(a.date || ''));
+                if (d !== 0) return d;
+                const na = Number(a.id);
+                const nb = Number(b.id);
+                if (Number.isFinite(na) && Number.isFinite(nb)) return nb - na;
+                return 0;
+            });
             return list;
         }
 
