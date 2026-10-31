@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh‑CN">
+<head>
+<meta charset="utf‑8">
+<title>PeerJS联机测试</title>
+</head>
+<body>
+<h2>你的ID:<span id="myid"></span></h2>
+<input id="remoteIdInput" placeholder="输入对方ID连接">
+<button onclick="connectPeer()">连接对方</button>
+<div>
+<input id="msgInput"><button onclick="sendMsg()">发送消息</button>
+</div>
+<div id="log"></div>
+
+<!--引入PeerJS CDN，使用公共免费信令服务器-->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const logDiv = document.getElementById("log");
+const myIdSpan = document.getElementById("myid");
+
+// 使用官方公共免费信令服务器（不用自己搭后端）
+const peer = new Peer(undefined, {
+  host: "peerjs-server.herokuapp.com",
+  port: 443,
+  path: "/",
+  secure:true
+});
+
+let conn = null;
+
+// 本机ID就绪
+peer.on("open", (id)=>{
+  myIdSpan.innerText = id;
+  appendLog("✅本机ID："+id+"，把这个ID发给好友");
+});
+
+// 收到别人主动连我
+peer.on("connection", (c)=>{
+  appendLog("🎉收到对方连接请求");
+  conn = c;
+  setupConn(c);
+});
+
+// 连接对方
+function connectPeer(){
+  const remoteId = document.getElementById("remoteIdInput").value.trim();
+  if(!remoteId) return;
+  appendLog("尝试连接 "+remoteId);
+  conn = peer.connect(remoteId);
+  setupConn(conn);
+}
+
+// 设置连接事件
+function setupConn(c){
+  c.on("open",()=>{
+    appendLog("✅P2P连接成功！可以联机通信");
+  });
+  c.on("data",(data)=>{
+    appendLog("📥收到消息："+JSON.stringify(data));
+  });
+  c.on("close",()=>{
+    appendLog("❌连接断开");
+  });
+  c.on("error",(err)=>{
+    appendLog("⚠️连接错误："+err);
+  });
+}
+
+//发送消息（游戏状态、坐标就通过这里发送）
+function sendMsg(){
+  if(!conn || !conn.open){
+    appendLog("⚠️还没有建立连接");
+    return;
+  }
+  const text = document.getElementById("msgInput").value;
+  conn.send({type:"chat", content:text});
+  appendLog("📤发送："+text);
+}
+
+function appendLog(text){
+  logDiv.innerHTML += "<div>"+text+"</div>";
+}
+
+peer.on("error",(err)=>{
+  appendLog("Peer错误："+err);
+})
+</script>
+</body>
+</html>
