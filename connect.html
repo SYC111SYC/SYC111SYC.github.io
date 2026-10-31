@@ -2,7 +2,7 @@
 <html lang="zh‑CN">
 <head>
 <meta charset="utf‑8">
-<title>PeerJS联机测试</title>
+<title>PeerJS联机测试（官方云信令）</title>
 </head>
 <body>
 <h2>你的ID:<span id="myid"></span></h2>
@@ -13,36 +13,30 @@
 </div>
 <div id="log"></div>
 
-<!--引入PeerJS CDN，使用公共免费信令服务器-->
+<!-- PeerJS CDN -->
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 const logDiv = document.getElementById("log");
 const myIdSpan = document.getElementById("myid");
 
-// 使用官方公共免费信令服务器（不用自己搭后端）
-const peer = new Peer(undefined, {
-  host: "peerjs-server.herokuapp.com",
-  port: 443,
-  path: "/",
-  secure:true
-});
+// 👉 重点：不写 host，直接使用 PeerJS 官方免费云信令！
+const peer = new Peer();
 
 let conn = null;
 
-// 本机ID就绪
 peer.on("open", (id)=>{
   myIdSpan.innerText = id;
   appendLog("✅本机ID："+id+"，把这个ID发给好友");
 });
 
-// 收到别人主动连我
+// 别人主动连我
 peer.on("connection", (c)=>{
   appendLog("🎉收到对方连接请求");
   conn = c;
   setupConn(c);
 });
 
-// 连接对方
+// 我主动连接别人
 function connectPeer(){
   const remoteId = document.getElementById("remoteIdInput").value.trim();
   if(!remoteId) return;
@@ -51,7 +45,6 @@ function connectPeer(){
   setupConn(conn);
 }
 
-// 设置连接事件
 function setupConn(c){
   c.on("open",()=>{
     appendLog("✅P2P连接成功！可以联机通信");
@@ -63,11 +56,10 @@ function setupConn(c){
     appendLog("❌连接断开");
   });
   c.on("error",(err)=>{
-    appendLog("⚠️连接错误："+err);
+    appendLog("⚠️通道错误："+err);
   });
 }
 
-//发送消息（游戏状态、坐标就通过这里发送）
 function sendMsg(){
   if(!conn || !conn.open){
     appendLog("⚠️还没有建立连接");
