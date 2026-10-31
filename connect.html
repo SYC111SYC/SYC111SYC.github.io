@@ -2,186 +2,569 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>聊天</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>猫球串门大厅</title>
 <style>
 *{box-sizing:border-box;font-family:system-ui}
-body{max-width:900px;margin:16px auto;padding:0 12px;}
+body{max-width:900px;margin:16px auto;padding:0 12px;color:#303545}
 .box{border:1px solid #ccc;padding:12px;border-radius:8px;margin:10px 0}
-#userList{min-height:120px}
-.user-item{padding:6px 8px;margin:4px 0;background:#f3f4f6;border-radius:6px;cursor:pointer;}
+input{max-width:100%;padding:7px;border:1px solid #cbd1dc;border-radius:6px}
+button{padding:7px 11px;border:0;border-radius:6px;background:#8fb0ff;color:#fff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}
+#userList{min-height:50px}
+.user-item{padding:6px 8px;margin:4px 0;background:#f3f4f6;border-radius:6px;cursor:pointer}
 .user-item:hover{background:#e5e7eb}
-#chatLog{height:240px;overflow-y:auto;border:1px solid #aaa;padding:8px 0}
-.msg{margin:4px 0}
-.me{color:#0066cc}
-.other{color:#222}
-.sys{color:#777}
+#chatLog{height:180px;overflow-y:auto;border:1px solid #aaa;padding:8px}
+.msg{margin:4px 0;overflow-wrap:anywhere}
+.me{color:#0066cc}.other{color:#222}.sys{color:#777}
+.arena{position:relative;height:250px;overflow:hidden;border:2px solid #d5c6a4;border-radius:14px;background:linear-gradient(#e9f7ff 0 70%,#dff0cf 70%);margin:10px 0}
+.arena-title{position:absolute;top:10px;left:0;width:100%;text-align:center;color:#596b80;font-size:13px}
+.cat{position:absolute;bottom:22px;width:86px;text-align:center;transition:left .85s ease;z-index:2}
+.cat.local{left:25%}.cat.remote{left:75%;display:none}
+.arena.room-active .cat.remote{display:block}
+.cat img{display:block;width:72px;height:72px;margin:auto;object-fit:contain;animation:cat-hop .55s ease-in-out infinite alternate}
+.cat-name{display:inline-block;max-width:100%;overflow:hidden;padding:2px 8px;border-radius:99px;background:#fff;color:#58497d;font-size:12px;font-weight:700;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 5px #0002}
+@keyframes cat-hop{to{transform:translateY(-5px)}}
+.arena-food{position:absolute;left:50%;top:58%;z-index:3;display:none;font-size:30px;transform:translate(-50%,-50%);animation:food-pop .3s ease-out}
+.arena-food.visible{display:block}
+@keyframes food-pop{from{transform:translate(-50%,-50%) scale(.3)}to{transform:translate(-50%,-50%) scale(1)}}
+.arena-message{position:absolute;top:42%;left:0;z-index:4;width:100%;color:#735124;font-weight:700;text-align:center;text-shadow:0 1px 2px #fff}
+.visit-sign{position:absolute;top:36px;left:50%;z-index:5;padding:6px 10px;border:2px solid #9a6b36;border-radius:6px;background:#ffe4a8;color:#704716;font-size:13px;font-weight:700;transform:translateX(-50%)}
+.feed-card{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px;border:1px solid #ead8aa;border-radius:10px;background:#fffaf0}
+.feed-stock{font-weight:700;color:#805b20}
+.feed-token{display:grid;width:44px;height:44px;place-items:center;border:1px dashed #d4a84e;border-radius:9px;background:#fff;font-size:28px;cursor:grab;touch-action:none}
+.feed-token:active{cursor:grabbing}
+.feed-tip{flex-basis:100%;margin:0;color:#7a715e;font-size:12px}
+[hidden]{display:none!important}
+@media(max-width:520px){.arena{height:220px}.cat.local{left:18%}.cat.remote{left:82%}.feed-card{gap:8px}}
 </style>
 </head>
 <body>
-
-<h2>聊天室</h2>
-<!-- 设置昵称 -->
+<h2>猫球串门大厅</h2>
 <div class="box">
-  <label>设置你的昵称：</label>
-  <input id="nameInput" placeholder="输入名字" value="玩家">
-  <button onclick="setNick()">确认进入私有大厅</button>
-  <div id="myInfo"></div>
+  <label for="nameInput">玩家昵称：</label>
+  <input id="nameInput" maxlength="24" placeholder="输入名字" value="玩家">
+  <button id="enterButton" type="button" onclick="setNick()">进入大厅</button>
+  <div id="myInfo" aria-live="polite"></div>
 </div>
-
-<!-- 在线用户列表 -->
 <div class="box">
-  <h4>在线用户（点击名字连接）</h4>
-  <div id="userList"></div>
+  <h3>在线玩家（点击连接）</h3>
+  <div id="userList">请先进入大厅</div>
 </div>
-
-<!-- 聊天区域 -->
 <div class="box">
-  <h4>聊天窗口</h4>
-  <div id="chatLog"></div>
+  <h3>猫球活动室</h3>
+  <div id="roomStatus" aria-live="polite">连接一位玩家后，可以邀请对方的猫球来串门。</div>
+  <div class="arena" id="arena">
+    <div class="arena-title">猫球活动室</div>
+    <div class="visit-sign" id="visitSign" hidden>我的猫球正在串门</div>
+    <div class="cat local" id="localCat">
+      <span class="cat-name" id="localCatName">猫球</span>
+      <img src="images/catball.png" alt="">
+    </div>
+    <div class="cat remote" id="remoteCat">
+      <span class="cat-name" id="remoteCatName">朋友的猫球</span>
+      <img src="images/catball.png" alt="">
+    </div>
+    <div class="arena-food" id="arenaFood" aria-label="猫粮">🍖</div>
+    <div class="arena-message" id="arenaMessage" aria-live="polite"></div>
+  </div>
+  <button id="inviteButton" type="button" hidden>邀请对方猫球来玩</button>
+</div>
+<div class="box">
+  <h3>猫粮卡片</h3>
+  <div class="feed-card">
+    <span class="feed-stock">🍖 猫粮：<strong id="foodCount">0</strong></span>
+    <div class="feed-token" id="feedToken" draggable="true" title="拖进活动室，猫球会来抢">🍖</div>
+    <button id="feedButton" type="button">放一份猫粮</button>
+    <p class="feed-tip">拖动猫粮或点击按钮放进活动室；两只猫球会一起抢，放出的猫粮从本机库存扣除。</p>
+  </div>
+</div>
+<div class="box">
+  <h3>聊天窗口</h3>
+  <div id="chatLog" aria-live="polite"></div>
   <input id="chatInput" placeholder="输入消息">
   <button onclick="sendChat()">发送</button>
   <button onclick="closeConn()">断开连接</button>
 </div>
-
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-// ========== 专属私有池子ID ==========
 const BASKET_NAME = "syc111syc-githubio-private-lobby-20261031";
 const basketUrl = `https://peerbasket.bittu.dev/basket/${BASKET_NAME}`;
+const FOOD_KEY = "catball_food_v1";
+const CAT_NAME_KEY = "catball_pet_name_v1";
+const PET_VISIT_KEY = "catball_pet_visit_v1";
+const $ = selector => document.querySelector(selector);
 
 let peer = null;
 let myPeerId = "";
 let myNick = "";
+let myCatName = "猫球";
+let remoteNick = "玩家";
+let remoteCatName = "朋友的猫球";
 let targetConn = null;
 let refreshTimer = null;
+let visitHeartbeat = null;
+let inviteTimer = null;
+let foodWinnerTimer = null;
+let foodResetTimer = null;
+let visitRole = "";
+let pendingInvite = false;
+let pendingInviteId = "";
+let visitInviteId = "";
+let foodInPlay = null;
 
-const $ = s => document.querySelector(s);
-
-function setNick(){
-  myNick = $("#nameInput").value.trim();
-  if(!myNick) return alert("名字不能为空");
-  $("#nameInput").disabled = true;
-  $("button[onclick='setNick()']").disabled = true;
-
-  peer = new Peer();
-  peer.on("open", (id)=>{
-    myPeerId = id;
-    $("#myInfo").innerText = `✅ 你的PeerID：${id}，昵称：${myNick}（私有大厅）`;
-    refreshTimer = setInterval(updateLobby, 8000);
-    updateLobby();
-  });
-
-  peer.on("connection", (conn)=>{
-    bindConnection(conn);
-  });
-
-  peer.on("error", err=>{
-    appendLog("Peer错误："+err, "sys");
-  })
-}
-
-// 上报自己、拉取本私有池子的在线列表【加大量容错】
-async function updateLobby(){
-  if(!peer || !myPeerId) return;
-  try{
-    const res = await fetch(basketUrl,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({peer_id:myPeerId})
-    })
-    if(!res.ok) throw new Error("http状态码 "+res.status);
-    const data = await res.json();
-    if(!data || !Array.isArray(data.peers)){
-      appendLog("大厅返回数据格式异常", "sys");
-      return;
-    }
-    renderUserList(data.peers);
-  }catch(e){
-    // 不再疯狂刷屏报错，只偶尔打印
-    console.warn("大厅刷新失败：", e);
-    // appendLog("大厅刷新失败："+e, "sys");
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    console.error(`无法读取本地数据（${key}）：`, error);
+    return null;
   }
 }
 
-function renderUserList(peersArr){
-  const wrap = $("#userList");
-  wrap.innerHTML = "";
-  for(const peerEntry of peersArr){
-    const peerId = typeof peerEntry === "string" ? peerEntry : peerEntry && peerEntry.peer_id;
-    if(typeof peerId !== "string" || !peerId) continue;
-    if(peerId === myPeerId) continue;
-    const nick = (peerEntry.meta && peerEntry.meta.nick) ? peerEntry.meta.nick : "玩家";
-    const div = document.createElement("div");
-    div.className = "user-item";
-    div.innerText = `${nick} (${peerId.slice(0,8)}...)`
-    div.onclick = ()=>connectToUser(peerId);
-    wrap.appendChild(div);
-  }
-  if(wrap.innerHTML === "") wrap.innerHTML = "<i>暂无其他玩家在这个私有大厅</i>";
-}
-
-function connectToUser(remoteId){
-  if(targetConn) return appendLog("⚠️ 你已经在一个聊天连接里了", "sys");
-  appendLog(`尝试连接对方`, "sys");
-  const conn = peer.connect(remoteId);
-  bindConnection(conn);
-}
-
-function bindConnection(conn){
-  targetConn = conn;
-  conn.on("open",()=>{
-    appendLog("✅ 连接成功！可以聊天", "sys");
-  })
-  conn.on("data", (msg)=>{
-    if(msg.type === "chat"){
-      appendLog(`【${msg.from}】${msg.content}`, "other");
-    }
-  })
-  conn.on("close",()=>{
-    appendLog("❌ 对方断开连接", "sys");
-    targetConn = null;
-  })
-  conn.on("error",e=>{
-    appendLog("连接失败："+e,"sys");
-    targetConn = null;
-  })
-}
-
-function sendChat(){
-  const text = $("#chatInput").value.trim();
-  if(!text || !targetConn || !targetConn.open){
-    alert("还没有连上对方！");
-    return;
-  }
-  targetConn.send({
-    type:"chat",
-    from:myNick,
-    content:text
-  })
-  appendLog(`【我】${text}`, "me");
-  $("#chatInput").value = "";
-}
-
-function closeConn(){
-  if(targetConn){
-    targetConn.close();
-    targetConn = null;
-    appendLog("✅ 已主动断开", "sys");
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.error(`无法保存本地数据（${key}）：`, error);
+    return false;
   }
 }
 
-function appendLog(text, cls="sys"){
+function getFoodCount() {
+  const count = Number.parseInt(readStorage(FOOD_KEY) || "0", 10);
+  return Number.isSafeInteger(count) && count > 0 ? count : 0;
+}
+
+function updateFoodCount() {
+  $("#foodCount").textContent = String(getFoodCount());
+  $("#feedButton").disabled = getFoodCount() < 1 || !foodRoomReady() || Boolean(foodInPlay);
+  $("#feedToken").setAttribute("aria-disabled", String($("#feedButton").disabled));
+}
+
+function loadCatName() {
+  myCatName = (readStorage(CAT_NAME_KEY) || "").trim().slice(0, 16) || "猫球";
+  $("#localCatName").textContent = myCatName;
+  if (targetConn && targetConn.open) sendData({ type: "catName", name: myCatName });
+}
+
+function appendLog(text, cls = "sys") {
   const log = $("#chatLog");
-  const d = document.createElement("div");
-  d.className = "msg "+cls;
-  d.innerText = text;
-  log.appendChild(d);
+  const entry = document.createElement("div");
+  entry.className = `msg ${cls}`;
+  entry.textContent = text;
+  log.appendChild(entry);
   log.scrollTop = log.scrollHeight;
 }
 
-window.onbeforeunload = ()=>{
-  if(refreshTimer) clearInterval(refreshTimer);
+function sendData(data) {
+  if (!targetConn || !targetConn.open) return false;
+  try {
+    targetConn.send(data);
+    return true;
+  } catch (error) {
+    appendLog(`发送失败：${error.message || error}`, "sys");
+    return false;
+  }
 }
+
+function setRoomStatus(text) {
+  $("#roomStatus").textContent = text;
+}
+
+function foodRoomReady() {
+  return Boolean(targetConn && targetConn.open && visitRole);
+}
+
+function updateRoom() {
+  const active = Boolean(visitRole && targetConn && targetConn.open);
+  $("#arena").classList.toggle("room-active", active);
+  $("#remoteCatName").textContent = remoteCatName;
+  $("#inviteButton").hidden = !targetConn || !targetConn.open || active || pendingInvite;
+  $("#visitSign").hidden = !(active && visitRole === "visitor");
+  updateFoodCount();
+}
+
+function setVisitMarker() {
+  const marker = {
+    sessionId: myPeerId,
+    peerId: targetConn ? targetConn.peer : "",
+    catName: myCatName,
+    updatedAt: Date.now()
+  };
+  if (!writeStorage(PET_VISIT_KEY, JSON.stringify(marker))) return false;
+  return true;
+}
+
+function startVisiting() {
+  if (!setVisitMarker()) return false;
+  visitRole = "visitor";
+  clearInterval(visitHeartbeat);
+  visitHeartbeat = setInterval(setVisitMarker, 2000);
+  updateRoom();
+  setRoomStatus(`${myCatName}去串门了！对方断开后就会回家。`);
+  return true;
+}
+
+function stopVisiting() {
+  clearInterval(visitHeartbeat);
+  clearTimeout(inviteTimer);
+  visitHeartbeat = null;
+  inviteTimer = null;
+  if (visitRole === "visitor") {
+    try {
+      const marker = JSON.parse(readStorage(PET_VISIT_KEY) || "null");
+      if (marker && marker.sessionId === myPeerId) localStorage.removeItem(PET_VISIT_KEY);
+    } catch (error) {
+      console.error("无法清除猫球串门状态：", error);
+    }
+  }
+  visitRole = "";
+  pendingInvite = false;
+  pendingInviteId = "";
+  visitInviteId = "";
+  clearTimeout(foodWinnerTimer);
+  clearTimeout(foodResetTimer);
+  foodWinnerTimer = null;
+  foodResetTimer = null;
+  foodInPlay = null;
+  $("#arenaFood").classList.remove("visible");
+  $("#arenaMessage").textContent = "";
+  updateRoom();
+}
+
+async function updateLobby() {
+  if (!peer || !myPeerId) return;
+  try {
+    const response = await fetch(basketUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ peer_id: myPeerId })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (!data || !Array.isArray(data.peers)) throw new Error("大厅返回数据格式异常");
+    renderUserList(data.peers);
+  } catch (error) {
+    console.warn("大厅刷新失败：", error);
+    setRoomStatus(`大厅暂时不可用：${error.message}`);
+  }
+}
+
+function renderUserList(peers) {
+  const wrap = $("#userList");
+  wrap.replaceChildren();
+  let count = 0;
+  for (const entry of peers) {
+    const peerId = typeof entry === "string" ? entry : entry && entry.peer_id;
+    if (typeof peerId !== "string" || !peerId || peerId === myPeerId) continue;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "user-item";
+    item.textContent = `连接玩家 (${peerId.slice(0, 8)}...)`;
+    item.addEventListener("click", () => connectToUser(peerId));
+    wrap.appendChild(item);
+    count++;
+  }
+  if (!count) wrap.textContent = "暂无其他玩家在线";
+}
+
+function setNick() {
+  myNick = $("#nameInput").value.trim();
+  if (!myNick) {
+    alert("名字不能为空");
+    return;
+  }
+  if (typeof Peer !== "function") {
+    appendLog("PeerJS 加载失败，请刷新页面后重试。", "sys");
+    return;
+  }
+  $("#nameInput").disabled = true;
+  $("#enterButton").disabled = true;
+  loadCatName();
+  peer = new Peer();
+  peer.on("open", id => {
+    myPeerId = id;
+    $("#myInfo").textContent = `已进入大厅：${myNick}（${id}）`;
+    refreshTimer = setInterval(updateLobby, 10000);
+    updateLobby();
+  });
+  peer.on("connection", bindConnection);
+  peer.on("error", error => appendLog(`Peer 错误：${error.message || error}`, "sys"));
+}
+
+function connectToUser(remoteId) {
+  if (!peer || !myPeerId) return;
+  if (targetConn) {
+    appendLog("请先断开当前连接。", "sys");
+    return;
+  }
+  appendLog("正在连接玩家……", "sys");
+  bindConnection(peer.connect(remoteId));
+}
+
+function bindConnection(conn) {
+  if (targetConn && targetConn !== conn) {
+    conn.close();
+    return;
+  }
+  targetConn = conn;
+  conn.on("open", () => {
+    appendLog("连接成功！可以聊天或邀请猫球串门。", "sys");
+    sendData({ type: "hello", nick: myNick, catName: myCatName });
+    updateRoom();
+    setRoomStatus("已连接。点击“邀请对方猫球来玩”开始串门。");
+  });
+  conn.on("data", handleData);
+  conn.on("close", () => {
+    appendLog("连接已断开，猫球回家了。", "sys");
+    stopVisiting();
+    targetConn = null;
+    updateRoom();
+    setRoomStatus("连接一位玩家后，可以邀请对方的猫球来串门。");
+  });
+  conn.on("error", error => {
+    appendLog(`连接失败：${error.message || error}`, "sys");
+    stopVisiting();
+    targetConn = null;
+    updateRoom();
+  });
+  if (conn.open) {
+    sendData({ type: "hello", nick: myNick, catName: myCatName });
+    updateRoom();
+  }
+}
+
+function handleInviteRequest(data) {
+  const inviteId = typeof data.id === "string" ? data.id : "";
+  if (!inviteId || inviteId.length > 100) return;
+  if (visitRole || pendingInvite) {
+    sendData({ type: "inviteResponse", id: inviteId, accepted: false, reason: "猫球正在串门或邀请中" });
+    return;
+  }
+  pendingInvite = true;
+  pendingInviteId = inviteId;
+  updateRoom();
+  const accepted = confirm(`${data.nick || remoteNick} 邀请你的猫球「${myCatName}」去串门。接受吗？`);
+  if (!accepted) {
+    pendingInvite = false;
+    pendingInviteId = "";
+    sendData({ type: "inviteResponse", id: inviteId, accepted: false });
+    updateRoom();
+    setRoomStatus("你暂时拒绝了串门邀请。");
+    return;
+  }
+  if (!startVisiting()) {
+    pendingInvite = false;
+    pendingInviteId = "";
+    sendData({ type: "inviteResponse", id: inviteId, accepted: false, reason: "无法保存串门状态" });
+    updateRoom();
+    appendLog("无法保存串门状态；请检查浏览器的本地存储权限。", "sys");
+    return;
+  }
+  pendingInvite = false;
+  pendingInviteId = "";
+  visitInviteId = inviteId;
+  if (!sendData({ type: "inviteResponse", id: inviteId, accepted: true, catName: myCatName })) {
+    stopVisiting();
+    appendLog("邀请回复发送失败，猫球没有离开。", "sys");
+    return;
+  }
+  appendLog(`${myCatName}出门串门啦！`, "sys");
+}
+
+function handleData(data) {
+  if (!data || typeof data !== "object" || typeof data.type !== "string") return;
+  if (data.type === "hello") {
+    remoteNick = typeof data.nick === "string" ? data.nick.slice(0, 24) : "玩家";
+    if (typeof data.catName === "string") remoteCatName = data.catName.slice(0, 16) || "猫球";
+    updateRoom();
+  } else if (data.type === "catName") {
+    if (typeof data.name === "string") {
+      remoteCatName = data.name.slice(0, 16) || "猫球";
+      updateRoom();
+    }
+  } else if (data.type === "chat") {
+    if (typeof data.content === "string") appendLog(`【${remoteNick}】${data.content.slice(0, 1000)}`, "other");
+  } else if (data.type === "catInvite") {
+    handleInviteRequest(data);
+  } else if (data.type === "inviteResponse") {
+    if (!pendingInvite || data.id !== pendingInviteId) {
+      if (data.accepted === true && typeof data.id === "string") {
+        sendData({ type: "inviteCancel", id: data.id });
+      }
+      return;
+    }
+    clearTimeout(inviteTimer);
+    inviteTimer = null;
+    pendingInvite = false;
+    pendingInviteId = "";
+    if (data.accepted === true && typeof data.catName === "string") {
+      remoteCatName = data.catName.slice(0, 16) || "猫球";
+      visitRole = "host";
+      visitInviteId = data.id;
+      updateRoom();
+      setRoomStatus(`${remoteCatName}来串门啦！两只猫球现在可以一起玩。`);
+      appendLog(`${remoteCatName}接受了串门邀请！`, "sys");
+    } else {
+      if (data.accepted === true) sendData({ type: "inviteCancel", id: data.id });
+      updateRoom();
+      setRoomStatus(data.reason ? `邀请未能完成：${data.reason}` : "对方暂时没有接受邀请。");
+    }
+  } else if (data.type === "inviteCancel") {
+    if (visitRole === "visitor" && data.id === visitInviteId) {
+      stopVisiting();
+      appendLog("串门邀请已过期，猫球回家了。", "sys");
+      setRoomStatus("串门邀请已过期，猫球回家了。");
+    }
+  } else if (data.type === "foodDrop") {
+    handleFoodDrop(data);
+  } else if (data.type === "foodWinner") {
+    handleFoodWinner(data);
+  }
+}
+
+function inviteCat() {
+  if (!targetConn || !targetConn.open || visitRole || pendingInvite) return;
+  pendingInvite = true;
+  const inviteId = `${myPeerId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+  pendingInviteId = inviteId;
+  updateRoom();
+  if (!sendData({ type: "catInvite", id: inviteId, nick: myNick, catName: myCatName })) {
+    pendingInvite = false;
+    pendingInviteId = "";
+    updateRoom();
+    return;
+  }
+  setRoomStatus(`已邀请 ${remoteNick} 的猫球，等待对方确认……`);
+  inviteTimer = setTimeout(() => {
+    if (!pendingInvite || pendingInviteId !== inviteId) return;
+    pendingInvite = false;
+    pendingInviteId = "";
+    inviteTimer = null;
+    sendData({ type: "inviteCancel", id: inviteId });
+    updateRoom();
+    setRoomStatus("邀请等待超时，可以重新邀请。");
+  }, 30000);
+}
+
+function showFoodDrop(data) {
+  foodInPlay = { id: data.id, ownerId: data.ownerId };
+  $("#arenaFood").classList.add("visible");
+  $("#arenaMessage").textContent = "猫粮出现了！猫球开抢！";
+  $("#localCat").style.left = "46%";
+  $("#remoteCat").style.left = "54%";
+  updateFoodCount();
+}
+
+function handleFoodDrop(data) {
+  if (!foodRoomReady() || typeof data.id !== "string" || data.ownerId !== targetConn.peer) return;
+  if (foodInPlay) return;
+  showFoodDrop(data);
+}
+
+function handleFoodWinner(data) {
+  if (!foodInPlay || data.id !== foodInPlay.id || !targetConn ||
+      ![myPeerId, targetConn.peer].includes(data.winnerId)) return;
+  const winnerName = data.winnerId === myPeerId ? myCatName : remoteCatName;
+  $("#arenaMessage").textContent = `${winnerName}抢到了猫粮！`;
+  $("#arenaFood").classList.remove("visible");
+  foodInPlay = null;
+  clearTimeout(foodWinnerTimer);
+  updateFoodCount();
+  clearTimeout(foodResetTimer);
+  foodResetTimer = setTimeout(() => {
+    $("#arenaMessage").textContent = "";
+    $("#localCat").style.left = "";
+    $("#remoteCat").style.left = "";
+  }, 2200);
+}
+
+function dropFood() {
+  if (!foodRoomReady()) {
+    appendLog("先连接玩家并完成猫球串门邀请，才能一起抢猫粮。", "sys");
+    return;
+  }
+  if (foodInPlay) {
+    setRoomStatus("上一份猫粮还在抢，等猫球吃完再放吧。");
+    return;
+  }
+  const count = getFoodCount();
+  if (count < 1) {
+    setRoomStatus("本机没有猫粮了，请先回首页获取猫粮。");
+    return;
+  }
+  const foodId = `${myPeerId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+  if (!writeStorage(FOOD_KEY, String(count - 1))) {
+    setRoomStatus("猫粮库存保存失败，没有放出猫粮。");
+    return;
+  }
+  const data = { type: "foodDrop", id: foodId, ownerId: myPeerId };
+  if (!sendData(data)) {
+    if (!writeStorage(FOOD_KEY, String(count))) {
+      appendLog("猫粮已放出但未能返还库存，请检查本地存储。", "sys");
+    }
+    updateFoodCount();
+    return;
+  }
+  updateFoodCount();
+  showFoodDrop(data);
+  foodWinnerTimer = setTimeout(() => {
+    if (!foodInPlay || foodInPlay.id !== foodId || !targetConn || !targetConn.open) return;
+    const winnerId = Math.random() < 0.5 ? myPeerId : targetConn.peer;
+    sendData({ type: "foodWinner", id: foodId, winnerId });
+    handleFoodWinner({ id: foodId, winnerId });
+  }, 1100);
+}
+
+function sendChat() {
+  const input = $("#chatInput");
+  const text = input.value.trim();
+  if (!text || !targetConn || !targetConn.open) {
+    if (text) appendLog("还没有连上对方。", "sys");
+    return;
+  }
+  if (sendData({ type: "chat", content: text })) {
+    appendLog(`【我】${text}`, "me");
+    input.value = "";
+  }
+}
+
+function closeConn() {
+  if (!targetConn) return;
+  stopVisiting();
+  targetConn.close();
+  targetConn = null;
+  updateRoom();
+  appendLog("已断开连接，猫球回家了。", "sys");
+}
+
+$("#inviteButton").addEventListener("click", inviteCat);
+$("#feedButton").addEventListener("click", dropFood);
+$("#feedToken").addEventListener("dragstart", event => {
+  event.dataTransfer.setData("text/plain", "cat-food");
+});
+$("#arena").addEventListener("dragover", event => event.preventDefault());
+$("#arena").addEventListener("drop", event => {
+  event.preventDefault();
+  if (event.dataTransfer.getData("text/plain") === "cat-food") dropFood();
+});
+window.addEventListener("storage", event => {
+  if (event.key === FOOD_KEY) updateFoodCount();
+  if (event.key === CAT_NAME_KEY) {
+    loadCatName();
+  }
+});
+window.addEventListener("beforeunload", () => {
+  clearInterval(refreshTimer);
+  stopVisiting();
+  if (peer) peer.destroy();
+});
+
+loadCatName();
+updateFoodCount();
+updateRoom();
 </script>
 </body>
 </html>

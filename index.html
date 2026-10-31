@@ -126,6 +126,80 @@
             will-change: transform;
         }
 
+        .pet-name-label {
+            position: absolute;
+            z-index: 3;
+            top: -10px;
+            left: 50%;
+            max-width: 150px;
+            overflow: hidden;
+            padding: 2px 8px;
+            border: 1px solid rgba(88, 73, 125, 0.18);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.94);
+            color: #58497d;
+            font-size: 12px;
+            font-weight: 700;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            transform: translateX(-50%);
+            pointer-events: none;
+        }
+
+        .pet-away-sign {
+            position: absolute;
+            top: 18px;
+            left: 0;
+            width: 94px;
+            padding: 8px 4px;
+            border: 2px solid #9a6b36;
+            border-radius: 6px;
+            background: #ffe4a8;
+            color: #704716;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.4;
+            text-align: center;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16);
+            pointer-events: none;
+        }
+
+        .pet-wrap.visiting > .pet,
+        .pet-wrap.visiting > .pet-name-label,
+        .pet-wrap.visiting > .pet-cosmetic,
+        .pet-wrap.visiting > .pet-speech {
+            display: none;
+        }
+
+        .pet-name-settings {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin: 8px 0;
+            color: #58497d;
+            font-size: 13px;
+        }
+
+        .pet-name-settings input {
+            width: 140px;
+            min-height: 32px;
+            padding: 4px 8px;
+            border: 1px solid #d6dde8;
+            border-radius: 7px;
+        }
+
+        .pet-name-settings button {
+            min-height: 32px;
+            padding: 4px 10px;
+            border: 0;
+            border-radius: 7px;
+            background: #8fb0ff;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
         .pet-cosmetic {
             position: absolute;
             z-index: 1;
@@ -1052,6 +1126,12 @@
         </nav>
     </header>
 
+    <div class="pet-name-settings">
+        <label for="petNameInput">给猫球起名</label>
+        <input id="petNameInput" type="text" maxlength="16" placeholder="猫球">
+        <button id="savePetNameBtn" type="button">保存名字</button>
+    </div>
+
     <div class="pet-food-bar">
         <span class="pet-food-info">🍖 猫粮：<strong id="foodCount">0</strong></span>
         <span class="pet-food-info">💎 积分：<strong id="pointsCountBar">0</strong></span>
@@ -1129,6 +1209,8 @@
     <main id="postList">加载中...</main>
 
     <div id="petWrap" class="pet-wrap" aria-label="桌宠" title="点击让我乱跑 10 秒">
+        <div class="pet-name-label" id="petNameLabel">猫球</div>
+        <div class="pet-away-sign" id="petAwaySign" hidden></div>
         <div class="pet-cosmetic pet-sign" id="petSign">最帅猫球</div>
         <svg class="pet-cosmetic pet-ingot" id="petIngot" viewBox="0 0 40 40" aria-hidden="true">
             <path d="m5 23 5-12h20l5 12-5 11H10L5 23Z" fill="#f6bd35" stroke="#a76b13" stroke-width="2"/>
@@ -1410,7 +1492,60 @@
         const petWrap = document.getElementById('petWrap');
         const pet = document.getElementById('pet');
         const petSpeech = document.getElementById('petSpeech');
+        const petNameLabel = document.getElementById('petNameLabel');
+        const petNameInput = document.getElementById('petNameInput');
+        const petAwaySign = document.getElementById('petAwaySign');
+        const CAT_NAME_KEY = 'catball_pet_name_v1';
+        const PET_VISIT_KEY = 'catball_pet_visit_v1';
         let speechTimer = null;
+
+        function updatePetName(name) {
+            const safeName = (name || '').trim().slice(0, 16) || '猫球';
+            petNameLabel.textContent = safeName;
+            petNameInput.value = safeName;
+            return safeName;
+        }
+
+        updatePetName(safeGet(CAT_NAME_KEY) || '猫球');
+
+        document.getElementById('savePetNameBtn').addEventListener('click', function() {
+            const name = (petNameInput.value || '').trim().slice(0, 16) || '猫球';
+            if (!safeSet(CAT_NAME_KEY, name)) {
+                petNameInput.focus();
+                return;
+            }
+            updatePetName(name);
+        });
+
+        petNameInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                document.getElementById('savePetNameBtn').click();
+            }
+        });
+
+        function updatePetVisitStatus() {
+            let visit = null;
+            try {
+                visit = JSON.parse(safeGet(PET_VISIT_KEY) || 'null');
+            } catch (error) {
+                console.warn('猫球串门状态无效：', error);
+            }
+            const isVisiting = visit && Number.isFinite(visit.updatedAt) &&
+                Date.now() - visit.updatedAt < 8000 && visit.updatedAt <= Date.now() + 5000;
+            petWrap.classList.toggle('visiting', Boolean(isVisiting));
+            petAwaySign.hidden = !isVisiting;
+            petAwaySign.textContent = isVisiting ? `${petNameLabel.textContent}去串门了` : '';
+        }
+
+        window.addEventListener('storage', function(event) {
+            if (event.key === PET_VISIT_KEY) {
+                updatePetVisitStatus();
+            } else if (event.key === CAT_NAME_KEY) {
+                updatePetName(event.newValue || '猫球');
+            }
+        });
+        setInterval(updatePetVisitStatus, 2500);
+        updatePetVisitStatus();
 
         const idlePhrases = ['喵~', '喵呜~', '欢迎！', '我是猫球。', '哈哈，快来陪我玩！'];
         const returnPhrases = ['等等我！', '不要抛弃我！', '我回来了，慢点！'];
