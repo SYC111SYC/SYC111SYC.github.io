@@ -1,82 +1,180 @@
 <!DOCTYPE html>
-<html lang="zh‑CN">
+<html lang="zh-CN">
 <head>
-<meta charset="utf‑8">
-<title>PeerJS联机测试（官方云信令）</title>
+<meta charset="utf-8">
+<title>联机大厅｜syc专属私有池子</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui}
+body{max-width:900px;margin:16px auto;padding:0 12px;}
+.box{border:1px solid #ccc;padding:12px;border-radius:8px;margin:10px 0}
+#userList{min-height:120px}
+.user-item{padding:6px 8px;margin:4px 0;background:#f3f4f6;border-radius:6px;cursor:pointer;}
+.user-item:hover{background:#e5e7eb}
+#chatLog{height:240px;overflow-y:auto;border:1px solid #aaa;padding:8px;margin:8px 0}
+.msg{margin:4px 0}
+.me{color:#0066cc}
+.other{color:#222}
+.sys{color:#777}
+</style>
 </head>
 <body>
-<h2>你的ID:<span id="myid"></span></h2>
-<input id="remoteIdInput" placeholder="输入对方ID连接">
-<button onclick="connectPeer()">连接对方</button>
-<div>
-<input id="msgInput"><button onclick="sendMsg()">发送消息</button>
-</div>
-<div id="log"></div>
 
-<!-- PeerJS CDN -->
+<h2>【私有大厅】syc111syc 联机房间</h2>
+<!-- 设置昵称 -->
+<div class="box">
+  <label>设置你的昵称：</label>
+  <input id="nameInput" placeholder="输入名字" value="玩家">
+  <button onclick="setNick()">确认进入私有大厅</button>
+  <div id="myInfo"></div>
+</div>
+
+<!-- 在线用户列表 -->
+<div class="box">
+  <h4>在线用户（点击名字连接）</h4>
+  <div id="userList"></div>
+</div>
+
+<!-- 聊天区域 -->
+<div class="box">
+  <h4>聊天窗口</h4>
+  <div id="chatLog"></div>
+  <input id="chatInput" placeholder="输入消息">
+  <button onclick="sendChat()">发送</button>
+  <button onclick="closeConn()">断开连接</button>
+</div>
+
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-const logDiv = document.getElementById("log");
-const myIdSpan = document.getElementById("myid");
+// ========== 专属私有池子ID！不要随便分享给外人 ==========
+const BASKET_NAME = "syc111syc-githubio-private-lobby-20261031";
+const basketUrl = `https://peerbasket.bittu.dev/basket/${BASKET_NAME}`;
 
-// 👉 重点：不写 host，直接使用 PeerJS 官方免费云信令！
-const peer = new Peer();
+let peer = null;
+let myPeerId = "";
+let myNick = "";
+let targetConn = null;
+let refreshTimer = null;
 
-let conn = null;
+const $ = s => document.querySelector(s);
 
-peer.on("open", (id)=>{
-  myIdSpan.innerText = id;
-  appendLog("✅本机ID："+id+"，把这个ID发给好友");
-});
+function setNick(){
+  myNick = $("#nameInput").value.trim();
+  if(!myNick) return alert("名字不能为空");
+  $("#nameInput").disabled = true;
+  $("button[onclick='setNick()']").disabled = true;
 
-// 别人主动连我
-peer.on("connection", (c)=>{
-  appendLog("🎉收到对方连接请求");
-  conn = c;
-  setupConn(c);
-});
+  peer = new Peer();
+  peer.on("open", (id)=>{
+    myPeerId = id;
+    $("#myInfo").innerText = `✅ 你的PeerID：${id}，昵称：${myNick}（私有大厅）`;
+    refreshTimer = setInterval(updateLobby, 8000);
+    updateLobby();
+  });
 
-// 我主动连接别人
-function connectPeer(){
-  const remoteId = document.getElementById("remoteIdInput").value.trim();
-  if(!remoteId) return;
-  appendLog("尝试连接 "+remoteId);
-  conn = peer.connect(remoteId);
-  setupConn(conn);
+  peer.on("connection", (conn)=>{
+    bindConnection(conn);
+  });
+
+  peer.on("error", err=>{
+    appendLog("Peer错误："+err, "sys");
+  })
 }
 
-function setupConn(c){
-  c.on("open",()=>{
-    appendLog("✅P2P连接成功！可以联机通信");
-  });
-  c.on("data",(data)=>{
-    appendLog("📥收到消息："+JSON.stringify(data));
-  });
-  c.on("close",()=>{
-    appendLog("❌连接断开");
-  });
-  c.on("error",(err)=>{
-    appendLog("⚠️通道错误："+err);
-  });
+// 上报自己、拉取本私有池子的在线列表
+async function updateLobby(){
+  if(!peer || !myPeerId) return;
+  try{
+    const res = await fetch(basketUrl,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({peer_id:myPeerId, meta:{nick:myNick}})
+    })
+    const data = await res.json();
+    renderUserList(data.peers);
+  }catch(e){
+    appendLog("大厅刷新失败："+e, "sys");
+  }
 }
 
-function sendMsg(){
-  if(!conn || !conn.open){
-    appendLog("⚠️还没有建立连接");
+function renderUserList(peersArr){
+  const wrap = $("#userList");
+  wrap.innerHTML = "";
+  for(const u of peersArr){
+    if(u.peer_id === myPeerId) continue;
+    const nick = u.meta?.nick || "匿名玩家";
+    const div = document.createElement("div");
+    div.className = "user-item";
+    div.innerText = `${nick} (${u.peer_id.slice(0,8)}...)`
+    div.onclick = ()=>connectToUser(u.peer_id);
+    wrap.appendChild(div);
+  }
+  if(wrap.innerHTML === "") wrap.innerHTML = "<i>暂无其他玩家在这个私有大厅</i>";
+}
+
+function connectToUser(remoteId){
+  if(targetConn) return appendLog("⚠️ 你已经在一个聊天连接里了", "sys");
+  appendLog(`尝试连接对方`, "sys");
+  const conn = peer.connect(remoteId);
+  bindConnection(conn);
+}
+
+function bindConnection(conn){
+  targetConn = conn;
+  conn.on("open",()=>{
+    appendLog("✅ 连接成功！可以聊天", "sys");
+  })
+  conn.on("data", (msg)=>{
+    if(msg.type === "chat"){
+      appendLog(`【${msg.from}】${msg.content}`, "other");
+    }
+  })
+  conn.on("close",()=>{
+    appendLog("❌ 对方断开连接", "sys");
+    targetConn = null;
+  })
+  conn.on("error",e=>{
+    appendLog("连接失败："+e,"sys");
+    targetConn = null;
+  })
+}
+
+function sendChat(){
+  const text = $("#chatInput").value.trim();
+  if(!text || !targetConn || !targetConn.open){
+    alert("还没有连上对方！");
     return;
   }
-  const text = document.getElementById("msgInput").value;
-  conn.send({type:"chat", content:text});
-  appendLog("📤发送："+text);
+  targetConn.send({
+    type:"chat",
+    from:myNick,
+    content:text
+  })
+  appendLog(`【我】${text}`, "me");
+  $("#chatInput").value = "";
 }
 
-function appendLog(text){
-  logDiv.innerHTML += "<div>"+text+"</div>";
+// 新增断开按钮
+function closeConn(){
+  if(targetConn){
+    targetConn.close();
+    targetConn = null;
+    appendLog("✅ 已主动断开", "sys");
+  }
 }
 
-peer.on("error",(err)=>{
-  appendLog("Peer错误："+err);
-})
+function appendLog(text, cls="sys"){
+  const log = $("#chatLog");
+  const d = document.createElement("div");
+  d.className = "msg "+cls;
+  d.innerText = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+// 页面关闭时清除定时器
+window.onbeforeunload = ()=>{
+  if(refreshTimer) clearInterval(refreshTimer);
+}
 </script>
 </body>
 </html>
