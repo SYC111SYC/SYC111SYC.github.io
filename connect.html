@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>联机大厅｜syc专属私有池子</title>
+<title>联机大厅｜syc专属私有池子（修复版）</title>
 <style>
 *{box-sizing:border-box;font-family:system-ui}
 body{max-width:900px;margin:16px auto;padding:0 12px;}
@@ -10,7 +10,7 @@ body{max-width:900px;margin:16px auto;padding:0 12px;}
 #userList{min-height:120px}
 .user-item{padding:6px 8px;margin:4px 0;background:#f3f4f6;border-radius:6px;cursor:pointer;}
 .user-item:hover{background:#e5e7eb}
-#chatLog{height:240px;overflow-y:auto;border:1px solid #aaa;padding:8px;margin:8px 0}
+#chatLog{height:240px;overflow-y:auto;border:1px solid #aaa;padding:8px 0}
 .msg{margin:4px 0}
 .me{color:#0066cc}
 .other{color:#222}
@@ -45,7 +45,7 @@ body{max-width:900px;margin:16px auto;padding:0 12px;}
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
-// ========== 专属私有池子ID！不要随便分享给外人 ==========
+// ========== 专属私有池子ID ==========
 const BASKET_NAME = "syc111syc-githubio-private-lobby-20261031";
 const basketUrl = `https://peerbasket.bittu.dev/basket/${BASKET_NAME}`;
 
@@ -80,7 +80,7 @@ function setNick(){
   })
 }
 
-// 上报自己、拉取本私有池子的在线列表
+// 上报自己、拉取本私有池子的在线列表【加大量容错】
 async function updateLobby(){
   if(!peer || !myPeerId) return;
   try{
@@ -89,10 +89,17 @@ async function updateLobby(){
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({peer_id:myPeerId, meta:{nick:myNick}})
     })
+    if(!res.ok) throw new Error("http状态码 "+res.status);
     const data = await res.json();
+    if(!data || !Array.isArray(data.peers)){
+      appendLog("大厅返回数据格式异常", "sys");
+      return;
+    }
     renderUserList(data.peers);
   }catch(e){
-    appendLog("大厅刷新失败："+e, "sys");
+    // 不再疯狂刷屏报错，只偶尔打印
+    console.warn("大厅刷新失败：", e);
+    // appendLog("大厅刷新失败："+e, "sys");
   }
 }
 
@@ -100,8 +107,10 @@ function renderUserList(peersArr){
   const wrap = $("#userList");
   wrap.innerHTML = "";
   for(const u of peersArr){
+    // 核心判空！防止 u 是undefined
+    if(!u || !u.peer_id) continue;
     if(u.peer_id === myPeerId) continue;
-    const nick = u.meta?.nick || "匿名玩家";
+    const nick = (u.meta && u.meta.nick) ? u.meta.nick : "匿名玩家";
     const div = document.createElement("div");
     div.className = "user-item";
     div.innerText = `${nick} (${u.peer_id.slice(0,8)}...)`
@@ -153,7 +162,6 @@ function sendChat(){
   $("#chatInput").value = "";
 }
 
-// 新增断开按钮
 function closeConn(){
   if(targetConn){
     targetConn.close();
@@ -171,7 +179,6 @@ function appendLog(text, cls="sys"){
   log.scrollTop = log.scrollHeight;
 }
 
-// 页面关闭时清除定时器
 window.onbeforeunload = ()=>{
   if(refreshTimer) clearInterval(refreshTimer);
 }
