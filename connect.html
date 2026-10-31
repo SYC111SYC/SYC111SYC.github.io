@@ -87,7 +87,7 @@ async function updateLobby(){
     const res = await fetch(basketUrl,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({peer_id:myPeerId, meta:{nick:myNick}})
+      body:JSON.stringify({peer_id:myPeerId})
     })
     if(!res.ok) throw new Error("http状态码 "+res.status);
     const data = await res.json();
@@ -106,15 +106,15 @@ async function updateLobby(){
 function renderUserList(peersArr){
   const wrap = $("#userList");
   wrap.innerHTML = "";
-  for(const u of peersArr){
-    // 核心判空！防止 u 是undefined
-    if(!u || !u.peer_id) continue;
-    if(u.peer_id === myPeerId) continue;
-    const nick = (u.meta && u.meta.nick) ? u.meta.nick : "匿名玩家";
+  for(const peerEntry of peersArr){
+    const peerId = typeof peerEntry === "string" ? peerEntry : peerEntry && peerEntry.peer_id;
+    if(typeof peerId !== "string" || !peerId) continue;
+    if(peerId === myPeerId) continue;
+    const nick = (peerEntry.meta && peerEntry.meta.nick) ? peerEntry.meta.nick : "玩家";
     const div = document.createElement("div");
     div.className = "user-item";
-    div.innerText = `${nick} (${u.peer_id.slice(0,8)}...)`
-    div.onclick = ()=>connectToUser(u.peer_id);
+    div.innerText = `${nick} (${peerId.slice(0,8)}...)`
+    div.onclick = ()=>connectToUser(peerId);
     wrap.appendChild(div);
   }
   if(wrap.innerHTML === "") wrap.innerHTML = "<i>暂无其他玩家在这个私有大厅</i>";
