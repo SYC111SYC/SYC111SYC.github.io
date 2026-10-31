@@ -102,6 +102,8 @@ let myCatName = "猫球";
 let remoteNick = "玩家";
 let remoteCatName = "朋友的猫球";
 let targetConn = null;
+let targetConnIsOutgoing = false;
+let connectionTimer = null;
 let refreshTimer = null;
 let visitHeartbeat = null;
 let inviteTimer = null;
@@ -290,27 +292,73 @@ function setNick() {
     refreshTimer = setInterval(updateLobby, 10000);
     updateLobby();
   });
-  peer.on("connection", bindConnection);
-  peer.on("error", error => appendLog(`Peer 错误：${error.message || error}`, "sys"));
+  peer.on("connection", conn => bindConnection(conn, true));
+  peer.on("error", error => {
+    const message = error.message || error.type || error;
+    appendLog(`Peer 错误：${message}`, "sys");
+    if (targetConn && !targetConn.open) {
+      setRoomStatus(`连接错误：${message}`);
+    }
+  });
 }
 
 function connectToUser(remoteId) {
   if (!peer || !myPeerId) return;
   if (targetConn) {
-    appendLog("请先断开当前连接。", "sys");
-    return;
+    if (targetConn.peer !== remoteId) {
+      appendLog("请先断开当前连接。", "sys");
+      return;
+    }
+    const outgoingIsPreferred = myPeerId < remoteId;
+    if (targetConnIsOutgoing === outgoingIsPreferred) {
+      appendLog("正在连接这位玩家，请稍候。", "sys");
+      return;
+    }
+    if (!outgoingIsPreferred) {
+      appendLog("正在等待对方的连接，请稍候。", "sys");
+      return;
+    }
   }
   appendLog("正在连接玩家……", "sys");
-  bindConnection(peer.connect(remoteId));
+  bindConnection(peer.connect(remoteId), false);
 }
 
-function bindConnection(conn) {
+function bindConnection(conn, isIncoming) {
   if (targetConn && targetConn !== conn) {
-    conn.close();
-    return;
+    if (targetConn.peer !== conn.peer) {
+      conn.close();
+      return;
+    }
+
+    const outgoingIsPreferred = myPeerId < conn.peer;
+    const currentIsPreferred = targetConnIsOutgoing === outgoingIsPreferred;
+    const candidateIsPreferred = isIncoming
+      ? !outgoingIsPreferred
+      : outgoingIsPreferred;
+    if (currentIsPreferred || !candidateIsPreferred) {
+      conn.close();
+      return;
+    }
+
+    clearTimeout(connectionTimer);
+    targetConn.close();
   }
   targetConn = conn;
+  targetConnIsOutgoing = !isIncoming;
+  clearTimeout(connectionTimer);
+  connectionTimer = setTimeout(() => {
+    if (targetConn !== conn || conn.open) return;
+    appendLog("连接超时，请确认对方在线后重试。", "sys");
+    setRoomStatus("连接超时，请重新点击在线玩家。");
+    conn.close();
+  }, 20000);
   conn.on("open", () => {
+    if (targetConn !== conn) {
+      conn.close();
+      return;
+    }
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
     appendLog("连接成功！可以聊天或邀请猫球串门。", "sys");
     sendData({ type: "hello", nick: myNick, catName: myCatName });
     updateRoom();
@@ -318,16 +366,24 @@ function bindConnection(conn) {
   });
   conn.on("data", handleData);
   conn.on("close", () => {
+    if (targetConn !== conn) return;
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
     appendLog("连接已断开，猫球回家了。", "sys");
     stopVisiting();
     targetConn = null;
+    targetConnIsOutgoing = false;
     updateRoom();
     setRoomStatus("连接一位玩家后，可以邀请对方的猫球来串门。");
   });
   conn.on("error", error => {
+    if (targetConn !== conn) return;
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
     appendLog(`连接失败：${error.message || error}`, "sys");
     stopVisiting();
     targetConn = null;
+    targetConnIsOutgoing = false;
     updateRoom();
   });
   if (conn.open) {
@@ -533,9 +589,12 @@ function sendChat() {
 
 function closeConn() {
   if (!targetConn) return;
+  clearTimeout(connectionTimer);
+  connectionTimer = null;
   stopVisiting();
   targetConn.close();
   targetConn = null;
+  targetConnIsOutgoing = false;
   updateRoom();
   appendLog("已断开连接，猫球回家了。", "sys");
 }
