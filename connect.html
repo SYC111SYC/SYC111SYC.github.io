@@ -406,20 +406,25 @@ function connectToUser(remoteId) {
       appendLog("请先断开当前连接。", "sys");
       return;
     }
+    if (targetConn.open) {
+      setRoomStatus(`已连接到 ${remoteNick}。`);
+      return;
+    }
     const outgoingIsPreferred = myPeerId < remoteId;
     if (targetConnIsOutgoing === outgoingIsPreferred) {
-      appendLog("正在连接这位玩家，请稍候。", "sys");
+      setRoomStatus("正在连接这位玩家，请稍候。");
       return;
     }
     if (!outgoingIsPreferred) {
-      appendLog("正在等待对方的连接，请稍候。", "sys");
+      setRoomStatus("正在等待对方的连接，请稍候。");
       return;
     }
   }
-  appendLog("正在连接玩家……", "sys");
+  setRoomStatus(`正在连接玩家（${remoteId.slice(0, 8)}…）……`);
   try {
     bindConnection(peer.connect(remoteId, { reliable: true }), false);
   } catch (error) {
+    setRoomStatus(`无法连接玩家：${error.message || error}`);
     appendLog(`无法发起连接：${error.message || error}`, "sys");
   }
 }
@@ -458,6 +463,7 @@ function bindConnection(conn, isIncoming) {
     }
     clearTimeout(connectionTimer);
     connectionTimer = null;
+    setRoomStatus("连接成功，正在同步玩家信息……");
     appendLog("连接成功！可以聊天或邀请猫球串门。", "sys");
     sendData({ type: "hello", nick: myNick, catName: myCatName });
     updateRoom();
@@ -466,8 +472,13 @@ function bindConnection(conn, isIncoming) {
   if (!conn.open) {
     connectionTimer = setTimeout(() => {
       if (targetConn !== conn || conn.open) return;
-      appendLog("连接超时，请确认对方在线后重试。", "sys");
+      connectionTimer = null;
+      targetConn = null;
+      targetConnIsOutgoing = false;
+      stopVisiting();
+      updateRoom();
       setRoomStatus("连接超时，请重新点击在线玩家。");
+      appendLog("连接超时，请确认对方在线后重试。", "sys");
       conn.close();
     }, 20000);
   }
@@ -477,12 +488,15 @@ function bindConnection(conn, isIncoming) {
     if (targetConn !== conn) return;
     clearTimeout(connectionTimer);
     connectionTimer = null;
+    const wasOpen = connectionOpened;
     appendLog("连接已断开，猫球回家了。", "sys");
     stopVisiting();
     targetConn = null;
     targetConnIsOutgoing = false;
     updateRoom();
-    setRoomStatus("连接一位玩家后，可以邀请对方的猫球来串门。");
+    setRoomStatus(wasOpen
+      ? "连接已断开。重新连接一位玩家后，可以邀请猫球串门。"
+      : "连接已关闭，请重新点击在线玩家。");
   });
   conn.on("error", error => {
     if (targetConn !== conn) return;
@@ -493,6 +507,7 @@ function bindConnection(conn, isIncoming) {
     targetConn = null;
     targetConnIsOutgoing = false;
     updateRoom();
+    setRoomStatus(`连接失败：${error.message || error}。请重新点击在线玩家。`);
   });
   if (conn.open) handleOpen();
 }
