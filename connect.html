@@ -49,6 +49,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </div>
 <div class="box">
   <h3>在线玩家（点击连接）</h3>
+  <div id="lobbyStatus" role="status" aria-live="polite">请先进入大厅</div>
   <div id="userList">请先进入大厅</div>
 </div>
 <div class="box">
@@ -104,7 +105,10 @@ let remoteCatName = "朋友的猫球";
 let targetConn = null;
 let targetConnIsOutgoing = false;
 let connectionTimer = null;
+let peerOpenTimer = null;
 let refreshTimer = null;
+let lobbyRequestController = null;
+let lobbyFailureCount = 0;
 let visitHeartbeat = null;
 let inviteTimer = null;
 let foodWinnerTimer = null;
@@ -114,6 +118,10 @@ let pendingInvite = false;
 let pendingInviteId = "";
 let visitInviteId = "";
 let foodInPlay = null;
+const LOBBY_REFRESH_INTERVAL = 10000;
+const LOBBY_REQUEST_TIMEOUT = 15000;
+const LOBBY_MAX_BACKOFF = 60000;
+const PEER_OPEN_TIMEOUT = 15000;
 
 function readStorage(key) {
   try {
@@ -237,20 +245,65 @@ function stopVisiting() {
 }
 
 async function updateLobby() {
-  if (!peer || !myPeerId) return;
+  if (!peer || !myPeerId || lobbyRequestController) return;
+  const controller = new AbortController();
+  lobbyRequestController = controller;
+  let timedOut = false;
+  let nextRefreshDelay = LOBBY_REFRESH_INTERVAL;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, LOBBY_REQUEST_TIMEOUT);
   try {
     const response = await fetch(basketUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ peer_id: myPeerId })
+      body: JSON.stringify({ peer_id: myPeerId }),
+      cache: "no-store",
+      signal: controller.signal
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (!data || !Array.isArray(data.peers)) throw new Error("大厅返回数据格式异常");
-    renderUserList(data.peers);
+    if (lobbyRequestController !== controller) return;
+    lobbyFailureCount = 0;
+    const count = renderUserList(data.peers);
+    $("#lobbyStatus").textContent = `大厅已更新 · ${count} 位玩家在线`;
   } catch (error) {
+    if (lobbyRequestController !== controller) return;
+    lobbyFailureCount++;
+    nextRefreshDelay = Math.min(
+      LOBBY_MAX_BACKOFF,
+      LOBBY_REFRESH_INTERVAL * (2 ** Math.min(lobbyFailureCount - 1, 3))
+    );
+    const message = timedOut ? `请求超时（${LOBBY_REQUEST_TIMEOUT / 1000}秒）` : error.message || String(error);
     console.warn("大厅刷新失败：", error);
-    setRoomStatus(`大厅暂时不可用：${error.message}`);
+    $("#userList").textContent = "暂时无法刷新在线玩家，请稍后重试。";
+    $("#lobbyStatus").textContent = `大厅暂时不可用：${message}；${Math.ceil(nextRefreshDelay / 1000)}秒后重试`;
+  } finally {
+    clearTimeout(timeout);
+    if (lobbyRequestController === controller) {
+      lobbyRequestController = null;
+      scheduleLobbyRefresh(nextRefreshDelay);
+    }
+  }
+}
+
+function scheduleLobbyRefresh(delay) {
+  clearTimeout(refreshTimer);
+  if (!peer || !myPeerId) return;
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null;
+    updateLobby();
+  }, delay);
+}
+
+function stopLobbyPolling() {
+  clearTimeout(refreshTimer);
+  refreshTimer = null;
+  if (lobbyRequestController) {
+    lobbyRequestController.abort();
+    lobbyRequestController = null;
   }
 }
 
@@ -270,6 +323,7 @@ function renderUserList(peers) {
     count++;
   }
   if (!count) wrap.textContent = "暂无其他玩家在线";
+  return count;
 }
 
 function setNick() {
@@ -284,22 +338,65 @@ function setNick() {
   }
   $("#nameInput").disabled = true;
   $("#enterButton").disabled = true;
+  $("#lobbyStatus").textContent = "正在连接信令服务……";
   loadCatName();
-  peer = new Peer();
-  peer.on("open", id => {
-    myPeerId = id;
-    $("#myInfo").textContent = `已进入大厅：${myNick}（${id}）`;
-    refreshTimer = setInterval(updateLobby, 10000);
-    updateLobby();
-  });
-  peer.on("connection", conn => bindConnection(conn, true));
-  peer.on("error", error => {
-    const message = error.message || error.type || error;
-    appendLog(`Peer 错误：${message}`, "sys");
-    if (targetConn && !targetConn.open) {
-      setRoomStatus(`连接错误：${message}`);
-    }
-  });
+  try {
+    peer = new Peer();
+    const activePeer = peer;
+    peerOpenTimer = setTimeout(() => {
+      if (peer !== activePeer || myPeerId) return;
+      peerOpenTimer = null;
+      appendLog("连接信令服务超时，请检查网络后重试。", "sys");
+      $("#lobbyStatus").textContent = "连接信令服务超时，请重试。";
+      activePeer.destroy();
+      peer = null;
+      $("#nameInput").disabled = false;
+      $("#enterButton").disabled = false;
+    }, PEER_OPEN_TIMEOUT);
+    peer.on("open", id => {
+      if (peer !== activePeer) return;
+      clearTimeout(peerOpenTimer);
+      peerOpenTimer = null;
+      myPeerId = id;
+      $("#myInfo").textContent = `已进入大厅：${myNick}（${id}）`;
+      $("#lobbyStatus").textContent = "正在更新在线玩家……";
+      updateLobby();
+    });
+    peer.on("connection", conn => bindConnection(conn, true));
+    peer.on("disconnected", () => {
+      if (peer !== activePeer || activePeer.destroyed) return;
+      appendLog("与信令服务断开，正在尝试恢复连接……", "sys");
+      try {
+        activePeer.reconnect();
+      } catch (error) {
+        appendLog(`信令服务重连失败：${error.message || error}`, "sys");
+      }
+    });
+    peer.on("error", error => {
+      const message = error.message || error.type || error;
+      appendLog(`Peer 错误：${message}`, "sys");
+      if (!myPeerId && peer === activePeer) {
+        clearTimeout(peerOpenTimer);
+        peerOpenTimer = null;
+        stopLobbyPolling();
+        activePeer.destroy();
+        peer = null;
+        $("#nameInput").disabled = false;
+        $("#enterButton").disabled = false;
+        $("#lobbyStatus").textContent = "无法进入大厅，请检查网络后重试。";
+      } else if (targetConn && !targetConn.open) {
+        setRoomStatus(`连接错误：${message}`);
+      }
+    });
+  } catch (error) {
+    clearTimeout(peerOpenTimer);
+    peerOpenTimer = null;
+    peer = null;
+    $("#nameInput").disabled = false;
+    $("#enterButton").disabled = false;
+    $("#lobbyStatus").textContent = "无法启动 PeerJS，请检查网络后重试。";
+    appendLog(`无法启动 PeerJS：${error.message || error}`, "sys");
+  }
 }
 
 function connectToUser(remoteId) {
@@ -320,10 +417,15 @@ function connectToUser(remoteId) {
     }
   }
   appendLog("正在连接玩家……", "sys");
-  bindConnection(peer.connect(remoteId), false);
+  try {
+    bindConnection(peer.connect(remoteId, { reliable: true }), false);
+  } catch (error) {
+    appendLog(`无法发起连接：${error.message || error}`, "sys");
+  }
 }
 
 function bindConnection(conn, isIncoming) {
+  let previousConn = null;
   if (targetConn && targetConn !== conn) {
     if (targetConn.peer !== conn.peer) {
       conn.close();
@@ -339,20 +441,17 @@ function bindConnection(conn, isIncoming) {
       conn.close();
       return;
     }
-
+    previousConn = targetConn;
     clearTimeout(connectionTimer);
-    targetConn.close();
   }
   targetConn = conn;
   targetConnIsOutgoing = !isIncoming;
   clearTimeout(connectionTimer);
-  connectionTimer = setTimeout(() => {
-    if (targetConn !== conn || conn.open) return;
-    appendLog("连接超时，请确认对方在线后重试。", "sys");
-    setRoomStatus("连接超时，请重新点击在线玩家。");
-    conn.close();
-  }, 20000);
-  conn.on("open", () => {
+  if (previousConn) previousConn.close();
+  let connectionOpened = false;
+  const handleOpen = () => {
+    if (connectionOpened) return;
+    connectionOpened = true;
     if (targetConn !== conn) {
       conn.close();
       return;
@@ -363,7 +462,16 @@ function bindConnection(conn, isIncoming) {
     sendData({ type: "hello", nick: myNick, catName: myCatName });
     updateRoom();
     setRoomStatus("已连接。点击“邀请对方猫球来玩”开始串门。");
-  });
+  };
+  if (!conn.open) {
+    connectionTimer = setTimeout(() => {
+      if (targetConn !== conn || conn.open) return;
+      appendLog("连接超时，请确认对方在线后重试。", "sys");
+      setRoomStatus("连接超时，请重新点击在线玩家。");
+      conn.close();
+    }, 20000);
+  }
+  conn.on("open", handleOpen);
   conn.on("data", handleData);
   conn.on("close", () => {
     if (targetConn !== conn) return;
@@ -386,10 +494,7 @@ function bindConnection(conn, isIncoming) {
     targetConnIsOutgoing = false;
     updateRoom();
   });
-  if (conn.open) {
-    sendData({ type: "hello", nick: myNick, catName: myCatName });
-    updateRoom();
-  }
+  if (conn.open) handleOpen();
 }
 
 function handleInviteRequest(data) {
@@ -589,13 +694,15 @@ function sendChat() {
 
 function closeConn() {
   if (!targetConn) return;
+  const conn = targetConn;
   clearTimeout(connectionTimer);
   connectionTimer = null;
-  stopVisiting();
-  targetConn.close();
   targetConn = null;
   targetConnIsOutgoing = false;
+  stopVisiting();
+  conn.close();
   updateRoom();
+  setRoomStatus("连接一位玩家后，可以邀请对方的猫球来串门。");
   appendLog("已断开连接，猫球回家了。", "sys");
 }
 
@@ -616,7 +723,8 @@ window.addEventListener("storage", event => {
   }
 });
 window.addEventListener("beforeunload", () => {
-  clearInterval(refreshTimer);
+  clearTimeout(peerOpenTimer);
+  stopLobbyPolling();
   stopVisiting();
   if (peer) peer.destroy();
 });
