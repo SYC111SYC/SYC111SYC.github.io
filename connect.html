@@ -49,7 +49,7 @@ button:disabled{opacity:.55;cursor:not-allowed}
 </div>
 <div class="box">
   <h3>在线玩家（点击连接）</h3>
-  <div id="lobbyStatus" role="status" aria-live="polite">请先进入大厅</div>
+  <div id="lobbyStatus" role="status" aria-live="polite">联机大厅使用 GoEasy 国内 WebSocket 中继；站点管理员需在 connect.html 配置 Common Key。</div>
   <div id="userList">请先进入大厅</div>
 </div>
 <div class="box">
@@ -87,28 +87,31 @@ button:disabled{opacity:.55;cursor:not-allowed}
   <button onclick="sendChat()">发送</button>
   <button onclick="closeConn()">断开连接</button>
 </div>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/goeasy-lite@2.13.24/goeasy-lite.min.js"></script>
 <script>
-const BASKET_NAME = "syc111syc-githubio-private-lobby-20261031";
-const basketUrl = `https://peerbasket.bittu.dev/basket/${BASKET_NAME}`;
+const GOEASY_COMMON_KEY = "BC-98335ad497924a1e9b8d730919ae0472";
+const GOEASY_HOST = "hangzhou.goeasy.io";
+const LOBBY_CHANNEL = "catball-lobby-syc111syc-githubio-v1";
+const INBOX_CHANNEL_PREFIX = "catball-inbox-";
 const FOOD_KEY = "catball_food_v1";
 const CAT_NAME_KEY = "catball_pet_name_v1";
 const PET_VISIT_KEY = "catball_pet_visit_v1";
 const $ = selector => document.querySelector(selector);
 
-let peer = null;
+function getGoEasyCommonKey() {
+  return window.CATBALL_GO_EASY_COMMON_KEY || GOEASY_COMMON_KEY;
+}
+
+let goeasy = null;
+let goeasyConnected = false;
 let myPeerId = "";
 let myNick = "";
 let myCatName = "猫球";
 let remoteNick = "玩家";
 let remoteCatName = "朋友的猫球";
 let targetConn = null;
-let targetConnIsOutgoing = false;
 let connectionTimer = null;
-let peerOpenTimer = null;
-let refreshTimer = null;
-let lobbyRequestController = null;
-let lobbyFailureCount = 0;
+const onlinePeers = new Map();
 let visitHeartbeat = null;
 let inviteTimer = null;
 let foodWinnerTimer = null;
@@ -118,10 +121,6 @@ let pendingInvite = false;
 let pendingInviteId = "";
 let visitInviteId = "";
 let foodInPlay = null;
-const LOBBY_REFRESH_INTERVAL = 10000;
-const LOBBY_REQUEST_TIMEOUT = 15000;
-const LOBBY_MAX_BACKOFF = 60000;
-const PEER_OPEN_TIMEOUT = 15000;
 
 function readStorage(key) {
   try {
@@ -169,14 +168,28 @@ function appendLog(text, cls = "sys") {
 }
 
 function sendData(data) {
-  if (!targetConn || !targetConn.open) return false;
-  try {
-    targetConn.send(data);
-    return true;
-  } catch (error) {
+  if (!goeasyConnected || !targetConn || !targetConn.open ||
+      !onlinePeers.has(targetConn.peer)) return false;
+  const targetId = targetConn.peer;
+  sendToPeer(targetId, data).catch(error => {
     appendLog(`发送失败：${error.message || error}`, "sys");
-    return false;
+    if (error.code === "peer_not_found") removeOnlinePeer(targetId);
+  });
+  return true;
+}
+
+function sendToPeer(peerId, data) {
+  if (!goeasy || !goeasyConnected) {
+    return Promise.reject(new Error("GoEasy 中继服务未连接"));
   }
+  return new Promise((resolve, reject) => {
+    goeasy.pubsub.publish({
+      channel: `${INBOX_CHANNEL_PREFIX}${peerId}`,
+      message: JSON.stringify({ from: myPeerId, to: peerId, data }),
+      onSuccess: resolve,
+      onFailed: reject
+    });
+  });
 }
 
 function setRoomStatus(text) {
@@ -244,272 +257,317 @@ function stopVisiting() {
   updateRoom();
 }
 
-async function updateLobby() {
-  if (!peer || !myPeerId || lobbyRequestController) return;
-  const controller = new AbortController();
-  lobbyRequestController = controller;
-  let timedOut = false;
-  let nextRefreshDelay = LOBBY_REFRESH_INTERVAL;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, LOBBY_REQUEST_TIMEOUT);
-  try {
-    const response = await fetch(basketUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ peer_id: myPeerId }),
-      cache: "no-store",
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    if (!data || !Array.isArray(data.peers)) throw new Error("大厅返回数据格式异常");
-    if (lobbyRequestController !== controller) return;
-    lobbyFailureCount = 0;
-    const count = renderUserList(data.peers);
-    $("#lobbyStatus").textContent = `大厅已更新 · ${count} 位玩家在线`;
-  } catch (error) {
-    if (lobbyRequestController !== controller) return;
-    lobbyFailureCount++;
-    nextRefreshDelay = Math.min(
-      LOBBY_MAX_BACKOFF,
-      LOBBY_REFRESH_INTERVAL * (2 ** Math.min(lobbyFailureCount - 1, 3))
-    );
-    const message = timedOut ? `请求超时（${LOBBY_REQUEST_TIMEOUT / 1000}秒）` : error.message || String(error);
-    console.warn("大厅刷新失败：", error);
-    $("#userList").textContent = "暂时无法刷新在线玩家，请稍后重试。";
-    $("#lobbyStatus").textContent = `大厅暂时不可用：${message}；${Math.ceil(nextRefreshDelay / 1000)}秒后重试`;
-  } finally {
-    clearTimeout(timeout);
-    if (lobbyRequestController === controller) {
-      lobbyRequestController = null;
-      scheduleLobbyRefresh(nextRefreshDelay);
-    }
-  }
-}
-
-function scheduleLobbyRefresh(delay) {
-  clearTimeout(refreshTimer);
-  if (!peer || !myPeerId) return;
-  refreshTimer = setTimeout(() => {
-    refreshTimer = null;
-    updateLobby();
-  }, delay);
-}
-
-function stopLobbyPolling() {
-  clearTimeout(refreshTimer);
-  refreshTimer = null;
-  if (lobbyRequestController) {
-    lobbyRequestController.abort();
-    lobbyRequestController = null;
-  }
-}
-
-function renderUserList(peers) {
+function renderUserList() {
   const wrap = $("#userList");
   wrap.replaceChildren();
   let count = 0;
-  for (const entry of peers) {
-    const peerId = typeof entry === "string" ? entry : entry && entry.peer_id;
-    if (typeof peerId !== "string" || !peerId || peerId === myPeerId) continue;
+  for (const [peerId, player] of onlinePeers) {
+    if (!peerId || peerId === myPeerId) continue;
     const item = document.createElement("button");
     item.type = "button";
     item.className = "user-item";
-    item.textContent = `连接玩家 (${peerId.slice(0, 8)}...)`;
+    item.textContent = `${player.nick || "玩家"} (${peerId.slice(0, 8)}…)`;
     item.addEventListener("click", () => connectToUser(peerId));
     wrap.appendChild(item);
     count++;
   }
   if (!count) wrap.textContent = "暂无其他玩家在线";
-  return count;
 }
 
-function setNick() {
+function announceTo(peerId) {
+  sendToPeer(peerId, { type: "hello", nick: myNick, catName: myCatName }).catch(error => {
+    if (error.code === "peer_not_found") removeOnlinePeer(peerId);
+    else console.error("无法发送玩家信息：", error);
+  });
+}
+
+function goEasyErrorMessage(error) {
+  return error && (error.content || error.message) || String(error);
+}
+
+function goEasyOperation(start) {
+  return new Promise((resolve, reject) => {
+    start({
+      onSuccess: resolve,
+      onFailed: error => reject(new Error(
+        `GoEasy ${error.code ? `(${error.code}) ` : ""}${goEasyErrorMessage(error)}`
+      ))
+    });
+  });
+}
+
+function removeOnlinePeer(peerId) {
+  onlinePeers.delete(peerId);
+  renderUserList();
+  if (!targetConn || targetConn.peer !== peerId) return;
+  clearTimeout(connectionTimer);
+  connectionTimer = null;
+  stopVisiting();
+  targetConn = null;
+  remoteNick = "玩家";
+  remoteCatName = "朋友的猫球";
+  updateRoom();
+  setRoomStatus("对方已离线，已断开中继连接。");
+  appendLog("对方已离线，猫球回家了。", "sys");
+}
+
+function addOnlineMember(member) {
+  if (!member || typeof member.id !== "string" || !member.id || member.id === myPeerId) return;
+  const data = member.data || {};
+  onlinePeers.set(member.id, {
+    nick: typeof data.nickname === "string" ? data.nickname.slice(0, 24) : "玩家",
+    catName: typeof data.catName === "string" ? data.catName.slice(0, 16) : "猫球"
+  });
+  announceTo(member.id);
+}
+
+function handlePresence(event) {
+  if (!event) return;
+  if (event.action === "join") {
+    addOnlineMember(event.member);
+  } else if (event.action === "leave" && event.member && typeof event.member.id === "string") {
+    removeOnlinePeer(event.member.id);
+  }
+  renderUserList();
+  $("#lobbyStatus").textContent = `GoEasy 国内中继已连接 · ${onlinePeers.size} 位玩家在线`;
+}
+
+function onDirectMessage(message) {
+  let envelope;
+  try {
+    envelope = typeof message.content === "string"
+      ? JSON.parse(message.content)
+      : message.content;
+  } catch (error) {
+    console.warn("忽略无法解析的中继消息：", error);
+    return;
+  }
+  if (!envelope || envelope.to !== myPeerId || typeof envelope.from !== "string" ||
+      !onlinePeers.has(envelope.from)) return;
+  const { from, data } = envelope;
+  if (data && data.type === "hello") {
+    const player = onlinePeers.get(from);
+    player.nick = typeof data.nick === "string" ? data.nick.slice(0, 24) : "玩家";
+    player.catName = typeof data.catName === "string" ? data.catName.slice(0, 16) : "猫球";
+    renderUserList();
+    if (targetConn && targetConn.peer === from) {
+      remoteNick = player.nick;
+      remoteCatName = player.catName || "猫球";
+      updateRoom();
+    }
+  }
+  if (!data || typeof data.type !== "string") return;
+  if (data.type === "connectRequest") {
+    handleConnectRequest(from, data);
+  } else if (data.type === "connectAccepted") {
+    if (!targetConn || targetConn.peer !== from) return;
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
+    targetConn.open = true;
+    remoteNick = typeof data.nick === "string" ? data.nick.slice(0, 24) : remoteNick;
+    remoteCatName = typeof data.catName === "string" ? data.catName.slice(0, 16) || "猫球" : remoteCatName;
+    updateRoom();
+    setRoomStatus(`已通过 GoEasy 连接到 ${remoteNick}。`);
+    appendLog("GoEasy 中继连接成功！可以聊天或邀请猫球串门。", "sys");
+  } else if (data.type === "connectRejected") {
+    if (!targetConn || targetConn.peer !== from) return;
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
+    targetConn = null;
+    updateRoom();
+    setRoomStatus(data.reason || "对方暂时无法连接，请稍后重试。");
+  } else if (data.type === "disconnect") {
+    if (!targetConn || targetConn.peer !== from) return;
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
+    targetConn = null;
+    stopVisiting();
+    remoteNick = "玩家";
+    remoteCatName = "朋友的猫球";
+    updateRoom();
+    setRoomStatus("对方已断开 GoEasy 中继连接。");
+    appendLog("对方已断开连接，猫球回家了。", "sys");
+  } else if (targetConn && targetConn.peer === from && targetConn.open) {
+    handleData(data);
+  }
+}
+
+async function setNick() {
   myNick = $("#nameInput").value.trim();
   if (!myNick) {
     alert("名字不能为空");
     return;
   }
-  if (typeof Peer !== "function") {
-    appendLog("PeerJS 加载失败，请刷新页面后重试。", "sys");
+  const GoEasy = window.GoEasy;
+  const appKey = getGoEasyCommonKey();
+  if (!GoEasy || typeof GoEasy.getInstance !== "function") {
+    $("#lobbyStatus").textContent = "GoEasy 组件加载失败，请检查网络后刷新页面。";
+    appendLog("GoEasy WebSocket SDK 加载失败，请检查网络后刷新页面。", "sys");
+    return;
+  }
+  if (!appKey || appKey === "BC-REPLACE_ME") {
+    $("#lobbyStatus").textContent = "尚未配置 GoEasy 服务。请在 connect.html 中填写 GoEasy Common Key。";
+    appendLog("需要先在 GoEasy 控制台创建杭州区域应用，并将 Common Key 填入 connect.html。", "sys");
     return;
   }
   $("#nameInput").disabled = true;
   $("#enterButton").disabled = true;
-  $("#lobbyStatus").textContent = "正在连接信令服务……";
+  $("#lobbyStatus").textContent = "正在连接 GoEasy 国内中继……";
   loadCatName();
   try {
-    peer = new Peer();
-    const activePeer = peer;
-    peerOpenTimer = setTimeout(() => {
-      if (peer !== activePeer || myPeerId) return;
-      peerOpenTimer = null;
-      appendLog("连接信令服务超时，请检查网络后重试。", "sys");
-      $("#lobbyStatus").textContent = "连接信令服务超时，请重试。";
-      activePeer.destroy();
-      peer = null;
-      $("#nameInput").disabled = false;
-      $("#enterButton").disabled = false;
-    }, PEER_OPEN_TIMEOUT);
-    peer.on("open", id => {
-      if (peer !== activePeer) return;
-      clearTimeout(peerOpenTimer);
-      peerOpenTimer = null;
-      myPeerId = id;
-      $("#myInfo").textContent = `已进入大厅：${myNick}（${id}）`;
-      $("#lobbyStatus").textContent = "正在更新在线玩家……";
-      updateLobby();
+    const activeClient = GoEasy.getInstance({
+      host: GOEASY_HOST,
+      appkey: appKey,
+      modules: ["pubsub"]
     });
-    peer.on("connection", conn => bindConnection(conn, true));
-    peer.on("disconnected", () => {
-      if (peer !== activePeer || activePeer.destroyed) return;
-      appendLog("与信令服务断开，正在尝试恢复连接……", "sys");
-      try {
-        activePeer.reconnect();
-      } catch (error) {
-        appendLog(`信令服务重连失败：${error.message || error}`, "sys");
-      }
+    goeasy = activeClient;
+    onlinePeers.clear();
+    myPeerId = `catball-${crypto.randomUUID()}`;
+    $("#myInfo").textContent = `正在进入大厅：${myNick}`;
+    await goEasyOperation(callbacks => activeClient.connect({
+      id: myPeerId,
+      data: { nickname: myNick, catName: myCatName },
+      onProgress: () => {
+        goeasyConnected = false;
+        $("#lobbyStatus").textContent = "GoEasy 正在连接或自动重连……";
+      },
+      ...callbacks
+    }));
+    goeasyConnected = true;
+    $("#myInfo").textContent = `已进入大厅：${myNick}（${myPeerId}）`;
+    await new Promise((resolve, reject) => {
+      activeClient.pubsub.subscribe({
+        channel: LOBBY_CHANNEL,
+        presence: { enable: true },
+        onMessage: () => {},
+        onSuccess: resolve,
+        onFailed: error => reject(new Error(
+          `大厅订阅失败${error.code ? `（${error.code}）` : ""}：${goEasyErrorMessage(error)}`
+        ))
+      });
     });
-    peer.on("error", error => {
-      const message = error.message || error.type || error;
-      appendLog(`Peer 错误：${message}`, "sys");
-      if (!myPeerId && peer === activePeer) {
-        clearTimeout(peerOpenTimer);
-        peerOpenTimer = null;
-        stopLobbyPolling();
-        activePeer.destroy();
-        peer = null;
-        $("#nameInput").disabled = false;
-        $("#enterButton").disabled = false;
-        $("#lobbyStatus").textContent = "无法进入大厅，请检查网络后重试。";
-      } else if (targetConn && !targetConn.open) {
-        setRoomStatus(`连接错误：${message}`);
-      }
+    await new Promise((resolve, reject) => {
+      activeClient.pubsub.subscribe({
+        channel: `${INBOX_CHANNEL_PREFIX}${myPeerId}`,
+        onMessage: onDirectMessage,
+        onSuccess: resolve,
+        onFailed: error => reject(new Error(
+          `消息中继订阅失败${error.code ? `（${error.code}）` : ""}：${goEasyErrorMessage(error)}`
+        ))
+      });
+    });
+    await new Promise((resolve, reject) => {
+      activeClient.pubsub.subscribePresence({
+        channel: LOBBY_CHANNEL,
+        onPresence: handlePresence,
+        onSuccess: resolve,
+        onFailed: error => reject(new Error(
+          `在线列表订阅失败${error.code ? `（${error.code}）` : ""}：${goEasyErrorMessage(error)}`
+        ))
+      });
+    });
+    await new Promise((resolve, reject) => {
+      activeClient.pubsub.hereNow({
+        channel: LOBBY_CHANNEL,
+        limit: 100,
+        onSuccess: response => {
+          const members = response && response.content && response.content.members;
+          if (!Array.isArray(members)) {
+            reject(new Error("GoEasy 在线成员数据格式异常"));
+            return;
+          }
+          members.forEach(addOnlineMember);
+          renderUserList();
+          $("#lobbyStatus").textContent = `GoEasy 国内中继已连接 · ${onlinePeers.size} 位玩家在线`;
+          resolve();
+        },
+        onFailed: error => reject(new Error(
+          `在线成员查询失败${error.code ? `（${error.code}）` : ""}：${goEasyErrorMessage(error)}`
+        ))
+      });
     });
   } catch (error) {
-    clearTimeout(peerOpenTimer);
-    peerOpenTimer = null;
-    peer = null;
+    if (goeasy) {
+      const failedClient = goeasy;
+      goeasy = null;
+      goeasyConnected = false;
+      try {
+        failedClient.disconnect({});
+      } catch (closeError) {
+        console.error("关闭失败的 GoEasy 连接时出错：", closeError);
+      }
+    }
+    myPeerId = "";
+    onlinePeers.clear();
     $("#nameInput").disabled = false;
     $("#enterButton").disabled = false;
-    $("#lobbyStatus").textContent = "无法启动 PeerJS，请检查网络后重试。";
-    appendLog(`无法启动 PeerJS：${error.message || error}`, "sys");
+    $("#lobbyStatus").textContent = `无法进入 GoEasy 大厅：${error.message || error}`;
+    appendLog(`无法进入 GoEasy 大厅：${error.message || error}`, "sys");
   }
 }
 
 function connectToUser(remoteId) {
-  if (!peer || !myPeerId) return;
-  if (targetConn) {
-    if (targetConn.peer !== remoteId) {
-      appendLog("请先断开当前连接。", "sys");
-      return;
-    }
-    if (targetConn.open) {
-      setRoomStatus(`已连接到 ${remoteNick}。`);
-      return;
-    }
-    const outgoingIsPreferred = myPeerId < remoteId;
-    if (targetConnIsOutgoing === outgoingIsPreferred) {
-      setRoomStatus("正在连接这位玩家，请稍候。");
-      return;
-    }
-    if (!outgoingIsPreferred) {
-      setRoomStatus("正在等待对方的连接，请稍候。");
-      return;
-    }
+  if (!goeasyConnected || !myPeerId || !onlinePeers.has(remoteId)) return;
+  if (targetConn && targetConn.peer !== remoteId) {
+    appendLog("请先断开当前连接。", "sys");
+    return;
   }
-  setRoomStatus(`正在连接玩家（${remoteId.slice(0, 8)}…）……`);
-  try {
-    bindConnection(peer.connect(remoteId, { reliable: true }), false);
-  } catch (error) {
-    setRoomStatus(`无法连接玩家：${error.message || error}`);
-    appendLog(`无法发起连接：${error.message || error}`, "sys");
+  if (targetConn && targetConn.peer === remoteId && targetConn.open) {
+    setRoomStatus(`已通过 GoEasy 连接到 ${remoteNick}。`);
+    return;
   }
+  if (targetConn && targetConn.peer === remoteId) {
+    setRoomStatus(`正在等待 ${remoteNick} 确认 GoEasy 连接……`);
+    return;
+  }
+  const player = onlinePeers.get(remoteId);
+  remoteNick = player.nick || "玩家";
+  remoteCatName = player.catName || "朋友的猫球";
+  const selection = { peer: remoteId, open: false };
+  targetConn = selection;
+  updateRoom();
+  setRoomStatus(`正在通过 GoEasy 连接到 ${remoteNick}……`);
+  connectionTimer = setTimeout(() => {
+    if (targetConn !== selection || selection.open) return;
+    connectionTimer = null;
+    targetConn = null;
+    updateRoom();
+    setRoomStatus("等待对方确认连接超时，请重试。");
+  }, 15000);
+  sendToPeer(remoteId, { type: "connectRequest", nick: myNick, catName: myCatName }).catch(error => {
+    if (targetConn !== selection) return;
+    clearTimeout(connectionTimer);
+    connectionTimer = null;
+    targetConn = null;
+    updateRoom();
+    setRoomStatus(`GoEasy 连接失败：${error.message || error}。请刷新大厅后重试。`);
+    appendLog(`GoEasy 连接失败：${error.message || error}`, "sys");
+  });
 }
 
-function bindConnection(conn, isIncoming) {
-  let previousConn = null;
-  if (targetConn && targetConn !== conn) {
-    if (targetConn.peer !== conn.peer) {
-      conn.close();
-      return;
-    }
-
-    const outgoingIsPreferred = myPeerId < conn.peer;
-    const currentIsPreferred = targetConnIsOutgoing === outgoingIsPreferred;
-    const candidateIsPreferred = isIncoming
-      ? !outgoingIsPreferred
-      : outgoingIsPreferred;
-    if (currentIsPreferred || !candidateIsPreferred) {
-      conn.close();
-      return;
-    }
-    previousConn = targetConn;
-    clearTimeout(connectionTimer);
+function handleConnectRequest(from, data) {
+  if (!onlinePeers.has(from)) return;
+  const remoteName = typeof data.nick === "string" ? data.nick.slice(0, 24) : "玩家";
+  if (targetConn && targetConn.peer !== from) {
+    sendToPeer(from, {
+      type: "connectRejected",
+      reason: `${myNick} 正在和其他玩家连接，请稍后再试。`
+    }).catch(error => console.error("无法回复 GoEasy 连接请求：", error));
+    return;
   }
-  targetConn = conn;
-  targetConnIsOutgoing = !isIncoming;
   clearTimeout(connectionTimer);
-  if (previousConn) previousConn.close();
-  let connectionOpened = false;
-  const handleOpen = () => {
-    if (connectionOpened) return;
-    connectionOpened = true;
-    if (targetConn !== conn) {
-      conn.close();
-      return;
-    }
-    clearTimeout(connectionTimer);
-    connectionTimer = null;
-    setRoomStatus("连接成功，正在同步玩家信息……");
-    appendLog("连接成功！可以聊天或邀请猫球串门。", "sys");
-    sendData({ type: "hello", nick: myNick, catName: myCatName });
-    updateRoom();
-    setRoomStatus("已连接。点击“邀请对方猫球来玩”开始串门。");
-  };
-  if (!conn.open) {
-    connectionTimer = setTimeout(() => {
-      if (targetConn !== conn || conn.open) return;
-      connectionTimer = null;
-      targetConn = null;
-      targetConnIsOutgoing = false;
-      stopVisiting();
-      updateRoom();
-      setRoomStatus("连接超时，请重新点击在线玩家。");
-      appendLog("连接超时，请确认对方在线后重试。", "sys");
-      conn.close();
-    }, 20000);
-  }
-  conn.on("open", handleOpen);
-  conn.on("data", handleData);
-  conn.on("close", () => {
-    if (targetConn !== conn) return;
-    clearTimeout(connectionTimer);
-    connectionTimer = null;
-    const wasOpen = connectionOpened;
-    appendLog("连接已断开，猫球回家了。", "sys");
-    stopVisiting();
-    targetConn = null;
-    targetConnIsOutgoing = false;
-    updateRoom();
-    setRoomStatus(wasOpen
-      ? "连接已断开。重新连接一位玩家后，可以邀请猫球串门。"
-      : "连接已关闭，请重新点击在线玩家。");
+  connectionTimer = null;
+  if (!targetConn) targetConn = { peer: from, open: true };
+  else targetConn.open = true;
+  remoteNick = remoteName;
+  remoteCatName = typeof data.catName === "string" ? data.catName.slice(0, 16) || "猫球" : "朋友的猫球";
+  updateRoom();
+  setRoomStatus(`已通过 GoEasy 连接到 ${remoteNick}。`);
+  appendLog(`${remoteNick} 已连接。`, "sys");
+  sendToPeer(from, { type: "connectAccepted", nick: myNick, catName: myCatName }).catch(error => {
+    if (targetConn && targetConn.peer === from) removeOnlinePeer(from);
+    console.error("无法确认中继连接：", error);
   });
-  conn.on("error", error => {
-    if (targetConn !== conn) return;
-    clearTimeout(connectionTimer);
-    connectionTimer = null;
-    appendLog(`连接失败：${error.message || error}`, "sys");
-    stopVisiting();
-    targetConn = null;
-    targetConnIsOutgoing = false;
-    updateRoom();
-    setRoomStatus(`连接失败：${error.message || error}。请重新点击在线玩家。`);
-  });
-  if (conn.open) handleOpen();
 }
 
 function handleInviteRequest(data) {
@@ -709,16 +767,16 @@ function sendChat() {
 
 function closeConn() {
   if (!targetConn) return;
-  const conn = targetConn;
+  sendData({ type: "disconnect" });
   clearTimeout(connectionTimer);
   connectionTimer = null;
   targetConn = null;
-  targetConnIsOutgoing = false;
   stopVisiting();
-  conn.close();
+  remoteNick = "玩家";
+  remoteCatName = "朋友的猫球";
   updateRoom();
   setRoomStatus("连接一位玩家后，可以邀请对方的猫球来串门。");
-  appendLog("已断开连接，猫球回家了。", "sys");
+  appendLog("已断开与玩家的 GoEasy 连接，猫球回家了。", "sys");
 }
 
 $("#inviteButton").addEventListener("click", inviteCat);
@@ -738,10 +796,8 @@ window.addEventListener("storage", event => {
   }
 });
 window.addEventListener("beforeunload", () => {
-  clearTimeout(peerOpenTimer);
-  stopLobbyPolling();
   stopVisiting();
-  if (peer) peer.destroy();
+  if (goeasy) goeasy.disconnect({});
 });
 
 loadCatName();
