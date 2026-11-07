@@ -17,26 +17,39 @@ button:disabled{opacity:.55;cursor:not-allowed}
 #chatLog{height:180px;overflow-y:auto;border:1px solid #aaa;padding:8px}
 .msg{margin:4px 0;overflow-wrap:anywhere}
 .me{color:#0066cc}.other{color:#222}.sys{color:#777}
-.arena{position:relative;height:250px;overflow:hidden;border:2px solid #d5c6a4;border-radius:14px;background:linear-gradient(#e9f7ff 0 70%,#dff0cf 70%);margin:10px 0}
+.arena{position:relative;height:380px;overflow:hidden;border:2px solid #d5c6a4;border-radius:14px;background:linear-gradient(#e9f7ff 0 70%,#dff0cf 70%);margin:10px 0}
 .arena-title{position:absolute;top:10px;left:0;width:100%;text-align:center;color:#596b80;font-size:13px}
-.cat{position:absolute;bottom:22px;width:86px;text-align:center;transition:left .85s ease;z-index:2}
+.cat{position:absolute;bottom:22px;width:86px;height:72px;text-align:center;transition:left .85s ease;z-index:2}
 .cat.local{left:25%}.cat.remote{left:75%;display:none}
 .arena.room-active .cat.remote{display:block}
 .cat img{display:block;width:72px;height:72px;margin:auto;object-fit:contain;animation:cat-hop .55s ease-in-out infinite alternate}
-.cat-name{display:inline-block;max-width:100%;overflow:hidden;padding:2px 8px;border-radius:99px;background:#fff;color:#58497d;font-size:12px;font-weight:700;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 5px #0002}
+.cat-name{position:absolute;top:-34px;left:50%;display:inline-block;max-width:100%;overflow:hidden;padding:2px 8px;border-radius:99px;background:#fff;color:#58497d;font-size:12px;font-weight:700;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 1px 5px #0002;transform:translateX(-50%)}
 @keyframes cat-hop{to{transform:translateY(-5px)}}
-.arena-food{position:absolute;left:50%;top:58%;z-index:3;display:none;font-size:30px;transform:translate(-50%,-50%);animation:food-pop .3s ease-out}
-.arena-food.visible{display:block}
-@keyframes food-pop{from{transform:translate(-50%,-50%) scale(.3)}to{transform:translate(-50%,-50%) scale(1)}}
-.arena-message{position:absolute;top:42%;left:0;z-index:4;width:100%;color:#735124;font-weight:700;text-align:center;text-shadow:0 1px 2px #fff}
+.cat-decoration{position:absolute;z-index:3;display:none;pointer-events:none}
+.cat-decoration.active{display:block}
+.cat-decoration svg{display:block;width:100%;height:100%}
+.cat-sign{top:-4px;left:50%;padding:2px 8px;border:2px solid #fff;border-radius:8px;background:linear-gradient(110deg,#ff5577,#ffbf3f,#55d878,#4ab8ff,#b45cff,#ff5577);background-size:250% 100%;color:#fff;font-size:10px;font-weight:900;line-height:1.4;white-space:nowrap;transform:translateX(-50%);animation:sign-rainbow 2.4s linear infinite;text-shadow:0 1px 2px #0006}
+@keyframes sign-rainbow{to{background-position:250% 0}}
+.cat-ingot{top:-10px;left:50%;width:38px;height:30px;transform:translateX(-50%)}
+.cat-scooter{left:8px;bottom:-3px;width:76px;height:30px}
+.math-board{position:absolute;top:14px;left:50%;z-index:4;display:flex;width:min(420px,calc(100% - 24px));min-height:150px;padding:8px 12px;flex-direction:column;justify-content:center;align-items:stretch;gap:6px;border:4px solid #8a6a3f;border-radius:8px;background:radial-gradient(circle at 20% 30%,#ffffff10 0,transparent 40%),radial-gradient(circle at 80% 70%,#ffffff0d 0,transparent 40%),linear-gradient(135deg,#2c4a3a,#1e3628);box-shadow:0 3px 8px #0004,inset 0 0 26px #0005;color:#e8f2eb;font-family:"Comic Sans MS","PingFang SC","Microsoft YaHei",sans-serif;transform:translateX(-50%)}
+.math-board-title{margin:0;text-align:center;font-size:13px}
+.math-board-controls{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px}
+.math-board select,.math-board input,.math-board button{min-height:30px;padding:4px 8px;border:1px solid #d3ddce;border-radius:5px;font:inherit}
+.math-board input{width:125px;background:#f8fff8;color:#26382d;font-size:16px}
+.math-board select{background:#f8fff8;color:#26382d}
+.math-board button{background:#709878;color:#fff;cursor:pointer}
+.math-board button:disabled{opacity:.55;cursor:not-allowed}
+.math-question{min-height:24px;text-align:center;font-size:20px;font-weight:700;letter-spacing:.5px;text-shadow:0 0 4px #dcffe64d}
+.math-progress-track{height:8px;overflow:hidden;border:1px solid #c1d5c2;border-radius:99px;background:#ffffff20}
+.math-progress-fill{width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#84d69a,#f8dc7d);transition:width .25s ease}
+.math-board-meta,.math-player-status{display:flex;justify-content:space-between;gap:8px;font-size:11px;line-height:1.3}
+.math-board-meta{color:#c4ddcb}
+.math-player-status{padding-top:4px;border-top:1px solid #ffffff30;color:#eef8ee}
+.math-player-status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .visit-sign{position:absolute;top:36px;left:50%;z-index:5;padding:6px 10px;border:2px solid #9a6b36;border-radius:6px;background:#ffe4a8;color:#704716;font-size:13px;font-weight:700;transform:translateX(-50%)}
-.feed-card{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:12px;border:1px solid #ead8aa;border-radius:10px;background:#fffaf0}
-.feed-stock{font-weight:700;color:#805b20}
-.feed-token{display:grid;width:44px;height:44px;place-items:center;border:1px dashed #d4a84e;border-radius:9px;background:#fff;font-size:28px;cursor:grab;touch-action:none}
-.feed-token:active{cursor:grabbing}
-.feed-tip{flex-basis:100%;margin:0;color:#7a715e;font-size:12px}
 [hidden]{display:none!important}
-@media(max-width:520px){.arena{height:220px}.cat.local{left:18%}.cat.remote{left:82%}.feed-card{gap:8px}}
+@media(max-width:520px){.arena{height:390px}.cat.local{left:18%}.cat.remote{left:82%}.math-board{top:12px;min-height:174px;padding:7px 8px}.math-question{font-size:18px}}
 </style>
 </head>
 <body>
@@ -60,25 +73,41 @@ button:disabled{opacity:.55;cursor:not-allowed}
     <div class="visit-sign" id="visitSign" hidden>我的猫球正在串门</div>
     <div class="cat local" id="localCat">
       <span class="cat-name" id="localCatName">猫球</span>
+      <div id="localCosmetic"></div>
       <img src="images/catball.png" alt="">
     </div>
     <div class="cat remote" id="remoteCat">
       <span class="cat-name" id="remoteCatName">朋友的猫球</span>
+      <div id="remoteCosmetic"></div>
       <img src="images/catball.png" alt="">
     </div>
-    <div class="arena-food" id="arenaFood" aria-label="猫粮">🍖</div>
-    <div class="arena-message" id="arenaMessage" aria-live="polite"></div>
+    <div class="math-board" id="mathBoard" aria-label="数学比赛">
+      <h4 class="math-board-title">📋 数学比赛</h4>
+      <div class="math-board-controls" id="mathSetup">
+        <select id="mathQuestionCount" aria-label="每轮题数">
+          <option value="3">3题 · +4积分</option>
+          <option value="5">5题 · +6积分</option>
+          <option value="8">8题 · +11积分</option>
+          <option value="15">15题 · +18积分</option>
+          <option value="20">20题 · +22积分</option>
+        </select>
+        <button id="startMathButton" type="button" disabled>开始</button>
+      </div>
+      <div class="math-question" id="mathQuestion" aria-live="polite">串门成功后开始比赛</div>
+      <div class="math-board-controls" id="mathAnswerControls" hidden>
+        <input id="mathAnswer" type="number" inputmode="numeric" placeholder="填入答案" disabled>
+        <button id="submitMathAnswer" type="button" disabled>提交</button>
+      </div>
+      <div class="math-progress-track" role="progressbar" aria-label="比赛题目进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="math-progress-fill" id="mathProgressFill"></div>
+      </div>
+      <div class="math-board-meta"><span id="mathProgressText">等待串门连接</span><span id="mathTimer">--:--</span></div>
+      <div class="math-player-status"><span id="localPlayerStatus">你：未开始</span><span id="remotePlayerStatus">对方：未开始</span></div>
+      <div class="math-board-meta" id="mathScores"></div>
+      <div class="math-board-meta" id="mathStatus" aria-live="polite">每题先答对得 2 分，后答对得 1 分，答错得 0 分。</div>
+    </div>
   </div>
   <button id="inviteButton" type="button" hidden>邀请对方猫球来玩</button>
-</div>
-<div class="box">
-  <h3>猫粮卡片</h3>
-  <div class="feed-card">
-    <span class="feed-stock">🍖 猫粮：<strong id="foodCount">0</strong></span>
-    <div class="feed-token" id="feedToken" draggable="true" title="拖进活动室，猫球会来抢">🍖</div>
-    <button id="feedButton" type="button">放一份猫粮</button>
-    <p class="feed-tip">拖动猫粮或点击按钮放进活动室；两只猫球会一起抢，放出的猫粮从本机库存扣除。</p>
-  </div>
 </div>
 <div class="box">
   <h3>聊天窗口</h3>
@@ -93,9 +122,11 @@ const GOEASY_COMMON_KEY = "BC-98335ad497924a1e9b8d730919ae0472";
 const GOEASY_HOST = "hangzhou.goeasy.io";
 const LOBBY_CHANNEL = "catball-lobby-syc111syc-githubio-v1";
 const INBOX_CHANNEL_PREFIX = "catball-inbox-";
-const FOOD_KEY = "catball_food_v1";
+const ECONOMY_KEY = "catball_economy_v1";
 const CAT_NAME_KEY = "catball_pet_name_v1";
 const PET_VISIT_KEY = "catball_pet_visit_v1";
+const MATH_PRIZES = { 3: 4, 5: 6, 8: 11, 15: 18, 20: 22 };
+const MATH_QUESTION_SECONDS = 20;
 const $ = selector => document.querySelector(selector);
 
 function getGoEasyCommonKey() {
@@ -114,13 +145,12 @@ let connectionTimer = null;
 const onlinePeers = new Map();
 let visitHeartbeat = null;
 let inviteTimer = null;
-let foodWinnerTimer = null;
-let foodResetTimer = null;
 let visitRole = "";
 let pendingInvite = false;
 let pendingInviteId = "";
 let visitInviteId = "";
-let foodInPlay = null;
+let mathGame = null;
+let paidMathGames = new Set();
 
 function readStorage(key) {
   try {
@@ -141,21 +171,57 @@ function writeStorage(key, value) {
   }
 }
 
-function getFoodCount() {
-  const count = Number.parseInt(readStorage(FOOD_KEY) || "0", 10);
-  return Number.isSafeInteger(count) && count > 0 ? count : 0;
+function getEquippedCosmetic() {
+  try {
+    const data = JSON.parse(readStorage(ECONOMY_KEY) || "{}");
+    const inventory = data.inventory || {};
+    const equipped = inventory.equipped;
+    return ["sign", "scooter", "ingot"].includes(equipped) &&
+      Number.isFinite(inventory[`${equipped}Until`]) &&
+      inventory[`${equipped}Until`] > Date.now() ? equipped : "";
+  } catch (error) {
+    console.warn("无法读取猫球装扮：", error);
+    return "";
+  }
 }
 
-function updateFoodCount() {
-  $("#foodCount").textContent = String(getFoodCount());
-  $("#feedButton").disabled = getFoodCount() < 1 || !foodRoomReady() || Boolean(foodInPlay);
-  $("#feedToken").setAttribute("aria-disabled", String($("#feedButton").disabled));
+function renderCosmetic(element, cosmetic) {
+  const decorations = {
+    sign: {
+      className: "cat-decoration cat-sign active",
+      markup: "最帅猫球"
+    },
+    ingot: {
+      className: "cat-decoration cat-ingot active",
+      markup: '<svg viewBox="0 0 40 40" aria-hidden="true"><path d="m5 23 5-12h20l5 12-5 11H10L5 23Z" fill="#f6bd35" stroke="#a76b13" stroke-width="2"/><path d="m10 11 5 8h10l5-8M15 19l-5 15m15-15 5 15M15 19h10" fill="none" stroke="#ffe98b" stroke-width="2"/></svg>'
+    },
+    scooter: {
+      className: "cat-decoration cat-scooter active",
+      markup: '<svg viewBox="0 0 80 32" aria-hidden="true"><circle cx="13" cy="25" r="5" fill="#7655a8"/><circle cx="65" cy="25" r="5" fill="#7655a8"/><path d="M13 23h43l-13-14H31m12 0h15l10 14m-10-14V3" fill="none" stroke="#65a8d7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M31 9h12" stroke="#ff9d55" stroke-width="4" stroke-linecap="round"/></svg>'
+    }
+  };
+  const decoration = decorations[cosmetic];
+  element.className = decoration ? decoration.className : "";
+  element.innerHTML = decoration ? decoration.markup : "";
+}
+
+function updateCosmetics() {
+  renderCosmetic($("#localCosmetic"), getEquippedCosmetic());
+}
+
+function syncCosmetic() {
+  updateCosmetics();
+  if (targetConn && targetConn.open) {
+    sendData({ type: "cosmetic", cosmetic: getEquippedCosmetic() });
+  }
 }
 
 function loadCatName() {
   myCatName = (readStorage(CAT_NAME_KEY) || "").trim().slice(0, 16) || "猫球";
   $("#localCatName").textContent = myCatName;
-  if (targetConn && targetConn.open) sendData({ type: "catName", name: myCatName });
+  if (targetConn && targetConn.open) {
+    sendData({ type: "catName", name: myCatName });
+  }
 }
 
 function appendLog(text, cls = "sys") {
@@ -196,7 +262,7 @@ function setRoomStatus(text) {
   $("#roomStatus").textContent = text;
 }
 
-function foodRoomReady() {
+function mathRoomReady() {
   return Boolean(targetConn && targetConn.open && visitRole);
 }
 
@@ -206,7 +272,16 @@ function updateRoom() {
   $("#remoteCatName").textContent = remoteCatName;
   $("#inviteButton").hidden = !targetConn || !targetConn.open || active || pendingInvite;
   $("#visitSign").hidden = !(active && visitRole === "visitor");
-  updateFoodCount();
+  $("#startMathButton").disabled = !active || Boolean(mathGame);
+  $("#mathSetup").hidden = !active || Boolean(mathGame);
+  $("#mathAnswerControls").hidden = !mathGame;
+  $("#mathAnswer").disabled = !active || !mathGame ||
+    mathGame.correctPlayers.has(myPeerId) || mathGame.finished || mathGame.deadline <= Date.now();
+  $("#submitMathAnswer").disabled = $("#mathAnswer").disabled;
+  if (!active && !mathGame) {
+    $("#mathProgressText").textContent = "等待串门连接";
+    $("#mathTimer").textContent = "--:--";
+  }
 }
 
 function setVisitMarker() {
@@ -247,13 +322,7 @@ function stopVisiting() {
   pendingInvite = false;
   pendingInviteId = "";
   visitInviteId = "";
-  clearTimeout(foodWinnerTimer);
-  clearTimeout(foodResetTimer);
-  foodWinnerTimer = null;
-  foodResetTimer = null;
-  foodInPlay = null;
-  $("#arenaFood").classList.remove("visible");
-  $("#arenaMessage").textContent = "";
+  if (mathGame) cancelMathGame("串门结束，比赛已取消。");
   updateRoom();
 }
 
@@ -275,7 +344,12 @@ function renderUserList() {
 }
 
 function announceTo(peerId) {
-  sendToPeer(peerId, { type: "hello", nick: myNick, catName: myCatName }).catch(error => {
+  sendToPeer(peerId, {
+    type: "hello",
+    nick: myNick,
+    catName: myCatName,
+    cosmetic: getEquippedCosmetic()
+  }).catch(error => {
     if (error.code === "peer_not_found") removeOnlinePeer(peerId);
     else console.error("无法发送玩家信息：", error);
   });
@@ -316,7 +390,8 @@ function addOnlineMember(member) {
   const data = member.data || {};
   onlinePeers.set(member.id, {
     nick: typeof data.nickname === "string" ? data.nickname.slice(0, 24) : "玩家",
-    catName: typeof data.catName === "string" ? data.catName.slice(0, 16) : "猫球"
+    catName: typeof data.catName === "string" ? data.catName.slice(0, 16) : "猫球",
+    cosmetic: ["sign", "scooter", "ingot"].includes(data.cosmetic) ? data.cosmetic : ""
   });
   announceTo(member.id);
 }
@@ -349,10 +424,12 @@ function onDirectMessage(message) {
     const player = onlinePeers.get(from);
     player.nick = typeof data.nick === "string" ? data.nick.slice(0, 24) : "玩家";
     player.catName = typeof data.catName === "string" ? data.catName.slice(0, 16) : "猫球";
+    player.cosmetic = ["sign", "scooter", "ingot"].includes(data.cosmetic) ? data.cosmetic : "";
     renderUserList();
     if (targetConn && targetConn.peer === from) {
       remoteNick = player.nick;
       remoteCatName = player.catName || "猫球";
+      renderCosmetic($("#remoteCosmetic"), player.cosmetic);
       updateRoom();
     }
   }
@@ -366,6 +443,9 @@ function onDirectMessage(message) {
     targetConn.open = true;
     remoteNick = typeof data.nick === "string" ? data.nick.slice(0, 24) : remoteNick;
     remoteCatName = typeof data.catName === "string" ? data.catName.slice(0, 16) || "猫球" : remoteCatName;
+    const player = onlinePeers.get(from);
+    if (player) player.cosmetic = ["sign", "scooter", "ingot"].includes(data.cosmetic) ? data.cosmetic : "";
+    renderCosmetic($("#remoteCosmetic"), player ? player.cosmetic : "");
     updateRoom();
     setRoomStatus(`已通过 GoEasy 连接到 ${remoteNick}。`);
     appendLog("GoEasy 中继连接成功！可以聊天或邀请猫球串门。", "sys");
@@ -387,6 +467,33 @@ function onDirectMessage(message) {
     updateRoom();
     setRoomStatus("对方已断开 GoEasy 中继连接。");
     appendLog("对方已断开连接，猫球回家了。", "sys");
+  } else if (data.type === "cosmetic") {
+    if (targetConn && targetConn.peer === from) {
+      renderCosmetic($("#remoteCosmetic"),
+        ["sign", "scooter", "ingot"].includes(data.cosmetic) ? data.cosmetic : "");
+    }
+  } else if (data.type === "mathStart") {
+    receiveMathStart(from, data);
+  } else if (data.type === "mathStartRejected") {
+    if (mathGame && mathGame.id === data.gameId && mathGame.host) {
+      cancelMathGame(data.reason || "对方无法开始比赛。");
+    }
+  } else if (data.type === "mathQuestion") {
+    receiveMathQuestion(from, data);
+  } else if (data.type === "mathAnswer") {
+    receiveMathAnswer(from, data);
+  } else if (data.type === "mathPlayerStatus") {
+    receiveMathPlayerStatus(from, data);
+  } else if (data.type === "mathJudgement") {
+    receiveMathJudgement(from, data);
+  } else if (data.type === "mathWrong") {
+    if (mathGame && mathGame.id === data.gameId && data.playerId === myPeerId) {
+      $("#mathStatus").textContent = "答错了，本题暂时没有得分，还可以再试。";
+      $("#mathAnswer").value = "";
+      $("#mathAnswer").focus();
+    }
+  } else if (data.type === "mathFinish") {
+    receiveMathFinish(from, data);
   } else if (targetConn && targetConn.peer === from && targetConn.open) {
     handleData(data);
   }
@@ -426,7 +533,7 @@ async function setNick() {
     $("#myInfo").textContent = `正在进入大厅：${myNick}`;
     await goEasyOperation(callbacks => activeClient.connect({
       id: myPeerId,
-      data: { nickname: myNick, catName: myCatName },
+      data: { nickname: myNick, catName: myCatName, cosmetic: getEquippedCosmetic() },
       onProgress: () => {
         goeasyConnected = false;
         $("#lobbyStatus").textContent = "GoEasy 正在连接或自动重连……";
@@ -523,6 +630,7 @@ function connectToUser(remoteId) {
   const player = onlinePeers.get(remoteId);
   remoteNick = player.nick || "玩家";
   remoteCatName = player.catName || "朋友的猫球";
+  renderCosmetic($("#remoteCosmetic"), player.cosmetic);
   const selection = { peer: remoteId, open: false };
   targetConn = selection;
   updateRoom();
@@ -534,7 +642,12 @@ function connectToUser(remoteId) {
     updateRoom();
     setRoomStatus("等待对方确认连接超时，请重试。");
   }, 15000);
-  sendToPeer(remoteId, { type: "connectRequest", nick: myNick, catName: myCatName }).catch(error => {
+  sendToPeer(remoteId, {
+    type: "connectRequest",
+    nick: myNick,
+    catName: myCatName,
+    cosmetic: getEquippedCosmetic()
+  }).catch(error => {
     if (targetConn !== selection) return;
     clearTimeout(connectionTimer);
     connectionTimer = null;
@@ -561,10 +674,18 @@ function handleConnectRequest(from, data) {
   else targetConn.open = true;
   remoteNick = remoteName;
   remoteCatName = typeof data.catName === "string" ? data.catName.slice(0, 16) || "猫球" : "朋友的猫球";
+  const player = onlinePeers.get(from);
+  if (player) player.cosmetic = ["sign", "scooter", "ingot"].includes(data.cosmetic) ? data.cosmetic : "";
+  renderCosmetic($("#remoteCosmetic"), player ? player.cosmetic : "");
   updateRoom();
   setRoomStatus(`已通过 GoEasy 连接到 ${remoteNick}。`);
   appendLog(`${remoteNick} 已连接。`, "sys");
-  sendToPeer(from, { type: "connectAccepted", nick: myNick, catName: myCatName }).catch(error => {
+  sendToPeer(from, {
+    type: "connectAccepted",
+    nick: myNick,
+    catName: myCatName,
+    cosmetic: getEquippedCosmetic()
+  }).catch(error => {
     if (targetConn && targetConn.peer === from) removeOnlinePeer(from);
     console.error("无法确认中继连接：", error);
   });
@@ -613,6 +734,11 @@ function handleData(data) {
   if (data.type === "hello") {
     remoteNick = typeof data.nick === "string" ? data.nick.slice(0, 24) : "玩家";
     if (typeof data.catName === "string") remoteCatName = data.catName.slice(0, 16) || "猫球";
+    const player = onlinePeers.get(targetConn.peer);
+    if (player) {
+      player.cosmetic = ["sign", "scooter", "ingot"].includes(data.cosmetic) ? data.cosmetic : "";
+      renderCosmetic($("#remoteCosmetic"), player.cosmetic);
+    }
     updateRoom();
   } else if (data.type === "catName") {
     if (typeof data.name === "string") {
@@ -652,10 +778,6 @@ function handleData(data) {
       appendLog("串门邀请已过期，猫球回家了。", "sys");
       setRoomStatus("串门邀请已过期，猫球回家了。");
     }
-  } else if (data.type === "foodDrop") {
-    handleFoodDrop(data);
-  } else if (data.type === "foodWinner") {
-    handleFoodWinner(data);
   }
 }
 
@@ -683,73 +805,419 @@ function inviteCat() {
   }, 30000);
 }
 
-function showFoodDrop(data) {
-  foodInPlay = { id: data.id, ownerId: data.ownerId };
-  $("#arenaFood").classList.add("visible");
-  $("#arenaMessage").textContent = "猫粮出现了！猫球开抢！";
-  $("#localCat").style.left = "46%";
-  $("#remoteCat").style.left = "54%";
-  updateFoodCount();
+function randomOperand() {
+  return Math.floor(Math.random() * 1000);
 }
 
-function handleFoodDrop(data) {
-  if (!foodRoomReady() || typeof data.id !== "string" || data.ownerId !== targetConn.peer) return;
-  if (foodInPlay) return;
-  showFoodDrop(data);
+function makeMathQuestion() {
+  const operators = ["+", "-", "*", "/"];
+  const operator = operators[Math.floor(Math.random() * operators.length)];
+  let a = randomOperand();
+  let b = randomOperand();
+  if (operator === "-" && a < b) [a, b] = [b, a];
+  if (operator === "/") {
+    b = 1 + Math.floor(Math.random() * 31);
+    const quotient = 1 + Math.floor(Math.random() * Math.floor(999 / b));
+    a = b * quotient;
+  }
+  const answer = operator === "+" ? a + b
+    : operator === "-" ? a - b
+      : operator === "*" ? a * b
+        : a / b;
+  return { a, b, operator, answer };
 }
 
-function handleFoodWinner(data) {
-  if (!foodInPlay || data.id !== foodInPlay.id || !targetConn ||
-      ![myPeerId, targetConn.peer].includes(data.winnerId)) return;
-  const winnerName = data.winnerId === myPeerId ? myCatName : remoteCatName;
-  $("#arenaMessage").textContent = `${winnerName}抢到了猫粮！`;
-  $("#arenaFood").classList.remove("visible");
-  foodInPlay = null;
-  clearTimeout(foodWinnerTimer);
-  updateFoodCount();
-  clearTimeout(foodResetTimer);
-  foodResetTimer = setTimeout(() => {
-    $("#arenaMessage").textContent = "";
-    $("#localCat").style.left = "";
-    $("#remoteCat").style.left = "";
-  }, 2200);
+function isValidMathQuestion(question) {
+  if (!question || !Number.isInteger(question.a) || question.a < 0 || question.a > 999 ||
+      !Number.isInteger(question.b) || question.b < 0 || question.b > 999 ||
+      !["+", "-", "*", "/"].includes(question.operator) ||
+      !Number.isSafeInteger(question.answer)) return false;
+  if (question.operator === "/" && question.b === 0) return false;
+  const expected = question.operator === "+" ? question.a + question.b
+    : question.operator === "-" ? question.a - question.b
+      : question.operator === "*" ? question.a * question.b
+        : question.a / question.b;
+  return Number.isInteger(expected) && expected === question.answer;
 }
 
-function dropFood() {
-  if (!foodRoomReady()) {
-    appendLog("先连接玩家并完成猫球串门邀请，才能一起抢猫粮。", "sys");
+function renderMathRound() {
+  if (!mathGame) return;
+  const question = mathGame.questions[mathGame.index];
+  $("#mathQuestion").textContent = `第 ${mathGame.index + 1}/${mathGame.questions.length} 题：${question.a} ${question.operator} ${question.b} = ?`;
+  $("#mathScores").textContent =
+    `${myNick}：${mathGame.scores[myPeerId]} 分　${remoteNick}：${mathGame.scores[targetConn.peer]} 分`;
+  renderMathProgress();
+  $("#mathAnswer").value = "";
+  $("#mathAnswer").disabled = mathGame.correctPlayers.has(myPeerId);
+  $("#submitMathAnswer").disabled = $("#mathAnswer").disabled;
+  updateRoom();
+}
+
+function createMathGame() {
+  if (!mathRoomReady() || mathGame) return;
+  const count = Number($("#mathQuestionCount").value);
+  const prize = MATH_PRIZES[count];
+  if (!prize) return;
+  const id = `${myPeerId}:${crypto.randomUUID()}`;
+  const questions = Array.from({ length: count }, makeMathQuestion);
+  mathGame = {
+    id,
+    host: true,
+    hostId: myPeerId,
+    questions,
+    prize,
+    scores: { [myPeerId]: 0, [targetConn.peer]: 0 },
+    index: 0,
+    firstCorrectId: "",
+    correctPlayers: new Set(),
+    playerStatus: { [myPeerId]: "答题中", [targetConn.peer]: "答题中" },
+    questionTimer: null,
+    timerInterval: null,
+    advanceTimer: null,
+    advancing: false
+  };
+  const startedAt = Date.now();
+  if (!sendData({ type: "mathStart", gameId: id, questions, prize, startedAt })) {
+    cancelMathGame("比赛开始消息发送失败，请重试。");
     return;
   }
-  if (foodInPlay) {
-    setRoomStatus("上一份猫粮还在抢，等猫球吃完再放吧。");
+  beginMathQuestion(0, startedAt);
+  appendLog(`数学比赛开始：${count} 题，赢家获得 ${prize} 积分。`, "sys");
+}
+
+function receiveMathStart(from, data) {
+  if (!targetConn || targetConn.peer !== from || !mathRoomReady() ||
+      typeof data.gameId !== "string" || data.gameId.length > 100 ||
+      !Array.isArray(data.questions) ||
+      ![3, 5, 8, 15, 20].includes(data.questions.length) ||
+      MATH_PRIZES[data.questions.length] !== data.prize ||
+      !Number.isFinite(data.startedAt) ||
+      data.questions.some(question => !isValidMathQuestion(question))) return;
+  if (mathGame) {
+    if (mathGame.id === data.gameId) return;
+    sendData({
+      type: "mathStartRejected",
+      gameId: data.gameId,
+      reason: "对方正在进行另一场比赛。"
+    });
     return;
   }
-  const count = getFoodCount();
-  if (count < 1) {
-    setRoomStatus("本机没有猫粮了，请先回首页获取猫粮。");
+  mathGame = {
+    id: data.gameId,
+    host: false,
+    hostId: from,
+    questions: data.questions,
+    prize: data.prize,
+    scores: { [myPeerId]: 0, [from]: 0 },
+    index: 0,
+    firstCorrectId: "",
+    correctPlayers: new Set(),
+    playerStatus: { [myPeerId]: "答题中", [from]: "答题中" },
+    questionTimer: null,
+    timerInterval: null,
+    advanceTimer: null,
+    advancing: false
+  };
+  beginMathQuestion(0, data.startedAt);
+  appendLog(`收到数学比赛邀请：${data.questions.length} 题，赢家获得 ${data.prize} 积分。`, "sys");
+}
+
+function beginMathQuestion(index, startedAt = Date.now()) {
+  if (!mathGame || index < 0 || index >= mathGame.questions.length) return;
+  clearTimeout(mathGame.questionTimer);
+  clearInterval(mathGame.timerInterval);
+  clearTimeout(mathGame.advanceTimer);
+  mathGame.index = index;
+  mathGame.startedAt = startedAt;
+  mathGame.deadline = startedAt + MATH_QUESTION_SECONDS * 1000;
+  mathGame.firstCorrectId = "";
+  mathGame.correctPlayers.clear();
+  mathGame.playerStatus[myPeerId] = "答题中";
+  mathGame.playerStatus[targetConn.peer] = "答题中";
+  mathGame.advancing = false;
+  renderMathRound();
+  $("#mathStatus").textContent = `本题限时 ${MATH_QUESTION_SECONDS} 秒。先答对得 2 分，后答对得 1 分，答错得 0 分。`;
+  updateMathTimer();
+  mathGame.timerInterval = setInterval(updateMathTimer, 200);
+  if (mathGame.host) {
+    mathGame.questionTimer = setTimeout(
+      advanceMathQuestion,
+      Math.max(0, mathGame.deadline - Date.now())
+    );
+  }
+}
+
+function updateMathTimer() {
+  if (!mathGame || mathGame.finished) return;
+  const seconds = Math.max(0, Math.ceil((mathGame.deadline - Date.now()) / 1000));
+  $("#mathTimer").textContent = `00:${String(seconds).padStart(2, "0")}`;
+}
+
+function renderMathProgress() {
+  if (!mathGame) return;
+  const total = mathGame.questions.length;
+  const percent = Math.floor(((mathGame.index + (mathGame.advancing ? 1 : 0)) / total) * 100);
+  const track = $(".math-progress-track");
+  $("#mathProgressFill").style.width = `${percent}%`;
+  track.setAttribute("aria-valuenow", String(percent));
+  $("#mathProgressText").textContent = `第 ${mathGame.index + 1} / ${total} 题`;
+  $("#localPlayerStatus").textContent = `你：${mathGame.playerStatus[myPeerId]}`;
+  $("#remotePlayerStatus").textContent =
+    `${remoteNick}：${mathGame.playerStatus[targetConn.peer]}`;
+}
+
+function setMathPlayerStatus(playerId, status, notifyPeer = false) {
+  if (!mathGame || !["答题中", "已提交", "答错，继续答题", "已答对"].includes(status)) return;
+  mathGame.playerStatus[playerId] = status;
+  renderMathProgress();
+  if (notifyPeer) {
+    sendData({ type: "mathPlayerStatus", gameId: mathGame.id, playerId, status });
+  }
+}
+
+function submitMathAnswer() {
+  if (!mathGame || mathGame.correctPlayers.has(myPeerId) ||
+      !mathRoomReady()) return;
+  const answer = Number($("#mathAnswer").value);
+  if (!Number.isSafeInteger(answer) || $("#mathAnswer").value.trim() === "") {
+    $("#mathStatus").textContent = "请输入整数答案。";
     return;
   }
-  const foodId = `${myPeerId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-  if (!writeStorage(FOOD_KEY, String(count - 1))) {
-    setRoomStatus("猫粮库存保存失败，没有放出猫粮。");
-    return;
+  const message = {
+    type: "mathAnswer",
+    gameId: mathGame.id,
+    index: mathGame.index,
+    answer
+  };
+  if (mathGame.host) {
+    processMathAnswer(myPeerId, message);
+  } else if (sendData(message)) {
+    $("#mathStatus").textContent = "答案已提交，等待裁定……";
   }
-  const data = { type: "foodDrop", id: foodId, ownerId: myPeerId };
-  if (!sendData(data)) {
-    if (!writeStorage(FOOD_KEY, String(count))) {
-      appendLog("猫粮已放出但未能返还库存，请检查本地存储。", "sys");
+  if (!mathGame.host && !mathGame.correctPlayers.has(myPeerId)) {
+    setMathPlayerStatus(myPeerId, "已提交", true);
+  }
+}
+
+function receiveMathAnswer(from, data) {
+  if (!mathGame || !mathGame.host || !targetConn || targetConn.peer !== from) return;
+  processMathAnswer(from, data);
+}
+
+function processMathAnswer(playerId, data) {
+  if (!mathGame || !mathGame.host || mathGame.advancing ||
+      Date.now() >= mathGame.deadline ||
+      data.gameId !== mathGame.id || data.index !== mathGame.index ||
+      ![myPeerId, targetConn.peer].includes(playerId) ||
+      mathGame.correctPlayers.has(playerId)) return;
+  const question = mathGame.questions[mathGame.index];
+  if (data.answer !== question.answer) {
+    if (playerId === myPeerId) {
+      $("#mathStatus").textContent = "答错了，本题暂时没有得分，还可以再试。";
+      $("#mathAnswer").value = "";
+      $("#mathAnswer").focus();
+      setMathPlayerStatus(playerId, "答错，继续答题", true);
+    } else {
+      sendData({ type: "mathWrong", gameId: mathGame.id, playerId });
+      setMathPlayerStatus(playerId, "答错，继续答题", true);
     }
-    updateFoodCount();
     return;
   }
-  updateFoodCount();
-  showFoodDrop(data);
-  foodWinnerTimer = setTimeout(() => {
-    if (!foodInPlay || foodInPlay.id !== foodId || !targetConn || !targetConn.open) return;
-    const winnerId = Math.random() < 0.5 ? myPeerId : targetConn.peer;
-    sendData({ type: "foodWinner", id: foodId, winnerId });
-    handleFoodWinner({ id: foodId, winnerId });
-  }, 1100);
+  const first = mathGame.correctPlayers.size === 0;
+  const correctPlayers = [...mathGame.correctPlayers, playerId];
+  const scores = {
+    ...mathGame.scores,
+    [playerId]: mathGame.scores[playerId] + (first ? 2 : 1)
+  };
+  const judgement = {
+    type: "mathJudgement",
+    gameId: mathGame.id,
+    index: mathGame.index,
+    playerId,
+    first,
+    correctPlayers,
+    scores
+  };
+  applyMathJudgement(judgement);
+  sendData(judgement);
+  if (mathGame.correctPlayers.size === 2) {
+    mathGame.advancing = true;
+    clearTimeout(mathGame.questionTimer);
+    renderMathProgress();
+    $("#mathStatus").textContent = "本题答完，准备下一题……";
+    mathGame.advanceTimer = setTimeout(advanceMathQuestion, 1000);
+  }
+}
+
+function receiveMathJudgement(from, data) {
+  if (!mathGame || mathGame.host || from !== mathGame.hostId ||
+      data.gameId !== mathGame.id || data.index !== mathGame.index ||
+      ![myPeerId, from].includes(data.playerId) ||
+      typeof data.first !== "boolean" ||
+      !Array.isArray(data.correctPlayers) ||
+      !data.correctPlayers.every(id => [myPeerId, from].includes(id)) ||
+      !data.scores || !Number.isSafeInteger(data.scores[myPeerId]) ||
+      !Number.isSafeInteger(data.scores[from])) return;
+  applyMathJudgement(data);
+}
+
+function receiveMathPlayerStatus(from, data) {
+  if (!mathGame || data.gameId !== mathGame.id ||
+      !["答题中", "已提交", "答错，继续答题", "已答对"].includes(data.status)) return;
+  if (mathGame.host && from === targetConn.peer && data.playerId === from) {
+    setMathPlayerStatus(from, data.status, true);
+  } else if (!mathGame.host && from === mathGame.hostId &&
+      [myPeerId, from].includes(data.playerId)) {
+    setMathPlayerStatus(data.playerId, data.status);
+  }
+}
+
+function applyMathJudgement(data) {
+  if (!mathGame || data.gameId !== mathGame.id || data.index !== mathGame.index) return;
+  mathGame.correctPlayers = new Set(data.correctPlayers);
+  mathGame.scores = { ...data.scores };
+  mathGame.playerStatus[data.playerId] = "已答对";
+  renderMathRound();
+  const points = data.first ? 2 : 1;
+  $("#mathStatus").textContent =
+    `${data.playerId === myPeerId ? "你" : remoteNick}${data.first ? "先" : "后"}答对，本题 +${points} 分。`;
+  if (!mathGame.host && mathGame.correctPlayers.size === 2) {
+    mathGame.advancing = true;
+    $("#mathStatus").textContent = "本题答完，等待下一题……";
+  }
+}
+
+function receiveMathQuestion(from, data) {
+  if (!mathGame || mathGame.host || from !== mathGame.hostId ||
+      data.gameId !== mathGame.id || !Number.isInteger(data.index) ||
+      !Number.isFinite(data.startedAt) ||
+      data.index !== mathGame.index + 1 ||
+      data.index >= mathGame.questions.length) return;
+  beginMathQuestion(data.index, data.startedAt);
+}
+
+function advanceMathQuestion() {
+  if (!mathGame || !mathGame.host) return;
+  mathGame.advancing = true;
+  renderMathProgress();
+  const nextIndex = mathGame.index + 1;
+  if (nextIndex >= mathGame.questions.length) {
+    finishMathGame();
+    return;
+  }
+  const startedAt = Date.now();
+  sendData({ type: "mathQuestion", gameId: mathGame.id, index: nextIndex, startedAt });
+  beginMathQuestion(nextIndex, startedAt);
+}
+
+function awardMathPrize(gameId, prize) {
+  if (paidMathGames.has(gameId)) return true;
+  let economy;
+  try {
+    economy = JSON.parse(readStorage(ECONOMY_KEY) || "{}");
+  } catch (error) {
+    console.error("无法读取积分数据：", error);
+    return false;
+  }
+  const points = Number(economy.points);
+  if (!Number.isSafeInteger(points) || points < 0 ||
+      !Number.isSafeInteger(points + prize)) return false;
+  economy.points = points + prize;
+  if (!economy.inventory || typeof economy.inventory !== "object" || Array.isArray(economy.inventory)) {
+    economy.inventory = {};
+  }
+  if (!writeStorage(ECONOMY_KEY, JSON.stringify(economy))) return false;
+  paidMathGames.add(gameId);
+  return true;
+}
+
+function finishMathGame() {
+  if (!mathGame || !mathGame.host) return;
+  const game = mathGame;
+  clearTimeout(game.questionTimer);
+  clearTimeout(game.advanceTimer);
+  const localScore = game.scores[myPeerId];
+  const remoteScore = game.scores[targetConn.peer];
+  const winnerId = localScore === remoteScore ? "" : localScore > remoteScore ? myPeerId : targetConn.peer;
+  const result = {
+    type: "mathFinish",
+    gameId: game.id,
+    scores: game.scores,
+    winnerId,
+    prize: game.prize
+  };
+  sendData(result);
+  showMathResult(result);
+}
+
+function receiveMathFinish(from, data) {
+  const maxScore = mathGame ? mathGame.questions.length * 2 : 0;
+  const localScore = data.scores && data.scores[myPeerId];
+  const remoteScore = data.scores && data.scores[from];
+  const expectedWinner = localScore === remoteScore ? ""
+    : localScore > remoteScore ? myPeerId : from;
+  if (!mathGame || mathGame.host || from !== mathGame.hostId ||
+      data.gameId !== mathGame.id || !data.scores ||
+      !Number.isSafeInteger(localScore) || localScore < 0 || localScore > maxScore ||
+      !Number.isSafeInteger(remoteScore) || remoteScore < 0 || remoteScore > maxScore ||
+      data.winnerId !== expectedWinner ||
+      data.prize !== mathGame.prize) return;
+  showMathResult(data);
+}
+
+function showMathResult(result) {
+  if (!mathGame || result.gameId !== mathGame.id) return;
+  const game = mathGame;
+  game.finished = true;
+  clearTimeout(game.questionTimer);
+  clearInterval(game.timerInterval);
+  clearTimeout(game.advanceTimer);
+  game.scores = { ...result.scores };
+  const winnerName = result.winnerId === myPeerId ? myNick
+    : result.winnerId ? remoteNick : "";
+  let status;
+  if (!result.winnerId) {
+    status = `比赛平局（${game.scores[myPeerId]}：${game.scores[targetConn.peer]}），本轮不发积分。`;
+  } else if (result.winnerId === myPeerId) {
+    status = awardMathPrize(game.id, game.prize)
+      ? `你赢了！获得 ${game.prize} 积分。`
+      : `你赢了！积分保存失败，请检查浏览器存储空间。`;
+  } else {
+    status = `${winnerName}获胜，得到 ${game.prize} 积分。`;
+  }
+  $("#mathQuestion").textContent = "本轮比赛结束";
+  $("#mathProgressFill").style.width = "100%";
+  $(".math-progress-track").setAttribute("aria-valuenow", "100");
+  $("#mathProgressText").textContent = `完成 ${game.questions.length} / ${game.questions.length} 题`;
+  $("#mathTimer").textContent = "00:00";
+  $("#localPlayerStatus").textContent = `你：${result.winnerId === myPeerId ? "获胜" : result.winnerId ? "完成" : "平局"}`;
+  $("#remotePlayerStatus").textContent =
+    `${remoteNick}：${result.winnerId === targetConn.peer ? "获胜" : result.winnerId ? "完成" : "平局"}`;
+  $("#mathScores").textContent =
+    `${myNick}：${game.scores[myPeerId]} 分　${remoteNick}：${game.scores[targetConn.peer]} 分`;
+  $("#mathStatus").textContent = status;
+  mathGame = null;
+  updateRoom();
+  appendLog(status, "sys");
+}
+
+function cancelMathGame(message) {
+  if (mathGame) {
+    clearTimeout(mathGame.questionTimer);
+    clearInterval(mathGame.timerInterval);
+    clearTimeout(mathGame.advanceTimer);
+  }
+  mathGame = null;
+  $("#mathQuestion").textContent = "串门成功后可以开始比赛。";
+  $("#mathStatus").textContent = message;
+  $("#mathScores").textContent = "";
+  $("#mathProgressFill").style.width = "0%";
+  $(".math-progress-track").setAttribute("aria-valuenow", "0");
+  $("#mathProgressText").textContent = "等待串门连接";
+  $("#mathTimer").textContent = "--:--";
+  $("#localPlayerStatus").textContent = "你：未开始";
+  $("#remotePlayerStatus").textContent = "对方：未开始";
+  updateRoom();
 }
 
 function sendChat() {
@@ -780,20 +1248,16 @@ function closeConn() {
 }
 
 $("#inviteButton").addEventListener("click", inviteCat);
-$("#feedButton").addEventListener("click", dropFood);
-$("#feedToken").addEventListener("dragstart", event => {
-  event.dataTransfer.setData("text/plain", "cat-food");
-});
-$("#arena").addEventListener("dragover", event => event.preventDefault());
-$("#arena").addEventListener("drop", event => {
-  event.preventDefault();
-  if (event.dataTransfer.getData("text/plain") === "cat-food") dropFood();
+$("#startMathButton").addEventListener("click", createMathGame);
+$("#submitMathAnswer").addEventListener("click", submitMathAnswer);
+$("#mathAnswer").addEventListener("keydown", event => {
+  if (event.key === "Enter") submitMathAnswer();
 });
 window.addEventListener("storage", event => {
-  if (event.key === FOOD_KEY) updateFoodCount();
   if (event.key === CAT_NAME_KEY) {
     loadCatName();
   }
+  if (event.key === ECONOMY_KEY) syncCosmetic();
 });
 window.addEventListener("beforeunload", () => {
   stopVisiting();
@@ -801,7 +1265,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 loadCatName();
-updateFoodCount();
+updateCosmetics();
 updateRoom();
 </script>
 </body>
