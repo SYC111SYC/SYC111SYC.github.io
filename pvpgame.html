@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10172b">
+  <title>猫球对决 · Catball Arena</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10172b;
+      --panel: rgba(26, 36, 61, .92);
+      --line: rgba(177, 196, 255, .16);
+      --muted: #9aa8c8;
+      --mint: #7af3d1;
+      --pink: #ff83a8;
+      --gold: #ffd675;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: #f3f5ff;
+      background:
+        radial-gradient(ellipse at 50% -18%, rgba(86, 122, 207, .28), transparent 55%),
+        radial-gradient(ellipse at 100% 80%, rgba(200, 89, 143, .12), transparent 35%),
+        var(--bg);
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    button { font: inherit; }
+    .page { width: min(1120px, calc(100% - 28px)); margin: 0 auto; padding: 18px 0 24px; }
+    .topbar, .heading, .hud, .hud-side, .actions, .footer { display: flex; align-items: center; }
+    .topbar, .heading { justify-content: space-between; gap: 16px; }
+    .topbar { margin-bottom: 22px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 900; letter-spacing: .15em; }
+    .brand-mark {
+      display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(122,243,209,.5);
+      border-radius: 12px; color: var(--mint); background: rgba(122,243,209,.09); font-size: 19px;
+      box-shadow: 0 0 24px rgba(122,243,209,.1);
+    }
+    .actions { gap: 8px; }
+    .quiet, .mode-button, .primary, .touch-controls button {
+      border: 1px solid var(--line); border-radius: 11px; color: #e8edff; background: rgba(255,255,255,.045);
+      cursor: pointer; transition: transform .15s, border-color .15s, background .15s;
+    }
+    .quiet { min-height: 38px; padding: 0 12px; font-size: 12px; }
+    .quiet:hover, .mode-button:hover { border-color: rgba(122,243,209,.45); background: rgba(122,243,209,.08); }
+    .heading { align-items: end; margin-bottom: 17px; }
+    .eyebrow { margin: 0 0 7px; color: var(--mint); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
+    h1 { margin: 0; font-size: clamp(29px, 4vw, 43px); letter-spacing: -.04em; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .points { flex: 0 0 auto; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.035); text-align: right; }
+    .points small { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; }
+    .points strong { color: var(--gold); font-size: 19px; }
+    .game-card { overflow: hidden; border: 1px solid rgba(170,190,255,.19); border-radius: 18px; background: var(--panel); box-shadow: 0 24px 80px rgba(0,0,0,.32); }
+    .hud { justify-content: space-between; gap: 16px; min-height: 77px; padding: 12px 19px; border-bottom: 1px solid var(--line); }
+    .hud-side { gap: 13px; min-width: 0; }
+    .hud-side.right { justify-content: flex-end; text-align: right; }
+    .cat-icon { width: 40px; height: 40px; object-fit: contain; }
+    .player-name { max-width: 145px; overflow: hidden; color: #fff; font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .health { display: flex; width: 145px; height: 8px; overflow: hidden; margin-top: 7px; border-radius: 9px; background: #39435f; }
+    .health span { width: 100%; border-radius: inherit; background: linear-gradient(90deg, #73ebc2, #b5f17e); transition: width .18s; }
+    .right .health span { margin-left: auto; background: linear-gradient(90deg, #ffca7b, #ff799f); }
+    .vs { color: #8997b8; font-size: 11px; font-weight: 900; letter-spacing: .1em; }
+    .arena { position: relative; overflow: hidden; background: #182b36; }
+    canvas { display: block; width: 100%; aspect-ratio: 16 / 9; touch-action: none; }
+    .overlay {
+      position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 18px;
+      background: rgba(9, 14, 29, .72); backdrop-filter: blur(5px);
+    }
+    .overlay-card {
+      width: min(510px, 100%); max-height: 100%; overflow: auto; padding: 25px;
+      border: 1px solid rgba(178,197,255,.22); border-radius: 17px; background: rgba(23,31,54,.96);
+      box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center;
+    }
+    .overlay-icon {
+      display: grid; width: 48px; height: 48px; margin: 0 auto 13px; place-items: center;
+      border: 1px solid rgba(122,243,209,.34); border-radius: 15px; color: var(--mint);
+      background: rgba(122,243,209,.08); font-size: 23px;
+    }
+    .overlay-card h2 { margin: 0 0 8px; font-size: 23px; }
+    .overlay-card p { margin: 0 auto 17px; color: #a7b2ce; font-size: 12px; line-height: 1.75; }
+    .mode-list { display: grid; gap: 9px; }
+    .mode-button { min-height: 48px; padding: 9px 13px; text-align: left; }
+    .mode-button strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .mode-button span { color: var(--muted); font-size: 10px; }
+    .primary { min-height: 43px; padding: 0 22px; border: 0; color: #11242d; background: linear-gradient(135deg,#82f5d4,#7fc7ff); font-size: 13px; font-weight: 900; }
+    .primary:hover { transform: translateY(-2px); }
+    .overlay-status { min-height: 18px; margin-top: 13px; color: var(--mint); font-size: 11px; }
+    .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-top: 12px; }
+    .info { min-height: 66px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.028); }
+    .info strong { display: block; margin-bottom: 5px; font-size: 11px; }
+    .info span { color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .touch-controls { display: none; grid-template-columns: repeat(5, 1fr); gap: 7px; padding: 10px; border-top: 1px solid var(--line); }
+    .touch-controls button { min-height: 46px; padding: 4px; font-size: 11px; font-weight: 800; touch-action: none; user-select: none; }
+    .touch-controls button:active, .touch-controls button.active { border-color: rgba(122,243,209,.6); color: var(--mint); background: rgba(122,243,209,.12); }
+    .footer { justify-content: space-between; gap: 12px; margin-top: 14px; color: #74809f; font-size: 10px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 700px) {
+      .page { width: min(100% - 18px, 620px); padding-top: 12px; }
+      .topbar { margin-bottom: 17px; }
+      .heading { align-items: start; }
+      .subtitle { max-width: 90%; font-size: 11px; }
+      .points { padding: 8px 10px; }
+      .points strong { font-size: 16px; }
+      .hud { min-height: 64px; gap: 5px; padding: 8px 10px; }
+      .hud-side { gap: 7px; }
+      .cat-icon { width: 32px; height: 32px; }
+      .player-name { max-width: 105px; font-size: 10px; }
+      .health { width: min(25vw, 115px); height: 7px; }
+      .touch-controls { display: grid; }
+      .bottom { grid-template-columns: 1fr; gap: 7px; margin-top: 8px; }
+      .info { min-height: auto; padding: 9px 11px; }
+      .overlay-card { padding: 18px; }
+      .footer { font-size: 9px; }
+    }
+    @media (max-width: 390px) {
+      .brand { font-size: 10px; }
+      .quiet { min-height: 34px; padding: 0 8px; font-size: 10px; }
+      .hud { padding-right: 7px; padding-left: 7px; }
+      .player-name { max-width: 82px; font-size: 9px; }
+      .health { width: 22vw; }
+      .touch-controls { gap: 4px; padding: 7px; }
+      .touch-controls button { min-height: 42px; font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><span>CATBALL&nbsp; / &nbsp;ARENA</span></div>
+      <div class="actions">
+        <button class="quiet" id="menuButton" type="button">模式菜单</button>
+        <a class="quiet" href="index.html" style="display:inline-flex;align-items:center;text-decoration:none">返回首页</a>
+      </div>
+    </header>
+    <section class="heading">
+      <div>
+        <p class="eyebrow">猫球擂台 · 拾取装备 · 灵活走位</p>
+        <h1>猫球对决</h1>
+        <p class="subtitle">抢先拾取道具，瞄准对手出击。获胜可得 12 积分，装扮和猫球名字与首页同步。</p>
+      </div>
+      <div class="points"><small>猫球积分</small><strong id="pointsValue">0</strong></div>
+    </section>
+    <section class="game-card" aria-label="猫球对决游戏">
+      <div class="hud">
+        <div class="hud-side">
+          <img class="cat-icon" src="images/catball.png" alt="">
+          <div><div class="player-name" id="p1Name">玩家 1</div><div class="health"><span id="p1Health"></span></div></div>
+        </div>
+        <div class="vs">VS</div>
+        <div class="hud-side right">
+          <div><div class="player-name" id="p2Name">玩家 2</div><div class="health"><span id="p2Health"></span></div></div>
+          <img class="cat-icon" src="images/catball.png" alt="">
+        </div>
+      </div>
+      <div class="arena">
+        <canvas id="arenaCanvas" width="960" height="540" aria-label="猫球战斗场地"></canvas>
+        <div class="overlay" id="overlay">
+          <div class="overlay-card">
+            <div class="overlay-icon" id="overlayIcon">🐾</div>
+            <h2 id="overlayTitle">准备好开战了吗？</h2>
+            <p id="overlayCopy">收集场地道具并击败对手。生命值归零时战斗结束。</p>
+            <div class="mode-list" id="modeList">
+              <button class="mode-button" type="button" data-mode="ai"><strong>🤖 人机对战</strong><span>WASD 移动 · 鼠标瞄准 · 空格使用/攻击</span></button>
+              <button class="mode-button" type="button" data-mode="local"><strong>⚔️ 本地 2 人</strong><span>P1：WASD + 空格　·　P2：方向键 + M</span></button>
+              <button class="mode-button" type="button" data-mode="online"><strong>🌐 联机双人</strong><span>GoEasy 自动匹配在线玩家</span></button>
+            </div>
+            <div class="overlay-status" id="overlayStatus" role="status" aria-live="polite"></div>
+            <button class="primary" id="overlayAction" type="button" hidden>再来一局</button>
+          </div>
+        </div>
+      </div>
+      <div class="touch-controls" aria-label="触屏操作">
+        <button type="button" data-control="up">▲</button>
+        <button type="button" data-control="left">◀</button>
+        <button type="button" data-control="down">▼</button>
+        <button type="button" data-control="right">▶</button>
+        <button type="button" data-control="fire">使用 / 攻击</button>
+      </div>
+    </section>
+    <section class="bottom">
+      <div class="info"><strong id="itemStatus">道具：空手</strong><span id="gameStatus">移动探索，靠近道具即可拾取；空手时靠近敌人按出击键肉搏。</span></div>
+      <div class="info"><strong>战场规则</strong><span>手雷延迟爆炸 · 子弹可被掩体挡住 · 猫粮会引开对手 · 药包持续回血</span></div>
+    </section>
+    <footer class="footer"><span>单局获胜奖励 +12 首页积分</span><span>触屏：方向按钮移动，点场地瞄准，使用按钮出击</span></footer>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/goeasy-lite@2.13.24/goeasy-lite.min.js"></script>
+  <script>
+    (() => {
+      "use strict";
+      const W = 960, H = 540, ECONOMY_KEY = "catball_economy_v1";
+      const NAME_KEY = "catball_pet_name_v1", GOEASY_KEY = "BC-6c13f16b8b4f45548f069666edacbd91";
+      const GOEASY_HOST = "hangzhou.goeasy.io", LOBBY = "catball-pvp-lobby-syc111syc-v1";
+      const INBOX = "catball-pvp-inbox-";
+      const canvas = document.getElementById("arenaCanvas");
+      const ctx = canvas.getContext("2d");
+      const $ = id => document.getElementById(id);
+      const keys = new Set(), touchInput = { up: false, down: false, left: false, right: false, fire: false };
+      const catImage = new Image();
+      catImage.src = "images/catball.png";
+      let cosmetic = "", catName = "猫球", points = 0, mode = "", state = null, lastFrame = 0;
+      let goeasy = null, connected = false, peerId = "", opponentId = "", opponentProfile = null;
+      let peers = new Map(), queueTimer = null, snapshotTimer = 0, lastInputSend = 0, inputSeq = 0;
+      let overlayState = "menu", resultMessage = "", rewardedGameIds = new Set();
+      const terrain = [
+        { x: 276, y: 167, w: 60, h: 44 }, { x: 614, y: 328, w: 65, h: 48 },
+        { x: 457, y: 95, w: 47, h: 34 }, { x: 442, y: 405, w: 55, h: 38 }
+      ];
+      const itemInfo = {
+        grenade: { icon: "💣", label: "手雷", color: "#ffc767" },
+        pistol: { icon: "🔫", label: "手枪", color: "#83d7ff" },
+        shotgun: { icon: "✦", label: "霰弹枪", color: "#ff9dbe" },
+        rifle: { icon: "▰", label: "步枪", color: "#8df0c0" },
+        cover: { icon: "▥", label: "掩体", color: "#c5a5ff" },
+        food: { icon: "🍖", label: "猫粮", color: "#ffbf80" },
+        medkit: { icon: "✚", label: "药包", color: "#ff879c" }
+      };
+
+      function readProfile() {
+        try {
+          catName = (localStorage.getItem(NAME_KEY) || "").trim().slice(0, 16) || "猫球";
+          const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
+          const inventory = data.inventory || {};
+          points = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
+          const equipped = inventory.equipped;
+          cosmetic = ["sign", "scooter", "ingot"].includes(equipped) &&
+            Number.isFinite(inventory[`${equipped}Until`]) && inventory[`${equipped}Until`] > Date.now() ? equipped : "";
+        } catch (error) {
+          console.error("无法读取猫球积分或装扮：", error);
+          catName = "猫球";
+          cosmetic = "";
+          points = 0;
+        }
+        $("pointsValue").textContent = points;
+      }
+
+      function awardWinner(player) {
+        if (!player || player.kind === "ai" || (mode === "online" && player.id !== "p1" && player.id !== "p2")) return "";
+        const rewardId = state && state.id;
+        if (rewardId && rewardedGameIds.has(rewardId)) return "本局奖励已领取。";
+        try {
+          const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
+          const current = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
+          if (!Number.isSafeInteger(current + 12)) return "积分超出可保存范围，奖励未能保存。";
+          data.points = current + 12;
+          if (!data.inventory || typeof data.inventory !== "object" || Array.isArray(data.inventory)) data.inventory = {};
+          localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
+          if (rewardId) rewardedGameIds.add(rewardId);
+          readProfile();
+          return "获胜奖励 +12 积分已存入首页账户。";
+        } catch (error) {
+          console.error("无法保存猫球对决奖励：", error);
+          return "获胜了，但积分保存失败，请检查浏览器存储空间。";
+        }
+      }
+      function makePlayer(id, name, x, color, kind, look) {
+        return {
+          id, name, x, y: H / 2, vx: 0, vy: 0, aim: id === "p1" ? 0 : Math.PI,
+          hp: 100, maxHp: 100, held: "", ammo: 0, attackCooldown: 0, meleeCooldown: 0,
+          invulnerable: 0, medTimer: 0, fireWasDown: false, input: { x: 0, y: 0, fire: false, pulse: false, aim: 0 },
+          color, kind, cosmetic: look || "", recoil: 0, walked: 0
+        };
+      }
+
+      function makeGame(gameMode, remote = null) {
+        mode = gameMode;
+        const onlineGuest = gameMode === "online" && remote && !remote.host;
+        const p1 = makePlayer(
+          "p1",
+          onlineGuest ? (remote.opponentName || "联机玩家") : catName,
+          145,
+          "#78f0cf",
+          "human",
+          onlineGuest ? (remote.opponentCosmetic || "") : cosmetic
+        );
+        const p2Kind = gameMode === "ai" ? "ai" : "human";
+        const p2Name = gameMode === "ai" ? "训练对手" :
+          gameMode === "online" ? (onlineGuest ? catName : (remote && remote.opponentName || "联机玩家")) : "玩家 2";
+        const p2Cosmetic = gameMode === "online" ? (onlineGuest ? cosmetic : (remote && remote.opponentCosmetic || "")) :
+          (opponentProfile && opponentProfile.cosmetic || "");
+        const p2 = makePlayer("p2", p2Name, W - 145, "#ff88ad", p2Kind, p2Cosmetic);
+        state = {
+          id: remote && remote.gameId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+          mode: gameMode, running: true, elapsed: 0, spawnTimer: 1.6, nextObjectId: 1,
+          players: [p1, p2], items: [], projectiles: [], covers: [], lures: [], particles: [],
+          winner: "", shake: 0
+        };
+        if (gameMode === "online") {
+          if (remote && remote.host) state.host = true;
+          else state.host = false;
+        }
+        updateNames();
+        $("gameStatus").textContent = gameMode === "ai" ? "击败训练对手，获得 12 积分。" :
+          gameMode === "local" ? "双人同屏对战，率先击败对手的一方获胜。" : "联机已接通，正在战斗。";
+        $("overlay").hidden = true;
+      }
+
+      function updateNames() {
+        if (!state) return;
+        $("p1Name").textContent = state.players[0].name;
+        $("p2Name").textContent = state.players[1].name;
+        $("p1Health").style.width = `${Math.max(0, state.players[0].hp)}%`;
+        $("p2Health").style.width = `${Math.max(0, state.players[1].hp)}%`;
+      }
+
+      function showMenu(title = "准备好开战了吗？", copy = "收集场地道具并击败对手。生命值归零时战斗结束。") {
+        overlayState = "menu";
+        $("overlayTitle").textContent = title;
+        $("overlayCopy").textContent = copy;
+        $("overlayIcon").textContent = "🐾";
+        $("modeList").hidden = false;
+        $("overlayAction").hidden = true;
+        $("overlayStatus").textContent = "";
+        $("overlay").hidden = false;
+      }
+
+      function showWaiting(message) {
+        overlayState = "waiting";
+        $("overlayTitle").textContent = "正在寻找对手…";
+        $("overlayCopy").textContent = "保持页面打开。匹配到另一位玩家后会自动开始。";
+        $("overlayIcon").textContent = "🌐";
+        $("modeList").hidden = true;
+        $("overlayAction").hidden = false;
+        $("overlayAction").textContent = "取消匹配";
+        $("overlayStatus").textContent = message;
+        $("overlay").hidden = false;
+      }
+
+      function showResult(winner, message = "") {
+        if (!state) return;
+        state.running = false;
+        state.winner = winner ? winner.id : "";
+        overlayState = "result";
+        const localSide = mode === "online" ? (state.host ? "p1" : "p2") : winner && winner.id;
+        const localWinner = winner && (mode !== "online" || winner.id === localSide);
+        const rewardText = localWinner ? awardWinner(winner) : "";
+        const heading = winner ? `${winner.name} 获胜！` : "平局";
+        resultMessage = `${message || heading}${rewardText ? ` ${rewardText}` : ""}`;
+        $("overlayIcon").textContent = winner ? "🏆" : "🤝";
+        $("overlayTitle").textContent = heading;
+        $("overlayCopy").textContent = resultMessage;
+        $("modeList").hidden = true;
+        $("overlayAction").hidden = false;
+        $("overlayAction").textContent = "返回模式菜单";
+        $("overlayStatus").textContent = "";
+        $("overlay").hidden = false;
+        $("gameStatus").textContent = resultMessage;
+        if (mode === "online" && state.host) broadcast({ type: "finish", winner: state.winner, winnerName: winner ? winner.name : "" });
+      }
+
+      function rand(min, max) { return min + Math.random() * (max - min); }
+      function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+      function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+      function itemAt(x, y) {
+        return state.items.find(item => Math.hypot(item.x - x, item.y - y) < 27);
+      }
+      function safePosition(x, y, radius = 23) {
+        return x > 45 + radius && x < W - 45 - radius && y > 48 + radius && y < H - 48 - radius &&
+          !terrain.some(rect => x + radius > rect.x && x - radius < rect.x + rect.w && y + radius > rect.y && y - radius < rect.y + rect.h) &&
+          !state.covers.some(rect => x + radius > rect.x && x - radius < rect.x + rect.w && y + radius > rect.y && y - radius < rect.y + rect.h);
+      }
+      function spawnItem() {
+        if (state.items.length >= 5) return;
+        const types = Object.keys(itemInfo);
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const x = rand(100, W - 100), y = rand(100, H - 100);
+          if (safePosition(x, y, 34) && !state.items.some(item => Math.hypot(item.x - x, item.y - y) < 75)) {
+            const type = types[Math.floor(Math.random() * types.length)];
+            state.items.push({ id: state.nextObjectId++, type, x, y, phase: rand(0, 6), born: state.elapsed });
+            addParticles(x, y, itemInfo[type].color, 12);
+            return;
+          }
+        }
+      }
+      function itemAmmo(type) { return ({ grenade: 1, pistol: 3, shotgun: 3, rifle: 5, cover: 1, food: 1, medkit: 1 })[type] || 1; }
+      function useItem(player) {
+        if (!state || !state.running) return;
+        const target = state.players.find(other => other !== player);
+        if (!player.held || player.ammo <= 0) {
+          if (player.meleeCooldown <= 0 && target && distance(player, target) < 72 &&
+              Math.cos(player.aim) * (target.x - player.x) / Math.max(1, distance(player, target)) +
+              Math.sin(player.aim) * (target.y - player.y) / Math.max(1, distance(player, target)) > .15) {
+            target.hp = Math.max(0, target.hp - 11);
+            target.invulnerable = .12;
+            player.meleeCooldown = .52;
+            player.recoil = .22;
+            addParticles(target.x, target.y, player.color, 9);
+            if (target.hp <= 0) showResult(player);
+          }
+          return;
+        }
+        const type = player.held;
+        if (type === "medkit") return;
+        if (type === "rifle" && player.attackCooldown > 0) return;
+        if (type !== "rifle" && player.attackCooldown > 0) return;
+        const dx = Math.cos(player.aim), dy = Math.sin(player.aim);
+        if (type === "grenade") {
+          state.projectiles.push({ id: state.nextObjectId++, kind: "grenade", owner: player.id, x: player.x + dx * 23, y: player.y + dy * 23, vx: dx * 280, vy: dy * 280, fuse: -1, age: 0 });
+          player.ammo = 0;
+        } else if (type === "cover") {
+          const x = player.x + dx * 67, y = player.y + dy * 67;
+          const cover = { id: state.nextObjectId++, x: x - (Math.abs(dx) > Math.abs(dy) ? 11 : 32), y: y - (Math.abs(dx) > Math.abs(dy) ? 32 : 11), w: Math.abs(dx) > Math.abs(dy) ? 22 : 64, h: Math.abs(dx) > Math.abs(dy) ? 64 : 22, life: 12 };
+          if (safePosition(x, y, 12)) state.covers.push(cover);
+          player.ammo = 0;
+          addParticles(x, y, "#c5a5ff", 14);
+        } else if (type === "food") {
+          state.lures.push({ id: state.nextObjectId++, owner: player.id, x: player.x + dx * 52, y: player.y + dy * 52, life: 6, phase: 0 });
+          player.ammo = 0;
+          addParticles(player.x + dx * 52, player.y + dy * 52, "#ffbf80", 10);
+        } else {
+          const count = type === "shotgun" ? 5 : 1;
+          const spread = type === "shotgun" ? .26 : type === "rifle" ? .025 : 0;
+          for (let i = 0; i < count; i++) {
+            const angle = player.aim + (count === 1 ? rand(-spread, spread) : (i - 2) * spread);
+            const speed = type === "shotgun" ? 550 : type === "rifle" ? 720 : 640;
+            state.projectiles.push({
+              id: state.nextObjectId++, kind: "bullet", owner: player.id, x: player.x + dx * 24, y: player.y + dy * 24,
+              vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: type === "shotgun" ? .68 : 1.1,
+              damage: type === "shotgun" ? 8 : type === "rifle" ? 15 : type === "pistol" ? 22 : 16
+            });
+          }
+          player.ammo--;
+        }
+        player.attackCooldown = type === "rifle" ? .16 : type === "shotgun" ? .44 : type === "pistol" ? .32 : .28;
+        player.recoil = .18;
+        if (player.ammo <= 0 && player.held !== "medkit") player.held = "";
+        addParticles(player.x + dx * 24, player.y + dy * 24, player.color, 4);
+      }
+
+      function addParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2, speed = rand(30, 180);
+          state.particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: rand(.22, .65), max: .65, color, size: rand(2, 5) });
+        }
+      }
+      function hitCover(x, y) {
+        return terrain.some(rect => x > rect.x && x < rect.x + rect.w && y > rect.y && y < rect.y + rect.h) ||
+          state.covers.some(rect => x > rect.x && x < rect.x + rect.w && y > rect.y && y < rect.y + rect.h);
+      }
+      function explode(projectile) {
+        addParticles(projectile.x, projectile.y, "#ffbd68", 30);
+        state.shake = .24;
+        state.players.forEach(player => {
+          const d = Math.hypot(projectile.x - player.x, projectile.y - player.y);
+          if (d < 118 && !hitCover((projectile.x + player.x) / 2, (projectile.y + player.y) / 2)) {
+            player.hp = Math.max(0, player.hp - Math.round(44 * (1 - d / 150)));
+            player.invulnerable = .15;
+          }
+        });
+        state.projectiles = state.projectiles.filter(item => item !== projectile);
+      }
+      function collisionMove(player, dx, dy) {
+        const radius = 22;
+        const nextX = clamp(player.x + dx, 48 + radius, W - 48 - radius);
+        if (safePosition(nextX, player.y, radius)) player.x = nextX;
+        const nextY = clamp(player.y + dy, 48 + radius, H - 48 - radius);
+        if (safePosition(player.x, nextY, radius)) player.y = nextY;
+      }
+      function aiInput(player, dt) {
+        const foe = state.players[0];
+        const lure = state.lures.reduce((best, item) => !best || item.life > best.life ? item : best, null);
+        const target = lure && lure.life > 0 ? lure : foe;
+        let wanted = null;
+        const useful = state.items.filter(item => item.type !== "medkit" || player.hp < 85)
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        if (player.hp < 38 && useful && distance(player, useful) < 290) wanted = useful;
+        else if (lure) wanted = lure;
+        else if ((!player.held || player.ammo < 1) && useful && distance(player, useful) > 42) wanted = useful;
+        else if (player.held) wanted = target;
+        const aimTarget = player.held ? foe : target;
+        player.input.aim = Math.atan2(aimTarget.y - player.y, aimTarget.x - player.x);
+        player.aim = player.input.aim;
+        const dx = wanted ? wanted.x - player.x : target.x - player.x;
+        const dy = wanted ? wanted.y - player.y : target.y - player.y;
+        const d = Math.max(1, Math.hypot(dx, dy));
+        if (player.held && !lure && d < 380 && player.ammo > 0) {
+          player.input.fire = player.held === "rifle";
+          player.input.pulse = player.attackCooldown <= 0;
+        } else if (!player.held && d < 62) {
+          player.input.pulse = player.meleeCooldown <= 0;
+        }
+        if (wanted && d > (wanted === target ? 72 : 30)) {
+          player.input.x = dx / d;
+          player.input.y = dy / d;
+        } else {
+          player.input.x = 0;
+          player.input.y = 0;
+        }
+      }
+
+      function updatePlayer(player, dt) {
+        player.attackCooldown = Math.max(0, player.attackCooldown - dt);
+        player.meleeCooldown = Math.max(0, player.meleeCooldown - dt);
+        player.invulnerable = Math.max(0, player.invulnerable - dt);
+        player.recoil = Math.max(0, player.recoil - dt);
+        if (player.kind === "ai") aiInput(player, dt);
+        else {
+          const isP1 = player.id === "p1";
+          const controls = isP1
+            ? { up: keys.has("KeyW"), down: keys.has("KeyS"), left: keys.has("KeyA"), right: keys.has("KeyD") }
+            : { up: keys.has("ArrowUp"), down: keys.has("ArrowDown"), left: keys.has("ArrowLeft"), right: keys.has("ArrowRight") };
+          if (mode === "online" && state.host && player.id === "p2") {
+            player.input.x = player.remoteInput ? player.remoteInput.x : 0;
+            player.input.y = player.remoteInput ? player.remoteInput.y : 0;
+            player.input.aim = player.remoteInput ? player.remoteInput.aim : player.aim;
+            player.input.fire = player.remoteInput ? player.remoteInput.fire : false;
+            player.input.pulse = Boolean(player.remoteInput && player.remoteInput.pulse);
+            if (player.remoteInput) player.remoteInput.pulse = false;
+          } else if (mode === "online" && (state.host && player.id === "p1" || !state.host && player.id === "p2")) {
+            player.input.x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+            player.input.y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("Space") || touchInput.fire;
+          } else if (mode === "online" && !state.host && player.id === "p1") {
+            player.input.x = player.remoteInput ? player.remoteInput.x : 0;
+            player.input.y = player.remoteInput ? player.remoteInput.y : 0;
+            player.input.aim = player.remoteInput ? player.remoteInput.aim : player.aim;
+            player.input.fire = player.remoteInput ? player.remoteInput.fire : false;
+            player.input.pulse = Boolean(player.remoteInput && player.remoteInput.pulse);
+            if (player.remoteInput) player.remoteInput.pulse = false;
+          } else if (mode === "local" && !isP1) {
+            player.input.x = (controls.right ? 1 : 0) - (controls.left ? 1 : 0);
+            player.input.y = (controls.down ? 1 : 0) - (controls.up ? 1 : 0);
+            if (player.input.x || player.input.y) player.aim = Math.atan2(player.input.y, player.input.x);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("KeyM");
+          } else {
+            player.input.x = (controls.right || touchInput.right ? 1 : 0) - (controls.left || touchInput.left ? 1 : 0);
+            player.input.y = (controls.down || touchInput.down ? 1 : 0) - (controls.up || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has(isP1 ? "Space" : "KeyM") || (isP1 && touchInput.fire);
+          }
+        }
+        if (player.kind !== "ai") {
+          const lure = state.lures.filter(item => item.owner !== player.id)
+            .sort((a, b) => distance(player, a) - distance(player, b))[0];
+          if (lure) {
+            const dx = lure.x - player.x, dy = lure.y - player.y;
+            const length = Math.max(1, Math.hypot(dx, dy));
+            player.input.x = dx / length;
+            player.input.y = dy / length;
+            player.input.fire = false;
+            player.input.pulse = false;
+          }
+        }
+        if (player.input.x || player.input.y) {
+          const magnitude = Math.hypot(player.input.x, player.input.y) || 1;
+          const speed = player.held === "scooter" ? 205 : 180;
+          const dx = player.input.x / magnitude * speed * dt, dy = player.input.y / magnitude * speed * dt;
+          collisionMove(player, dx, dy);
+          player.walked += Math.hypot(dx, dy);
+        }
+        if (Number.isFinite(player.input.aim)) player.aim = player.input.aim;
+        if (player.held === "medkit") {
+          player.medTimer += dt;
+          if (player.medTimer >= 1 && player.hp < player.maxHp) {
+            player.hp = Math.min(player.maxHp, player.hp + 1);
+            player.medTimer -= 1;
+          }
+          if (player.hp >= player.maxHp) { player.held = ""; player.ammo = 0; }
+        }
+        if (player.input.pulse || (player.held === "rifle" && player.input.fire)) useItem(player);
+        player.input.pulse = false;
+        player.fireWasDown = player.input.fire;
+        const pickup = itemAt(player.x, player.y);
+        if (pickup) {
+          player.held = pickup.type;
+          player.ammo = itemAmmo(pickup.type);
+          player.medTimer = 0;
+          state.items = state.items.filter(item => item !== pickup);
+          addParticles(pickup.x, pickup.y, itemInfo[pickup.type].color, 18);
+        }
+      }
+
+      function updateObjects(dt) {
+        state.spawnTimer -= dt;
+        if (state.spawnTimer <= 0) { spawnItem(); state.spawnTimer = rand(4.5, 7.5); }
+        state.covers.forEach(cover => cover.life -= dt);
+        state.covers = state.covers.filter(cover => cover.life > 0);
+        state.lures.forEach(lure => { lure.life -= dt; lure.phase += dt; });
+        state.lures = state.lures.filter(lure => lure.life > 0);
+        for (const shot of [...state.projectiles]) {
+          if (shot.kind === "grenade") {
+            shot.age += dt;
+            if (shot.fuse >= 0) {
+              shot.fuse -= dt;
+              if (shot.fuse <= 0) explode(shot);
+              continue;
+            }
+            shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+            shot.vx *= Math.pow(.982, dt * 60); shot.vy *= Math.pow(.982, dt * 60);
+            const hitPlayer = state.players.find(player => player.id !== shot.owner && distance(player, shot) < 25);
+            if (hitPlayer || hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 || shot.y < 52 || shot.y > H - 52 || shot.age > .9) {
+              shot.fuse = 1.5;
+            }
+          } else {
+            shot.life -= dt;
+            shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+            const hitPlayer = state.players.find(player => player.id !== shot.owner && distance(player, shot) < 23);
+            if (hitPlayer) {
+              hitPlayer.hp = Math.max(0, hitPlayer.hp - shot.damage);
+              hitPlayer.invulnerable = .1;
+              addParticles(shot.x, shot.y, hitPlayer.color, 7);
+              state.projectiles = state.projectiles.filter(item => item !== shot);
+              if (hitPlayer.hp <= 0) showResult(state.players.find(player => player.id === shot.owner));
+            } else if (hitCover(shot.x, shot.y) || shot.x < 46 || shot.x > W - 46 || shot.y < 46 || shot.y > H - 46 || shot.life <= 0) {
+              addParticles(shot.x, shot.y, "#dce8f4", 3);
+              state.projectiles = state.projectiles.filter(item => item !== shot);
+            }
+          }
+        }
+        state.particles.forEach(p => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .96; p.vy *= .96; });
+        state.particles = state.particles.filter(p => p.life > 0);
+        state.shake = Math.max(0, state.shake - dt);
+      }
+
+      function updateGame(dt) {
+        if (!state || !state.running || (mode === "online" && !state.host)) return;
+        state.elapsed += dt;
+        state.players.forEach(player => updatePlayer(player, dt));
+        updateObjects(dt);
+        updateNames();
+        const dead = state.players.find(player => player.hp <= 0);
+        if (dead && state.running) showResult(state.players.find(player => player !== dead));
+        if (mode === "online" && state.running) {
+          snapshotTimer += dt;
+          if (snapshotTimer >= .05) {
+            snapshotTimer = 0;
+            broadcast({ type: "state", state: serializableState() });
+          }
+        }
+      }
+
+      function serializableState() {
+        const copy = JSON.parse(JSON.stringify(state));
+        delete copy.host;
+        copy.particles = [];
+        copy.players.forEach(player => { delete player.remoteInput; });
+        return copy;
+      }
+
+      function drawCosmetic(player) {
+        if (player.cosmetic === "sign") {
+          ctx.fillStyle = "#ffb9d1";
+          ctx.fillRect(player.x - 29, player.y - 51, 58, 15);
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(player.x - 29, player.y - 51, 58, 15);
+          ctx.fillStyle = "#57284a"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.fillText("最帅猫球", player.x, player.y - 40);
+        } else if (player.cosmetic === "ingot") {
+          ctx.fillStyle = "#ffd45f"; ctx.strokeStyle = "#a76b13"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(player.x + 19, player.y + 11); ctx.lineTo(player.x + 28, player.y + 15);
+          ctx.lineTo(player.x + 25, player.y + 25); ctx.lineTo(player.x + 13, player.y + 25);
+          ctx.lineTo(player.x + 10, player.y + 15); ctx.closePath(); ctx.fill(); ctx.stroke();
+        } else if (player.cosmetic === "scooter") {
+          ctx.strokeStyle = "#6abce9"; ctx.lineWidth = 3; ctx.beginPath();
+          ctx.moveTo(player.x - 20, player.y + 24); ctx.lineTo(player.x + 20, player.y + 24);
+          ctx.lineTo(player.x + 10, player.y + 14); ctx.moveTo(player.x + 20, player.y + 24); ctx.lineTo(player.x + 15, player.y + 13);
+          ctx.stroke(); ctx.fillStyle = "#795ca5";
+          [-16, 17].forEach(dx => { ctx.beginPath(); ctx.arc(player.x + dx, player.y + 25, 4, 0, Math.PI * 2); ctx.fill(); });
+        }
+      }
+
+      function drawPlayer(player) {
+        const bob = Math.sin(player.walked / 12) * (player.input.x || player.input.y ? 2 : 1);
+        ctx.save();
+        ctx.translate(player.x, player.y + bob);
+        ctx.globalAlpha = player.invulnerable > 0 ? .55 + Math.sin(state.elapsed * 38) * .3 : 1;
+        ctx.fillStyle = player.color + "30";
+        ctx.beginPath(); ctx.ellipse(0, 21, 28, 12, 0, 0, Math.PI * 2); ctx.fill();
+        if (catImage.complete && catImage.naturalWidth) ctx.drawImage(catImage, -28, -29, 56, 56);
+        else {
+          ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#fff"; ctx.font = "bold 24px sans-serif"; ctx.textAlign = "center"; ctx.fillText("●", 0, 8);
+        }
+        ctx.globalAlpha = 1;
+        drawCosmetic(player);
+        ctx.strokeStyle = player.color; ctx.lineWidth = 3; ctx.globalAlpha = .8;
+        ctx.beginPath(); ctx.moveTo(Math.cos(player.aim) * 22, Math.sin(player.aim) * 22);
+        ctx.lineTo(Math.cos(player.aim) * 35, Math.sin(player.aim) * 35); ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = "rgba(12,18,31,.85)";
+        ctx.beginPath(); ctx.roundRect(player.x - 31, player.y - 43, 62, 16, 7); ctx.fill();
+        ctx.fillStyle = "#f4f6ff"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center"; ctx.fillText(player.name.slice(0, 12), player.x, player.y - 32);
+        if (player.held) {
+          const item = itemInfo[player.held];
+          ctx.fillStyle = item ? item.color : "#fff";
+          ctx.font = "bold 13px sans-serif"; ctx.fillText(`${item ? item.icon : ""} ${player.ammo}`, player.x, player.y + 43);
+        }
+      }
+
+      function draw() {
+        ctx.save();
+        if (state && state.shake > 0) ctx.translate(rand(-5, 5) * state.shake * 4, rand(-4, 4) * state.shake * 4);
+        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        sky.addColorStop(0, "#21364a"); sky.addColorStop(.7, "#29434a"); sky.addColorStop(1, "#365446");
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = "rgba(218,237,204,.16)";
+        for (let x = 25; x < W; x += 74) for (let y = 33; y < H; y += 68) {
+          ctx.beginPath(); ctx.arc(x + Math.sin(y + x) * 14, y, 1.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.strokeStyle = "rgba(217,243,213,.14)"; ctx.lineWidth = 2; ctx.strokeRect(46, 46, W - 92, H - 92);
+        ctx.fillStyle = "rgba(13,25,34,.5)";
+        ctx.fillRect(0, 0, W, 39); ctx.fillRect(0, H - 39, W, 39); ctx.fillRect(0, 0, 39, H); ctx.fillRect(W - 39, 0, 39, H);
+        terrain.forEach((rect, index) => {
+          ctx.fillStyle = index % 2 ? "#526158" : "#596359"; ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 12); ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,.12)"; ctx.beginPath(); ctx.ellipse(rect.x + rect.w * .35, rect.y + 6, rect.w * .34, 5, 0, 0, Math.PI * 2); ctx.fill();
+        });
+        if (state) {
+          state.covers.forEach(cover => {
+            ctx.globalAlpha = Math.min(1, cover.life / .35);
+            ctx.fillStyle = "#8875a9"; ctx.beginPath(); ctx.roundRect(cover.x, cover.y, cover.w, cover.h, 6); ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.fillRect(cover.x + 5, cover.y + 4, Math.max(0, cover.w - 10), 3);
+            ctx.globalAlpha = 1;
+          });
+          state.items.forEach(item => {
+            const info = itemInfo[item.type], float = Math.sin(state.elapsed * 3 + item.phase) * 5;
+            ctx.save(); ctx.translate(item.x, item.y + float);
+            ctx.fillStyle = info.color + "33"; ctx.beginPath(); ctx.arc(0, 0, 24 + Math.sin(state.elapsed * 4 + item.phase) * 2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#162333"; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = info.color; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(info.icon, 0, 1);
+            ctx.restore();
+          });
+          state.lures.forEach(lure => {
+            ctx.globalAlpha = .7 + Math.sin(lure.phase * 9) * .2;
+            ctx.fillStyle = "#ffbd80"; ctx.font = "22px sans-serif"; ctx.textAlign = "center"; ctx.fillText("🍖", lure.x, lure.y);
+            ctx.globalAlpha = 1;
+          });
+          state.projectiles.forEach(shot => {
+            if (shot.kind === "grenade") {
+              ctx.fillStyle = shot.fuse >= 0 ? (Math.sin(state.elapsed * 25) > 0 ? "#fff0a0" : "#ff765f") : "#ffbd5b";
+              ctx.beginPath(); ctx.arc(shot.x, shot.y, 8, 0, Math.PI * 2); ctx.fill();
+            } else {
+              ctx.fillStyle = shot.owner === "p1" ? "#b6ffe5" : "#ffd0de";
+              ctx.beginPath(); ctx.ellipse(shot.x, shot.y, 7, 3, Math.atan2(shot.vy, shot.vx), 0, Math.PI * 2); ctx.fill();
+            }
+          });
+          state.particles.forEach(p => {
+            ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+          });
+          ctx.globalAlpha = 1;
+          state.players.forEach(drawPlayer);
+        } else {
+          ctx.fillStyle = "rgba(255,255,255,.06)"; ctx.font = "700 20px sans-serif"; ctx.textAlign = "center";
+          ctx.fillText("选择一种模式，开始猫球对决", W / 2, H / 2);
+        }
+        ctx.restore();
+      }
+
+      function updateHudInfo() {
+        if (!state) { $("itemStatus").textContent = "道具：空手"; return; }
+        const localPlayer = mode === "online" && !state.host ? state.players[1] : state.players[0];
+        const info = itemInfo[localPlayer.held];
+        $("itemStatus").textContent = info ? `道具：${info.label}　剩余 ${localPlayer.ammo}` : "道具：空手（靠近后按出击键肉搏）";
+        $("p1Health").style.width = `${Math.max(0, state.players[0].hp)}%`;
+        $("p2Health").style.width = `${Math.max(0, state.players[1].hp)}%`;
+      }
+
+      function frame(now) {
+        const dt = Math.min(.04, (now - (lastFrame || now)) / 1000);
+        lastFrame = now;
+        updateGame(dt);
+        if (mode === "online" && state && !state.host && state.running) sendInput();
+        draw();
+        updateHudInfo();
+        requestAnimationFrame(frame);
+      }
+
+      function pointerAim(event) {
+        if (!state || !state.running) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (event.clientX - rect.left) * W / rect.width;
+        const y = (event.clientY - rect.top) * H / rect.height;
+        const player = mode === "online" && !state.host ? state.players[1] : state.players[0];
+        player.aim = Math.atan2(y - player.y, x - player.x);
+      }
+      canvas.addEventListener("pointerdown", event => { pointerAim(event); canvas.setPointerCapture(event.pointerId); });
+      canvas.addEventListener("pointermove", event => { if (event.buttons) pointerAim(event); });
+
+      function firePulse(playerId) {
+        if (!state || !state.running) return;
+        if (mode === "online" && !state.host) {
+          sendInput(true);
+          return;
+        }
+        const player = state.players.find(item => item.id === playerId);
+        if (player) player.input.pulse = true;
+      }
+      document.addEventListener("keydown", event => {
+        const keysUsed = ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+        if (keysUsed.includes(event.code)) event.preventDefault();
+        if (!keys.has(event.code)) {
+          if (event.code === "Space" && (mode !== "online" || state)) firePulse("p1");
+          if (event.code === "KeyM" && mode === "local") firePulse("p2");
+        }
+        keys.add(event.code);
+      });
+      document.addEventListener("keyup", event => keys.delete(event.code));
+      window.addEventListener("blur", () => { keys.clear(); Object.keys(touchInput).forEach(key => touchInput[key] = false); });
+      document.querySelectorAll("[data-control]").forEach(button => {
+        const control = button.dataset.control;
+        const down = event => {
+          event.preventDefault();
+          if (control === "fire") { touchInput.fire = true; firePulse("p1"); }
+          else touchInput[control] = true;
+          button.classList.add("active");
+          if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+        };
+        const up = event => {
+          if (event) event.preventDefault();
+          if (control === "fire") touchInput.fire = false;
+          else touchInput[control] = false;
+          button.classList.remove("active");
+        };
+        button.addEventListener("pointerdown", down);
+        button.addEventListener("pointerup", up);
+        button.addEventListener("pointercancel", up);
+        button.addEventListener("lostpointercapture", up);
+      });
+
+      function goEasyOperation(start) {
+        return new Promise((resolve, reject) => start({
+          onSuccess: resolve,
+          onFailed: error => reject(new Error(error && (error.content || error.message) || String(error)))
+        }));
+      }
+      function randomId() {
+        return `catball-pvp-${window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+      }
+      async function startOnline() {
+        mode = "online";
+        peers.clear();
+        showWaiting("正在连接 GoEasy…");
+        if (!window.GoEasy || typeof window.GoEasy.getInstance !== "function") {
+          showMenu("联机服务加载失败", "请检查网络后刷新页面，或选择人机/本地双人模式。");
+          $("overlayStatus").textContent = "GoEasy SDK 未能加载。";
+          return;
+        }
+        try {
+          goeasy = window.GoEasy.getInstance({ host: GOEASY_HOST, appkey: GOEASY_KEY, modules: ["pubsub"] });
+          peerId = randomId();
+          await goEasyOperation(callbacks => goeasy.connect({
+            id: peerId,
+            data: { nickname: catName, catName, cosmetic },
+            ...callbacks
+          }));
+          connected = true;
+          await goEasyOperation(callbacks => goeasy.pubsub.subscribe({
+            channel: LOBBY, presence: { enable: true }, onMessage: onLobbyMessage, ...callbacks
+          }));
+          await goEasyOperation(callbacks => goeasy.pubsub.subscribe({
+            channel: `${INBOX}${peerId}`, onMessage: onDirectMessage, ...callbacks
+          }));
+          await goEasyOperation(callbacks => goeasy.pubsub.subscribePresence({
+            channel: LOBBY, onPresence: handlePresence, ...callbacks
+          }));
+          await goEasyOperation(callbacks => goeasy.pubsub.hereNow({
+            channel: LOBBY, limit: 100, onSuccess: response => {
+              const members = response && response.content && response.content.members;
+              if (!Array.isArray(members)) { callbacks.onFailed(new Error("GoEasy 在线成员数据格式异常")); return; }
+              members.forEach(addPeer);
+              callbacks.onSuccess();
+            }, onFailed: callbacks.onFailed
+          }));
+          publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic } });
+          queueTimer = setInterval(() => {
+            if (!opponentId && connected) {
+              publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic } });
+              tryMatch();
+            }
+          }, 2500);
+          tryMatch();
+          $("overlayStatus").textContent = peers.size ? `找到 ${peers.size} 位在线玩家，正在匹配…` : "已连接，正在等待对手加入…";
+        } catch (error) {
+          console.error("GoEasy 联机失败：", error);
+          closeOnline();
+          showMenu("暂时无法联机", "请确认网络连接和 GoEasy 服务状态。");
+          $("overlayStatus").textContent = error.message || "连接失败，请稍后重试。";
+        }
+      }
+      function addPeer(member) {
+        if (!member || typeof member.id !== "string" || member.id === peerId || !member.id.startsWith("catball-pvp-")) return;
+        const profile = member.data || {};
+        peers.set(member.id, {
+          name: String(profile.nickname || profile.catName || "联机玩家").slice(0, 16),
+          cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : ""
+        });
+      }
+      function handlePresence(event) {
+        if (!event || !event.member) return;
+        if (event.action === "join") {
+          addPeer(event.member);
+          publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic } });
+          tryMatch();
+        } else if (event.action === "leave") {
+          peers.delete(event.member.id);
+          if (event.member.id === opponentId && state && state.running) {
+            closeOnline(false);
+            state = null;
+            mode = "";
+            showMenu("对手已离线", "联机对手离开了游戏。请返回菜单重新匹配。");
+          }
+        }
+      }
+      function publishLobby(data) {
+        if (!connected || !goeasy) return;
+        goeasy.pubsub.publish({
+          channel: LOBBY, message: JSON.stringify(data),
+          onSuccess: () => {}, onFailed: error => console.error("GoEasy 匹配消息发送失败：", error)
+        });
+      }
+      function onLobbyMessage(message) {
+        try {
+          const data = typeof message.content === "string" ? JSON.parse(message.content) : message.content;
+          if (!data || data.type !== "ready" || typeof data.from !== "string" || data.from === peerId) return;
+          peers.set(data.from, {
+            name: String((data.profile && data.profile.name) || "联机玩家").slice(0, 16),
+            cosmetic: ["sign", "scooter", "ingot"].includes(data.profile && data.profile.cosmetic) ? data.profile.cosmetic : ""
+          });
+          tryMatch();
+        } catch (error) {
+          console.warn("忽略无法解析的匹配消息：", error);
+        }
+      }
+      function tryMatch() {
+        if (!connected || opponentId || overlayState !== "waiting") return;
+        const candidate = [...peers.keys()].filter(id => id < peerId).sort()[0];
+        if (!candidate) return;
+        const profile = peers.get(candidate);
+        opponentId = candidate;
+        opponentProfile = profile;
+        publishDirect(candidate, {
+          type: "offer", from: peerId, profile: { name: catName, cosmetic }
+        });
+        $("overlayStatus").textContent = `正在与 ${profile.name} 握手…`;
+      }
+      function publishDirect(to, data) {
+        if (!connected || !goeasy || !to) return;
+        goeasy.pubsub.publish({
+          channel: `${INBOX}${to}`,
+          message: JSON.stringify({ from: peerId, to, data }),
+          onSuccess: () => {}, onFailed: error => console.error("GoEasy 对战消息发送失败：", error)
+        });
+      }
+      function onDirectMessage(message) {
+        let envelope;
+        try { envelope = typeof message.content === "string" ? JSON.parse(message.content) : message.content; }
+        catch (error) { console.warn("忽略无法解析的联机消息：", error); return; }
+        if (!envelope || envelope.to !== peerId || typeof envelope.from !== "string" || !envelope.data) return;
+        const { from, data } = envelope;
+        if (data.type === "offer" && overlayState === "waiting" && !opponentId) {
+          opponentId = from;
+          const profile = data.profile || {};
+          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : "" };
+          publishDirect(from, { type: "accept", profile: { name: catName, cosmetic } });
+          $("overlayStatus").textContent = `已连接 ${opponentProfile.name}，等待开战…`;
+        } else if (data.type === "accept" && from === opponentId && !state) {
+          const profile = data.profile || {};
+          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : "" };
+          makeGame("online", {
+            host: true, opponentName: opponentProfile.name, opponentCosmetic: opponentProfile.cosmetic
+          });
+          publishDirect(from, {
+            type: "start", hostName: catName, hostCosmetic: cosmetic,
+            guestName: opponentProfile.name, guestCosmetic: opponentProfile.cosmetic, gameId: state.id
+          });
+        } else if (data.type === "start" && from === opponentId && !state) {
+          const profile = { name: String(data.hostName || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(data.hostCosmetic) ? data.hostCosmetic : "" };
+          opponentProfile = profile;
+          makeGame("online", { host: false, opponentName: profile.name, opponentCosmetic: profile.cosmetic, gameId: data.gameId });
+        } else if (data.type === "input" && from === opponentId && state && state.host && state.running &&
+                   data.input && typeof data.input === "object") {
+          const remote = state.players[1];
+          remote.remoteInput = {
+            x: clamp(Number(data.input.x) || 0, -1, 1), y: clamp(Number(data.input.y) || 0, -1, 1),
+            aim: Number.isFinite(data.input.aim) ? data.input.aim : remote.aim,
+            fire: Boolean(data.input.fire), pulse: Boolean(data.input.pulse)
+          };
+        } else if (data.type === "state" && from === opponentId && state && !state.host && data.state && data.state.id === state.id) {
+          state = { ...data.state, host: false };
+          updateNames();
+        } else if (data.type === "finish" && from === opponentId && state && !state.host) {
+          const winner = state.players.find(player => player.id === data.winner) || null;
+          if (winner) winner.name = String(data.winnerName || winner.name).slice(0, 16);
+          showResult(winner, winner ? `${winner.name} 获胜！` : "平局。");
+        } else if (data.type === "quit" && from === opponentId) {
+          closeOnline(false);
+          state = null;
+          mode = "";
+          showMenu("对手已离开", "本场联机对战已结束。");
+        }
+      }
+      function sendInput(pulse = false) {
+        if (!connected || !opponentId || !state || state.host || !state.running) return;
+        const now = performance.now();
+        if (!pulse && now - lastInputSend < 45) return;
+        lastInputSend = now;
+        const player = state.players[1];
+        const x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+        const y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+        publishDirect(opponentId, {
+          type: "input", seq: ++inputSeq,
+          input: { x, y, aim: player.aim, fire: keys.has("Space") || touchInput.fire, pulse }
+        });
+      }
+      function broadcast(data) {
+        if (opponentId) publishDirect(opponentId, data);
+      }
+      function closeOnline(notifyOpponent = true) {
+        clearInterval(queueTimer);
+        queueTimer = null;
+        if (notifyOpponent && opponentId && connected) publishDirect(opponentId, { type: "quit" });
+        if (goeasy) {
+          try { goeasy.disconnect({}); }
+          catch (error) { console.error("关闭 GoEasy 连接失败：", error); }
+        }
+        goeasy = null; connected = false; peerId = ""; opponentId = "";
+        opponentProfile = null; peers.clear();
+      }
+      function returnToMenu() {
+        if (mode === "online") closeOnline();
+        state = null; mode = ""; keys.clear();
+        showMenu();
+      }
+
+      document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => {
+        if (button.dataset.mode === "ai") { makeGame("ai"); spawnItem(); spawnItem(); }
+        else if (button.dataset.mode === "local") { makeGame("local"); spawnItem(); spawnItem(); }
+        else startOnline();
+      }));
+      $("overlayAction").addEventListener("click", () => {
+        if (overlayState === "waiting") returnToMenu();
+        else if (overlayState === "result") returnToMenu();
+      });
+      $("menuButton").addEventListener("click", returnToMenu);
+      window.addEventListener("storage", event => {
+        if (event.key === ECONOMY_KEY || event.key === NAME_KEY) readProfile();
+      });
+      window.addEventListener("beforeunload", () => {
+        if (opponentId && connected) publishDirect(opponentId, { type: "quit" });
+        if (goeasy) goeasy.disconnect({});
+      });
+      readProfile();
+      showMenu();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
