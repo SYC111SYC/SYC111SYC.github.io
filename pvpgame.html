@@ -108,6 +108,7 @@
       .cat-icon { width: 32px; height: 32px; }
       .player-name { max-width: 105px; font-size: 10px; }
       .health { width: min(25vw, 115px); height: 7px; }
+      .shield-bar { width: min(25vw, 115px); }
       .touch-controls { display: grid; }
       .bottom { grid-template-columns: 1fr; gap: 7px; margin-top: 8px; }
       .info { min-height: auto; padding: 9px 11px; }
@@ -120,6 +121,7 @@
       .hud { padding-right: 7px; padding-left: 7px; }
       .player-name { max-width: 82px; font-size: 9px; }
       .health { width: 22vw; }
+      .shield-bar { width: 22vw; }
       .touch-controls { gap: 4px; padding: 7px; }
       .touch-controls button { min-height: 42px; font-size: 9px; }
     }
@@ -148,6 +150,9 @@
     .hud { min-height: 62px; padding: 8px 12px; border-bottom-color: #ddd; }
     .player-name { color: #303545; }
     .health { background: #e5e8ed; }
+    .shield-bar { width: 145px; height: 4px; overflow: hidden; margin-top: 3px; border-radius: 4px; background: #e5e8ed; }
+    .shield-bar span { display: block; width: 100%; height: 100%; background: #63bce9; transition: width .18s; }
+    .right .shield-bar span { margin-left: auto; }
     .vs { color: #707a8b; }
     .overlay { background: rgba(245,247,250,.84); backdrop-filter: blur(2px); }
     .overlay-card { border-color: #cbd1dc; border-radius: 8px; background: #fff; box-shadow: 0 5px 20px #00000012; }
@@ -157,10 +162,30 @@
     .primary { border: 0; color: #fff; background: #8fb0ff; }
     .primary:hover { background: #769cf3; }
     .overlay-status { color: #557a6c; }
+    #setupPanel, #shopPanel { text-align: left; }
+    .setup-note, .loadout-heading { margin: 8px 0 10px; color: #596578; font-size: 11px; }
+    #onlineBounty { display: grid; grid-template-columns: 1fr 100px; align-items: center; gap: 8px; margin: 9px 0; }
+    #onlineBounty label { color: #404b5d; font-size: 11px; line-height: 1.5; }
+    #bountyInput { width: 100%; min-height: 35px; padding: 5px 8px; border: 1px solid #cbd1dc; border-radius: 6px; font: inherit; }
+    .loadout-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; }
+    .loadout-list, .shop-products, .bag-list { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
+    .loadout-row, .shop-product, .bag-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid #d5d9e0; border-radius: 6px; background: #fff; font-size: 11px; }
+    .loadout-row label { display: flex; flex: 1; align-items: center; gap: 8px; cursor: pointer; }
+    .loadout-row input { accent-color: #709878; }
+    .shop-product-copy, .bag-copy { flex: 1; min-width: 0; }
+    .shop-product-copy strong, .bag-copy strong { display: block; margin-bottom: 3px; }
+    .shop-product-copy small, .bag-copy small { color: #657184; line-height: 1.45; }
+    .shop-product button, .bag-row button { flex: 0 0 auto; padding: 6px 9px; border: 0; border-radius: 5px; color: #fff; background: #8fb0ff; cursor: pointer; }
+    .shop-product button:disabled, .bag-row button:disabled { opacity: .5; cursor: not-allowed; }
+    .shop-balance { margin: 0 0 8px; color: #596578; font-size: 12px; }
+    .shop-balance strong { color: #765a19; }
+    .bag-title { margin: 12px 0 6px; font-size: 13px; }
+    .setup-actions { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
     .info { min-height: 58px; }
     .info span { color: #657184; }
     .touch-controls { grid-template-columns: minmax(150px, 1fr) minmax(118px, .75fr); align-items: center; gap: 12px; padding: 10px; }
     .dpad { display: grid; width: 144px; grid-template: repeat(3, 42px) / repeat(3, 42px); justify-self: center; gap: 3px; }
+    .touch-actions { display: grid; min-width: 0; gap: 6px; }
     .dpad button { min-height: 42px; padding: 0; font-size: 17px; }
     .dpad .up { grid-area: 1 / 2; }
     .dpad .left { grid-area: 2 / 1; }
@@ -187,6 +212,7 @@
     <header class="topbar">
       <div class="brand"><span class="brand-mark">✦</span><span>CATBALL&nbsp; / &nbsp;ARENA</span></div>
       <div class="actions">
+        <button class="quiet" id="shopButton" type="button">小商店 / 背包</button>
         <button class="quiet" id="menuButton" type="button">模式菜单</button>
         <a class="quiet" href="index.html" style="display:inline-flex;align-items:center;text-decoration:none">返回首页</a>
       </div>
@@ -195,7 +221,7 @@
       <div>
         <p class="eyebrow">猫球擂台 · 拾取装备 · 灵活走位</p>
         <h1>猫球对决</h1>
-        <p class="subtitle">抢先拾取道具，瞄准对手出击。获胜可得 12 积分，装扮和猫球名字与首页同步。</p>
+        <p class="subtitle">拾取装备、部署宠物并赢下对决。战斗奖励、背包和猫球装扮与首页积分同步。</p>
       </div>
       <div class="points"><small>猫球积分</small><strong id="pointsValue">0</strong></div>
     </section>
@@ -203,11 +229,11 @@
       <div class="hud">
         <div class="hud-side">
           <img class="cat-icon" src="images/catball.png" alt="">
-          <div><div class="player-name" id="p1Name">玩家 1</div><div class="health"><span id="p1Health"></span></div></div>
+          <div><div class="player-name" id="p1Name">玩家 1</div><div class="health"><span id="p1Health"></span></div><div class="shield-bar" id="p1ShieldWrap" hidden><span id="p1Shield"></span></div></div>
         </div>
         <div class="vs">VS</div>
         <div class="hud-side right">
-          <div><div class="player-name" id="p2Name">玩家 2</div><div class="health"><span id="p2Health"></span></div></div>
+          <div><div class="player-name" id="p2Name">玩家 2</div><div class="health"><span id="p2Health"></span></div><div class="shield-bar" id="p2ShieldWrap" hidden><span id="p2Shield"></span></div></div>
           <img class="cat-icon" src="images/catball.png" alt="">
         </div>
       </div>
@@ -223,6 +249,28 @@
               <button class="mode-button" type="button" data-mode="local"><strong>⚔️ 本地 2 人</strong><span>P1：WASD + 空格　·　P2：方向键 + M</span></button>
               <button class="mode-button" type="button" data-mode="online"><strong>🌐 联机双人</strong><span>GoEasy 自动匹配在线玩家</span></button>
             </div>
+            <section id="setupPanel" hidden>
+              <p class="setup-note">每局可装备最多 2 个宠物和 2 件装备；本地双人模式不使用背包。</p>
+              <div id="onlineBounty" hidden>
+                <label for="bountyInput">本局战利品（对方获胜时得到；你获胜时夺得对方战利品）</label>
+                <input id="bountyInput" type="number" min="0" step="1" value="0" inputmode="numeric">
+              </div>
+              <div class="loadout-heading">选择背包物品　<button class="quiet" id="loadoutShopButton" type="button">打开商店</button></div>
+              <div id="loadoutList" class="loadout-list"></div>
+              <div class="overlay-status" id="setupStatus" role="status" aria-live="polite"></div>
+              <div class="setup-actions">
+                <button class="primary" id="setupStart" type="button">开始对战</button>
+                <button class="quiet" id="setupCancel" type="button">返回</button>
+              </div>
+            </section>
+            <section id="shopPanel" hidden>
+              <div class="shop-balance">积分 <strong id="shopPoints">0</strong>　·　背包 <strong id="bagCount">0 / 8</strong></div>
+              <div class="shop-products" id="shopProducts"></div>
+              <h3 class="bag-title">我的背包</h3>
+              <div class="bag-list" id="bagList"></div>
+              <div class="overlay-status" id="shopStatus" role="status" aria-live="polite"></div>
+              <button class="quiet" id="shopClose" type="button">关闭</button>
+            </section>
             <div class="overlay-status" id="overlayStatus" role="status" aria-live="polite"></div>
             <button class="primary" id="overlayAction" type="button" hidden>再来一局</button>
           </div>
@@ -236,14 +284,18 @@
           <button class="right" type="button" data-control="right" aria-label="右移">▶</button>
           <button class="down" type="button" data-control="down" aria-label="下移">▼</button>
         </div>
-        <button type="button" data-control="fire">使用 / 攻击</button>
+        <div class="touch-actions">
+          <button type="button" data-control="fire">使用 / 攻击</button>
+          <button type="button" data-ability="drone">无人机投粮</button>
+          <button type="button" data-ability="pearl">末影珍珠</button>
+        </div>
       </div>
     </section>
     <section class="bottom">
       <div class="info"><strong id="itemStatus">道具：空手</strong><span id="gameStatus">移动探索，靠近道具即可拾取；空手时靠近敌人按出击键肉搏。</span></div>
       <div class="info"><strong>战场规则</strong><span>手雷延迟爆炸 · 子弹可被掩体挡住 · 猫粮会引开对手 · 药包持续回血</span></div>
     </section>
-    <footer class="footer"><span>单局获胜奖励 +12 首页积分</span><span>触屏：方向按钮移动，点场地瞄准，使用按钮出击</span></footer>
+    <footer class="footer"><span>人机胜利 +20 积分 · 联机可设置战利品</span><span>触屏：十字移动，点场地瞄准，可使用攻击、投粮和珍珠按钮</span></footer>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/goeasy-lite@2.13.24/goeasy-lite.min.js"></script>
   <script>
@@ -261,10 +313,29 @@
       let pointerTarget = null;
       const catImage = new Image();
       catImage.src = "images/catball.png";
+      const elephantImage = new Image();
+      elephantImage.src = "images/elephantball.png";
+      const dogImage = new Image();
+      dogImage.src = "images/dogball.png";
       let cosmetic = "", catName = "猫球", points = 0, mode = "", state = null, lastFrame = 0;
-      let goeasy = null, connected = false, peerId = "", opponentId = "", opponentProfile = null;
+      let goeasy = null, connected = false, peerId = "", opponentId = "", opponentProfile = null, onlineAttemptId = 0;
       let peers = new Map(), queueTimer = null, snapshotTimer = 0, lastInputSend = 0, inputSeq = 0;
       let overlayState = "menu", resultMessage = "", rewardedGameIds = new Set();
+      let arenaBag = [], selectedLoadout = { pets: [], equipment: [] }, setupMode = "";
+      let lockedStake = 0, opponentStake = 0, stakeReserved = false, shopReturnSetup = false;
+      const BAG_CAPACITY = 8, PET_LIMIT = 2, EQUIPMENT_LIMIT = 2;
+      const petSpecs = {
+        elephant: { name: "象球", maxHp: 400, speed: 36, price: 40, description: "400 HP · 移速 0.2 倍 · 靠近后每秒踩踏 12 伤害", image: elephantImage },
+        drone: { name: "猫粮自动无人机", maxHp: 40, speed: 190, price: 25, description: "40 HP · 敌人附近盘旋 · F/L 空投一次 2 秒猫粮" },
+        dog: { name: "狗球", maxHp: 80, speed: 216, price: 17, description: "80 HP · 移速 1.2 倍 · 冲向敌人啃咬" , image: dogImage },
+        turret: { name: "枪塔", maxHp: 150, speed: 0, price: 18, description: "150 HP · 固定不动 · 每秒发射步枪子弹" }
+      };
+      const equipmentSpecs = {
+        shield: { name: "护盾", price: 20, description: "吸收伤害；3 秒未受击后每秒恢复 15 点" },
+        pearl: { name: "末影珍珠", price: 8, description: "P1 按 E / P2 按 K 投掷并传送到落点" },
+        phase: { name: "穿墙术", price: 12, description: "本局可穿过墙体与掩体" }
+      };
+      const shopItems = { ...petSpecs, ...equipmentSpecs };
       const terrain = [
         { x: 276, y: 167, w: 60, h: 44 }, { x: 614, y: 328, w: 65, h: 48 },
         { x: 457, y: 95, w: 47, h: 34 }, { x: 442, y: 405, w: 55, h: 38 }
@@ -291,6 +362,19 @@
           const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
           const inventory = data.inventory || {};
           points = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
+          const seen = new Set();
+          arenaBag = (Array.isArray(inventory.pvpBag) ? inventory.pvpBag : [])
+            .filter(item => item && typeof item.id === "string" && !seen.has(item.id) &&
+              Object.prototype.hasOwnProperty.call(shopItems, item.type) &&
+              (seen.add(item.id), true))
+            .map(item => {
+              const entry = { id: item.id, type: item.type };
+              if (petSpecs[item.type]) {
+                const maxHp = petSpecs[item.type].maxHp;
+                entry.hp = Number.isFinite(item.hp) ? clamp(item.hp, 0, maxHp) : maxHp;
+              }
+              return entry;
+            }).slice(0, BAG_CAPACITY);
           const equipped = inventory.equipped;
           cosmetic = ["sign", "scooter", "ingot"].includes(equipped) &&
             Number.isFinite(inventory[`${equipped}Until`]) && inventory[`${equipped}Until`] > Date.now() ? equipped : "";
@@ -301,41 +385,338 @@
           points = 0;
         }
         $("pointsValue").textContent = points;
+        if ($("shopPoints")) renderShop();
       }
 
-      function awardWinner(player) {
-        if (!player || player.kind === "ai" || (mode === "online" && player.id !== "p1" && player.id !== "p2")) return "";
-        const rewardId = state && state.id;
-        if (rewardId && rewardedGameIds.has(rewardId)) return "本局奖励已领取。";
+      function persistArenaChanges(pointsDelta, nextBag) {
         try {
           const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
+          if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("积分数据格式无效");
           const current = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
-          if (!Number.isSafeInteger(current + 12)) return "积分超出可保存范围，奖励未能保存。";
-          data.points = current + 12;
           if (!data.inventory || typeof data.inventory !== "object" || Array.isArray(data.inventory)) data.inventory = {};
+          if (!Number.isSafeInteger(current + pointsDelta) || current + pointsDelta < 0) return false;
+          data.points = current + pointsDelta;
+          data.inventory.pvpBag = nextBag.map(item => ({ ...item }));
           localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
-          if (rewardId) rewardedGameIds.add(rewardId);
           readProfile();
-          return "获胜奖励 +12 积分已存入首页账户。";
+          return true;
         } catch (error) {
-          console.error("无法保存猫球对决奖励：", error);
-          return "获胜了，但积分保存失败，请检查浏览器存储空间。";
+          console.error("无法保存猫球商店或积分数据：", error);
+          return false;
         }
+      }
+
+      function settleMatch(winner, localWinner) {
+        if (!state || state.matchSettled) return "";
+        const rewardId = state.id;
+        if (rewardId && rewardedGameIds.has(rewardId)) return "本局奖励已领取。";
+        const localSide = mode === "online" ? (state.host ? "p1" : "p2") : "p1";
+        const localPlayer = state.players.find(player => player.id === localSide);
+        const selected = state.loadouts && state.loadouts[localSide];
+        let nextBag = arenaBag.map(item => ({ ...item }));
+        if (selected && localPlayer) {
+          for (const petItem of selected.pets) {
+            const pet = localPlayer.pets.find(item => item.itemId === petItem.id);
+            if (!pet || !pet.alive || pet.hp <= 0) {
+              nextBag = nextBag.filter(item => item.id !== petItem.id);
+            } else {
+              nextBag = nextBag.map(item => item.id === petItem.id ? { ...item, hp: pet.hp } : item);
+            }
+          }
+          for (const gear of selected.equipment) {
+            if (gear.type === "pearl" && localPlayer.equipment.pearlUsed) {
+              nextBag = nextBag.filter(item => item.id !== gear.id);
+            }
+          }
+        }
+        let reward = 0, rewardLabel = "";
+        if (mode === "online" && !winner) {
+          reward = state.stakes[localSide] || 0;
+          rewardLabel = `平局，返还战利品 ${reward} 积分。`;
+        } else if (localWinner && winner) {
+          if (mode === "ai") {
+            reward = 20;
+            rewardLabel = "人机胜利奖励 +20 积分。";
+          } else if (mode === "online") {
+            const otherSide = localSide === "p1" ? "p2" : "p1";
+            reward = (state.stakes[localSide] || 0) + (state.stakes[otherSide] || 0);
+            rewardLabel = `夺得本局战利品 ${state.stakes[otherSide] || 0} 积分。`;
+          } else {
+            reward = 12;
+            rewardLabel = "获胜奖励 +12 积分。";
+          }
+        }
+        const bagChanged = JSON.stringify(nextBag) !== JSON.stringify(arenaBag);
+        const saved = !reward && !bagChanged || persistArenaChanges(reward, nextBag);
+        state.matchSettled = true;
+        if (mode === "online" && saved) stakeReserved = false;
+        if (!saved) return reward ? "积分或背包保存失败，请检查浏览器存储空间。" : "宠物或装备保存失败，请检查浏览器存储空间。";
+        if (rewardId && reward) rewardedGameIds.add(rewardId);
+        return rewardLabel;
+      }
+
+      function itemName(type) {
+        return petSpecs[type] ? petSpecs[type].name : equipmentSpecs[type] ? equipmentSpecs[type].name : type;
+      }
+      function renderLoadout() {
+        const list = $("loadoutList");
+        list.replaceChildren();
+        const selectedPets = new Set(selectedLoadout.pets);
+        const selectedEquipment = new Set(selectedLoadout.equipment);
+        if (!arenaBag.length) {
+          list.textContent = "背包是空的，可先去小商店购买宠物或装备。";
+          return;
+        }
+        arenaBag.forEach(item => {
+          const isPet = Boolean(petSpecs[item.type]);
+          const selected = isPet ? selectedPets.has(item.id) : selectedEquipment.has(item.id);
+          const row = document.createElement("div");
+          row.className = "loadout-row";
+          const label = document.createElement("label");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = selected;
+          checkbox.addEventListener("change", () => {
+            const bucket = isPet ? selectedLoadout.pets : selectedLoadout.equipment;
+            const limit = isPet ? PET_LIMIT : EQUIPMENT_LIMIT;
+            if (checkbox.checked && bucket.length >= limit) {
+              checkbox.checked = false;
+              $("setupStatus").textContent = `每局最多装备 ${limit} 个${isPet ? "宠物" : "装备"}。`;
+              return;
+            }
+            if (checkbox.checked) bucket.push(item.id);
+            else selectedLoadout[isPet ? "pets" : "equipment"] = bucket.filter(id => id !== item.id);
+            $("setupStatus").textContent = "";
+          });
+          const copy = document.createElement("span");
+          copy.textContent = `${itemName(item.type)}${isPet ? ` · HP ${Math.floor(item.hp)} / ${petSpecs[item.type].maxHp}` : ""}`;
+          label.append(checkbox, copy);
+          const kind = document.createElement("small");
+          kind.textContent = isPet ? "宠物" : "装备";
+          row.append(label, kind);
+          list.appendChild(row);
+        });
+      }
+
+      function renderShop() {
+        if (!$("shopProducts")) return;
+        $("shopPoints").textContent = points;
+        $("bagCount").textContent = `${arenaBag.length} / ${BAG_CAPACITY}`;
+        const products = $("shopProducts");
+        products.replaceChildren();
+        Object.entries(shopItems).forEach(([type, product]) => {
+          const row = document.createElement("div");
+          row.className = "shop-product";
+          const copy = document.createElement("div");
+          copy.className = "shop-product-copy";
+          const title = document.createElement("strong");
+          title.textContent = `${product.name} · ${product.price} 积分`;
+          const desc = document.createElement("small");
+          desc.textContent = product.description;
+          copy.append(title, desc);
+          const buy = document.createElement("button");
+          buy.type = "button";
+          buy.dataset.buy = type;
+          buy.textContent = "购买";
+          buy.disabled = arenaBag.length >= BAG_CAPACITY || points < product.price;
+          row.append(copy, buy);
+          products.appendChild(row);
+        });
+        const bagList = $("bagList");
+        bagList.replaceChildren();
+        if (!arenaBag.length) {
+          bagList.textContent = "背包空空如也。";
+        } else {
+          arenaBag.forEach(item => {
+            const row = document.createElement("div");
+            row.className = "bag-row";
+            const copy = document.createElement("div");
+            copy.className = "bag-copy";
+            const title = document.createElement("strong");
+            title.textContent = itemName(item.type);
+            copy.appendChild(title);
+            if (petSpecs[item.type]) {
+              const status = document.createElement("small");
+              status.textContent = `HP ${Math.floor(item.hp)} / ${petSpecs[item.type].maxHp}`;
+              copy.appendChild(status);
+            } else {
+              const status = document.createElement("small");
+              status.textContent = "可在每局开始前装备";
+              copy.appendChild(status);
+            }
+            row.appendChild(copy);
+            if (petSpecs[item.type] && item.hp < petSpecs[item.type].maxHp) {
+              const heal = document.createElement("button");
+              heal.type = "button";
+              heal.dataset.heal = item.id;
+              heal.textContent = "+25 HP · 2分";
+              heal.disabled = points < 2;
+              row.appendChild(heal);
+            }
+            bagList.appendChild(row);
+          });
+        }
+      }
+
+      function showSetup(gameMode, reset = false) {
+        setupMode = gameMode;
+        if (reset) selectedLoadout = emptyLoadout();
+        $("overlayTitle").textContent = gameMode === "online" ? "联机战前准备" : "选择本局装备";
+        $("overlayCopy").textContent = gameMode === "online"
+          ? "设置对手获胜时得到的战利品，并选择本局出战宠物和装备。"
+          : "挑选背包里的宠物和装备；未选择的物品仍留在背包。";
+        $("overlayIcon").textContent = gameMode === "online" ? "🌐" : "🎒";
+        $("modeList").hidden = true;
+        $("setupPanel").hidden = false;
+        $("shopPanel").hidden = true;
+        $("onlineBounty").hidden = gameMode !== "online";
+        $("setupStatus").textContent = "";
+        $("overlayAction").hidden = true;
+        $("overlay").hidden = false;
+        $("shopButton").disabled = false;
+        if (reset && gameMode === "online") $("bountyInput").value = "0";
+        renderLoadout();
+      }
+
+      function openShop() {
+        if (state && state.running || overlayState === "waiting") return;
+        shopReturnSetup = Boolean(setupMode);
+        $("overlayTitle").textContent = "猫球小商店";
+        $("overlayCopy").textContent = "购买的物品会存入 8 格背包；宠物存活归队后可用积分修复。";
+        $("overlayIcon").textContent = "🛍️";
+        $("modeList").hidden = true;
+        $("setupPanel").hidden = true;
+        $("shopPanel").hidden = false;
+        $("overlayAction").hidden = true;
+        $("overlay").hidden = false;
+        $("shopStatus").textContent = "";
+        readProfile();
+      }
+
+      function closeShop() {
+        if (shopReturnSetup && setupMode) showSetup(setupMode);
+        else showMenu();
+      }
+
+      function buyItem(type) {
+        const product = shopItems[type];
+        if (!product) return;
+        readProfile();
+        if (arenaBag.length >= BAG_CAPACITY) {
+          $("shopStatus").textContent = "背包已满（8 格），请先整理后再购买。";
+          return;
+        }
+        if (points < product.price) {
+          $("shopStatus").textContent = "积分不足，无法购买。";
+          return;
+        }
+        const item = { id: `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, type };
+        if (petSpecs[type]) item.hp = petSpecs[type].maxHp;
+        if (!persistArenaChanges(-product.price, [...arenaBag, item])) {
+          $("shopStatus").textContent = "购买未完成，积分或背包保存失败。";
+          return;
+        }
+        $("shopStatus").textContent = `已购买${product.name}，存入背包。`;
+        renderLoadout();
+      }
+
+      function healBagPet(id) {
+        readProfile();
+        const item = arenaBag.find(entry => entry.id === id);
+        if (!item || !petSpecs[item.type] || item.hp >= petSpecs[item.type].maxHp) return;
+        if (points < 2) {
+          $("shopStatus").textContent = "需要 2 积分才能修复 25 HP。";
+          return;
+        }
+        const nextBag = arenaBag.map(entry => entry.id === id
+          ? { ...entry, hp: Math.min(petSpecs[entry.type].maxHp, entry.hp + 25) } : entry);
+        if (!persistArenaChanges(-2, nextBag)) {
+          $("shopStatus").textContent = "宠物修复失败，积分或背包保存失败。";
+          return;
+        }
+        $("shopStatus").textContent = `${itemName(item.type)}已恢复 25 HP。`;
+        renderLoadout();
+      }
+
+      function refundStake() {
+        if (!stakeReserved) return true;
+        if (!persistArenaChanges(lockedStake, arenaBag)) {
+          $("setupStatus").textContent = "战利品退还失败，请检查浏览器存储空间。";
+          return false;
+        }
+        stakeReserved = false;
+        lockedStake = 0;
+        return true;
       }
       function makePlayer(id, name, x, color, kind, look) {
         return {
           id, name, x, y: H / 2, vx: 0, vy: 0, aim: id === "p1" ? 0 : Math.PI,
           hp: 100, maxHp: 100, held: "", ammo: 0, attackCooldown: 0, meleeCooldown: 0,
+          pets: [], equipment: { shield: 0, maxShield: 0, shieldHitAt: -Infinity, pearlAvailable: false, pearlUsed: false, phase: false },
           invulnerable: 0, medTimer: 0, fireWasDown: false, input: { x: 0, y: 0, fire: false, pulse: false, aim: 0 },
           color, kind, cosmetic: look || "", recoil: 0, walked: 0,
           navPath: [], navIndex: 0, navKey: "", navTimer: 0, stuckFor: 0, lastX: x, lastY: H / 2
         };
       }
 
-      function makeGame(gameMode, remote = null) {
+      function emptyLoadout() { return { pets: [], equipment: [] }; }
+      function sanitizeLoadout(loadout) {
+        const result = emptyLoadout();
+        if (!loadout || typeof loadout !== "object") return result;
+        const usedIds = new Set();
+        (Array.isArray(loadout.pets) ? loadout.pets : []).slice(0, PET_LIMIT).forEach(item => {
+          if (!item || !petSpecs[item.type] || typeof item.id !== "string" || usedIds.has(item.id)) return;
+          usedIds.add(item.id);
+          result.pets.push({ id: item.id.slice(0, 100), type: item.type, hp: clamp(Number(item.hp) || petSpecs[item.type].maxHp, 1, petSpecs[item.type].maxHp) });
+        });
+        (Array.isArray(loadout.equipment) ? loadout.equipment : []).slice(0, EQUIPMENT_LIMIT).forEach(item => {
+          if (!item || !equipmentSpecs[item.type] || typeof item.id !== "string" || usedIds.has(item.id)) return;
+          usedIds.add(item.id);
+          result.equipment.push({ id: item.id.slice(0, 100), type: item.type });
+        });
+        return result;
+      }
+      function selectedLoadoutData() {
+        return sanitizeLoadout({
+          pets: selectedLoadout.pets.map(id => arenaBag.find(item => item.id === id)).filter(Boolean),
+          equipment: selectedLoadout.equipment.map(id => arenaBag.find(item => item.id === id)).filter(Boolean)
+        });
+      }
+      function equipPlayer(player, loadout) {
+        const selected = sanitizeLoadout(loadout);
+        player.pets = selected.pets.map((entry, index) => {
+          const spec = petSpecs[entry.type];
+          const side = player.id === "p1" ? 1 : -1;
+          const x = player.x + side * (34 + index * 30), y = player.y + (index % 2 ? 48 : -48);
+          return {
+            id: `${player.id}-${entry.id}`, itemId: entry.id, owner: player.id, type: entry.type, isPet: true,
+            x, y, hp: clamp(entry.hp, 1, spec.maxHp), maxHp: spec.maxHp, alive: true,
+            speed: spec.speed, color: player.color, damage: entry.type === "elephant" ? 12 : entry.type === "dog" ? 18 : 0,
+            cooldown: 0, phase: rand(0, Math.PI * 2), age: 0, navPath: [], navIndex: 0,
+            navKey: "", navTimer: 0, navPoint: null, stuckFor: 0,
+            input: { x: 0, y: 0 }, foodAvailable: entry.type === "drone", selfDestruct: false
+          };
+        });
+        player.equipment = {
+          shield: selected.equipment.some(item => item.type === "shield") ? 75 : 0,
+          maxShield: selected.equipment.some(item => item.type === "shield") ? 75 : 0,
+          shieldHitAt: -Infinity,
+          pearlAvailable: selected.equipment.some(item => item.type === "pearl"),
+          pearlUsed: false,
+          phase: selected.equipment.some(item => item.type === "phase"),
+          items: selected.equipment
+        };
+        return selected;
+      }
+
+      function makeGame(gameMode, remote = null, loadout = null) {
         mode = gameMode;
         pointerTarget = null;
         const onlineGuest = gameMode === "online" && remote && !remote.host;
+        const localLoadout = gameMode === "local" ? emptyLoadout() : sanitizeLoadout(loadout || selectedLoadoutData());
+        const hostLoadout = onlineGuest ? sanitizeLoadout(remote.hostLoadout) : localLoadout;
+        const guestLoadout = gameMode === "online" && !onlineGuest
+          ? sanitizeLoadout(remote && remote.opponentLoadout) : onlineGuest ? localLoadout : emptyLoadout();
         const p1 = makePlayer(
           "p1",
           onlineGuest ? (remote.opponentName || "联机玩家") : catName,
@@ -350,19 +731,29 @@
         const p2Cosmetic = gameMode === "online" ? (onlineGuest ? cosmetic : (remote && remote.opponentCosmetic || "")) :
           (opponentProfile && opponentProfile.cosmetic || "");
         const p2 = makePlayer("p2", p2Name, W - 145, "#ff88ad", p2Kind, p2Cosmetic);
+        const p1Loadout = gameMode === "online" && onlineGuest ? hostLoadout : localLoadout;
+        const p2Selected = gameMode === "online" ? guestLoadout : emptyLoadout();
+        equipPlayer(p1, p1Loadout);
+        equipPlayer(p2, p2Selected);
+        const localStake = gameMode === "online" ? lockedStake : 0;
+        const otherStake = gameMode === "online" ? Number(remote && remote.opponentStake) || 0 : 0;
         state = {
           id: remote && remote.gameId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
           mode: gameMode, running: true, elapsed: 0, spawnTimer: 1.6, nextObjectId: 1,
           players: [p1, p2], items: [], projectiles: [], covers: [], lures: [], particles: [],
-          winner: "", shake: 0
+          winner: "", shake: 0,
+          loadouts: { p1: p1Loadout, p2: p2Selected },
+          stakes: gameMode === "online" ? (onlineGuest ? { p1: otherStake, p2: localStake } : { p1: localStake, p2: otherStake }) : { p1: 0, p2: 0 }
         };
         if (gameMode === "online") {
           if (remote && remote.host) state.host = true;
           else state.host = false;
         }
         updateNames();
-        $("gameStatus").textContent = gameMode === "ai" ? "击败训练对手，获得 12 积分。" :
+        $("gameStatus").textContent = gameMode === "ai" ? "训练对手胜利奖励 +20 积分。" :
           gameMode === "local" ? "双人同屏对战，率先击败对手的一方获胜。" : "联机已接通，正在战斗。";
+        $("shopButton").disabled = true;
+        updateNames();
         $("overlay").hidden = true;
       }
 
@@ -372,17 +763,26 @@
         $("p2Name").textContent = state.players[1].name;
         $("p1Health").style.width = `${Math.max(0, state.players[0].hp)}%`;
         $("p2Health").style.width = `${Math.max(0, state.players[1].hp)}%`;
+        [0, 1].forEach(index => {
+          const player = state.players[index], prefix = index === 0 ? "p1" : "p2";
+          $(`${prefix}ShieldWrap`).hidden = player.equipment.maxShield <= 0;
+          $(`${prefix}Shield`).style.width = `${player.equipment.maxShield ? player.equipment.shield / player.equipment.maxShield * 100 : 0}%`;
+        });
       }
 
       function showMenu(title = "准备好开战了吗？", copy = "收集场地道具并击败对手。生命值归零时战斗结束。") {
         overlayState = "menu";
+        setupMode = "";
         $("overlayTitle").textContent = title;
         $("overlayCopy").textContent = copy;
         $("overlayIcon").textContent = "🐾";
         $("modeList").hidden = false;
+        $("setupPanel").hidden = true;
+        $("shopPanel").hidden = true;
         $("overlayAction").hidden = true;
         $("overlayStatus").textContent = "";
         $("overlay").hidden = false;
+        $("shopButton").disabled = false;
       }
 
       function showWaiting(message) {
@@ -391,20 +791,24 @@
         $("overlayCopy").textContent = "保持页面打开。匹配到另一位玩家后会自动开始。";
         $("overlayIcon").textContent = "🌐";
         $("modeList").hidden = true;
+        $("setupPanel").hidden = true;
+        $("shopPanel").hidden = true;
         $("overlayAction").hidden = false;
         $("overlayAction").textContent = "取消匹配";
         $("overlayStatus").textContent = message;
         $("overlay").hidden = false;
+        $("shopButton").disabled = true;
       }
 
       function showResult(winner, message = "") {
-        if (!state) return;
+        if (!state || !state.running) return;
         state.running = false;
         state.winner = winner ? winner.id : "";
         overlayState = "result";
-        const localSide = mode === "online" ? (state.host ? "p1" : "p2") : winner && winner.id;
-        const localWinner = winner && (mode !== "online" || winner.id === localSide);
-        const rewardText = localWinner ? awardWinner(winner) : "";
+        const localSide = mode === "online" ? (state.host ? "p1" : "p2") : "p1";
+        const localWinner = winner && (mode === "ai" ? winner.id === "p1" :
+          mode === "online" ? winner.id === localSide : true);
+        const rewardText = settleMatch(winner, Boolean(localWinner));
         const heading = winner ? `${winner.name} 获胜！` : "平局";
         resultMessage = `${message || heading}${rewardText ? ` ${rewardText}` : ""}`;
         $("overlayIcon").textContent = winner ? "🏆" : "🤝";
@@ -415,6 +819,7 @@
         $("overlayAction").textContent = "返回模式菜单";
         $("overlayStatus").textContent = "";
         $("overlay").hidden = false;
+        $("shopButton").disabled = false;
         $("gameStatus").textContent = resultMessage;
         if (mode === "online" && state.host) broadcast({ type: "finish", winner: state.winner, winnerName: winner ? winner.name : "" });
       }
@@ -424,6 +829,60 @@
       function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
       function itemAt(x, y) {
         return state.items.find(item => Math.hypot(item.x - x, item.y - y) < 27);
+      }
+      function deployDroneFood(player) {
+        const drone = player.pets.find(pet => pet.type === "drone" && pet.alive && pet.foodAvailable);
+        if (!drone) return false;
+        drone.foodAvailable = false;
+        drone.foodDropped = true;
+        state.lures.push({
+          id: state.nextObjectId++, owner: player.id, drone: true, droneId: drone.id,
+          x: drone.x, y: drone.y, life: 2, phase: 0
+        });
+        addParticles(drone.x, drone.y, "#ffbf80", 10);
+        return true;
+      }
+      function throwPearl(player) {
+        if (!player.equipment.pearlAvailable) return false;
+        const dx = Math.cos(player.aim), dy = Math.sin(player.aim);
+        state.projectiles.push({
+          id: state.nextObjectId++, kind: "pearl", owner: player.id,
+          x: player.x + dx * 22, y: player.y + dy * 22,
+          vx: dx * 340, vy: dy * 340, age: 0
+        });
+        player.equipment.pearlAvailable = false;
+        player.equipment.pearlUsed = true;
+        return true;
+      }
+      function landPearl(projectile) {
+        const owner = state.players.find(player => player.id === projectile.owner);
+        if (!owner) return;
+        let landing = null;
+        for (let radius = 0; radius <= 112 && !landing; radius += 14) {
+          for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+            const x = projectile.x + Math.cos(angle) * radius;
+            const y = projectile.y + Math.sin(angle) * radius;
+            if (safePosition(x, y, 22)) { landing = { x, y }; break; }
+          }
+        }
+        if (landing) {
+          owner.x = landing.x;
+          owner.y = landing.y;
+          owner.invulnerable = .2;
+        }
+        addParticles(projectile.x, projectile.y, "#8bd5ff", 18);
+        state.projectiles = state.projectiles.filter(item => item !== projectile);
+      }
+      function activateAbility(playerId, ability) {
+        if (!state || !state.running) return;
+        if (mode === "online" && !state.host && playerId === "p2") {
+          publishDirect(opponentId, { type: "action", playerId, ability });
+          return;
+        }
+        const player = state.players.find(item => item.id === playerId);
+        if (!player) return;
+        if (ability === "drone") deployDroneFood(player);
+        else if (ability === "pearl") throwPearl(player);
       }
       function safePosition(x, y, radius = 23) {
         return x > 45 + radius && x < W - 45 - radius && y > 48 + radius && y < H - 48 - radius &&
@@ -451,8 +910,7 @@
           if (player.meleeCooldown <= 0 && target && distance(player, target) < 72 &&
               Math.cos(player.aim) * (target.x - player.x) / Math.max(1, distance(player, target)) +
               Math.sin(player.aim) * (target.y - player.y) / Math.max(1, distance(player, target)) > .15) {
-            target.hp = Math.max(0, target.hp - 11);
-            target.invulnerable = .12;
+            applyDamage(target, 11);
             player.meleeCooldown = .52;
             player.recoil = .22;
             addParticles(target.x, target.y, player.color, 9);
@@ -504,6 +962,27 @@
           state.particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: rand(.22, .65), max: .65, color, size: rand(2, 5) });
         }
       }
+      function applyDamage(target, amount) {
+        if (!target || amount <= 0) return;
+        if (target.isPet) {
+          if (!target.alive) return;
+          target.hp = Math.max(0, target.hp - amount);
+          if (target.hp <= 0) {
+            target.alive = false;
+            addParticles(target.x, target.y, target.color || "#d4d8dc", 18);
+          }
+          return;
+        }
+        const equipment = target.equipment;
+        if (equipment && equipment.maxShield > 0) {
+          equipment.shieldHitAt = state.elapsed;
+          const absorbed = Math.min(equipment.shield, amount);
+          equipment.shield -= absorbed;
+          amount -= absorbed;
+        }
+        if (amount > 0) target.hp = Math.max(0, target.hp - amount);
+        target.invulnerable = .12;
+      }
       function hitCover(x, y) {
         return terrain.some(rect => x > rect.x && x < rect.x + rect.w && y > rect.y && y < rect.y + rect.h) ||
           state.covers.some(rect => x > rect.x && x < rect.x + rect.w && y > rect.y && y < rect.y + rect.h);
@@ -514,18 +993,24 @@
         state.players.forEach(player => {
           const d = Math.hypot(projectile.x - player.x, projectile.y - player.y);
           if (d < 118 && !hitCover((projectile.x + player.x) / 2, (projectile.y + player.y) / 2)) {
-            player.hp = Math.max(0, player.hp - Math.round(44 * (1 - d / 150)));
-            player.invulnerable = .15;
+            applyDamage(player, Math.round(44 * (1 - d / 150)));
           }
+          player.pets.forEach(pet => {
+            const petDistance = distance(projectile, pet);
+            if (pet.alive && petDistance < 118 &&
+                !hitCover((projectile.x + pet.x) / 2, (projectile.y + pet.y) / 2)) {
+              applyDamage(pet, Math.round(36 * (1 - petDistance / 150)));
+            }
+          });
         });
         state.projectiles = state.projectiles.filter(item => item !== projectile);
       }
       function collisionMove(player, dx, dy) {
         const radius = 22;
         const nextX = clamp(player.x + dx, 48 + radius, W - 48 - radius);
-        if (safePosition(nextX, player.y, radius)) player.x = nextX;
+        if (player.equipment && player.equipment.phase || safePosition(nextX, player.y, radius)) player.x = nextX;
         const nextY = clamp(player.y + dy, 48 + radius, H - 48 - radius);
-        if (safePosition(player.x, nextY, radius)) player.y = nextY;
+        if (player.equipment && player.equipment.phase || safePosition(player.x, nextY, radius)) player.y = nextY;
       }
       const navGrid = { x: 68, y: 68, step: 28, cols: 30, rows: 15 };
       function gridPosition(index) {
@@ -637,7 +1122,7 @@
       }
       function aiInput(player, dt) {
         const foe = state.players.find(other => other !== player);
-        const lure = state.lures.filter(item => item.owner !== player.id)
+        const lure = state.lures.filter(item => item.owner !== player.id && !item.drone)
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         const healItem = state.items.filter(item => item.type === "medkit")
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
@@ -682,6 +1167,9 @@
         player.meleeCooldown = Math.max(0, player.meleeCooldown - dt);
         player.invulnerable = Math.max(0, player.invulnerable - dt);
         player.recoil = Math.max(0, player.recoil - dt);
+        if (player.equipment.maxShield && state.elapsed - player.equipment.shieldHitAt >= 3) {
+          player.equipment.shield = Math.min(player.equipment.maxShield, player.equipment.shield + 15 * dt);
+        }
         if (player.kind === "ai") aiInput(player, dt);
         else {
           const isP1 = player.id === "p1";
@@ -720,17 +1208,23 @@
             player.input.fire = keys.has(isP1 ? "Space" : "KeyM") || (isP1 && touchInput.fire);
           }
         }
-        if (player.kind !== "ai") {
-          const lure = state.lures.filter(item => item.owner !== player.id)
+        const lure = state.lures.filter(item => item.owner !== player.id && !item.drone)
             .sort((a, b) => distance(player, a) - distance(player, b))[0];
-          if (lure) {
+        if (lure && player.kind !== "ai") {
             const dx = lure.x - player.x, dy = lure.y - player.y;
             const length = Math.max(1, Math.hypot(dx, dy));
             player.input.x = dx / length;
             player.input.y = dy / length;
             player.input.fire = false;
             player.input.pulse = false;
-          }
+        }
+        const droneLure = state.lures.filter(item => item.owner !== player.id && item.drone)
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        if (droneLure) {
+          const dx = droneLure.x - player.x, dy = droneLure.y - player.y;
+          const length = Math.max(1, Math.hypot(dx, dy));
+          player.input.x = clamp(player.input.x + dx / length * .22, -1, 1);
+          player.input.y = clamp(player.input.y + dy / length * .22, -1, 1);
         }
         if (player.input.x || player.input.y) {
           const magnitude = Math.hypot(player.input.x, player.input.y) || 1;
@@ -780,8 +1274,20 @@
         state.covers.forEach(cover => cover.life -= dt);
         state.covers = state.covers.filter(cover => cover.life > 0);
         state.lures.forEach(lure => { lure.life -= dt; lure.phase += dt; });
+        state.lures.filter(lure => lure.drone && lure.life <= 0).forEach(lure => {
+          const drone = state.players.flatMap(player => player.pets).find(pet => pet.id === lure.droneId);
+          if (drone && drone.alive) { drone.selfDestruct = true; drone.age = 0; }
+        });
         state.lures = state.lures.filter(lure => lure.life > 0);
         for (const shot of [...state.projectiles]) {
+          if (shot.kind === "pearl") {
+            shot.age += dt;
+            shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+            shot.vx *= Math.pow(.982, dt * 60); shot.vy *= Math.pow(.982, dt * 60);
+            if (hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 ||
+                shot.y < 52 || shot.y > H - 52 || shot.age > .9) landPearl(shot);
+            continue;
+          }
           if (shot.kind === "grenade") {
             shot.age += dt;
             if (shot.fuse >= 0) {
@@ -791,20 +1297,28 @@
             }
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
             shot.vx *= Math.pow(.982, dt * 60); shot.vy *= Math.pow(.982, dt * 60);
-            const hitPlayer = state.players.find(player => player.id !== shot.owner && distance(player, shot) < 25);
-            if (hitPlayer || hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 || shot.y < 52 || shot.y > H - 52 || shot.age > .9) {
+            const hitTarget = state.players.filter(player => player.id !== shot.owner)
+              .some(player => distance(player, shot) < 25 ||
+                player.pets.some(pet => pet.alive && distance(pet, shot) < 23));
+            if (hitTarget || hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 || shot.y < 52 || shot.y > H - 52 || shot.age > .9) {
               shot.fuse = 1.5;
             }
           } else {
             shot.life -= dt;
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
-            const hitPlayer = state.players.find(player => player.id !== shot.owner && distance(player, shot) < 23);
-            if (hitPlayer) {
-              hitPlayer.hp = Math.max(0, hitPlayer.hp - shot.damage);
-              hitPlayer.invulnerable = .1;
-              addParticles(shot.x, shot.y, hitPlayer.color, 7);
+            let hitTarget = null, hitDistance = Infinity;
+            state.players.filter(player => player.id !== shot.owner).forEach(player => {
+              const playerDistance = distance(player, shot);
+              if (playerDistance < 23 && playerDistance < hitDistance) { hitTarget = player; hitDistance = playerDistance; }
+              player.pets.filter(pet => pet.alive).forEach(pet => {
+                const petDistance = distance(pet, shot);
+                if (petDistance < 20 && petDistance < hitDistance) { hitTarget = pet; hitDistance = petDistance; }
+              });
+            });
+            if (hitTarget) {
+              applyDamage(hitTarget, shot.damage);
+              addParticles(shot.x, shot.y, hitTarget.color || "#dce8f4", 7);
               state.projectiles = state.projectiles.filter(item => item !== shot);
-              if (hitPlayer.hp <= 0) showResult(state.players.find(player => player.id === shot.owner));
             } else if (hitCover(shot.x, shot.y) || shot.x < 46 || shot.x > W - 46 || shot.y < 46 || shot.y > H - 46 || shot.life <= 0) {
               addParticles(shot.x, shot.y, "#dce8f4", 3);
               state.projectiles = state.projectiles.filter(item => item !== shot);
@@ -816,10 +1330,69 @@
         state.shake = Math.max(0, state.shake - dt);
       }
 
+      function updatePets(dt) {
+        state.players.forEach(owner => owner.pets.forEach(pet => {
+          if (!pet.alive) return;
+          pet.cooldown = Math.max(0, pet.cooldown - dt);
+          const enemy = state.players.find(player => player.id !== owner.id);
+          if (pet.type === "turret") {
+            pet.x = owner.x + (owner.id === "p1" ? 48 : -48);
+            pet.y = owner.y + 48;
+            if (pet.cooldown <= 0 && hasLineOfSight(pet, enemy)) {
+              const angle = Math.atan2(enemy.y - pet.y, enemy.x - pet.x);
+              state.projectiles.push({
+                id: state.nextObjectId++, kind: "bullet", owner: owner.id,
+                x: pet.x + Math.cos(angle) * 18, y: pet.y + Math.sin(angle) * 18,
+                vx: Math.cos(angle) * 620, vy: Math.sin(angle) * 620,
+                life: 1.1, damage: 14
+              });
+              pet.cooldown = 1;
+            }
+            return;
+          }
+          if (pet.type === "drone") {
+            pet.phase += dt * 1.7;
+            if (pet.selfDestruct) {
+              pet.age += dt;
+              const dx = enemy.x - pet.x, dy = enemy.y - pet.y, length = Math.max(1, Math.hypot(dx, dy));
+              const travel = Math.min(length, 260 * dt);
+              pet.x += dx / length * travel;
+              pet.y += dy / length * travel;
+              if (length < 25 || pet.age > 5) {
+                if (length < 25) applyDamage(enemy, 18);
+                pet.alive = false;
+                addParticles(pet.x, pet.y, "#ffbf80", 18);
+              }
+            } else {
+              const orbitX = clamp(enemy.x + Math.cos(pet.phase) * 92, 56, W - 56);
+              const orbitY = clamp(enemy.y + Math.sin(pet.phase) * 62, 56, H - 56);
+              const dx = orbitX - pet.x, dy = orbitY - pet.y, length = Math.max(1, Math.hypot(dx, dy));
+              pet.x += dx / length * Math.min(length, pet.speed * dt);
+              pet.y += dy / length * Math.min(length, pet.speed * dt);
+            }
+            return;
+          }
+          navigate(pet, enemy, `pet-${pet.id}-${enemy.id}`, 39, dt);
+          if (pet.input.x || pet.input.y) {
+            const magnitude = Math.max(1, Math.hypot(pet.input.x, pet.input.y));
+            const speed = pet.speed;
+            collisionMove(pet, pet.input.x / magnitude * speed * dt, pet.input.y / magnitude * speed * dt);
+          }
+          const d = distance(pet, enemy);
+          if (pet.type === "elephant" && d < 50) applyDamage(enemy, pet.damage * dt);
+          if (pet.type === "dog" && d < 46 && pet.cooldown <= 0) {
+            applyDamage(enemy, pet.damage);
+            pet.cooldown = .8;
+            addParticles(enemy.x, enemy.y, "#e8a878", 6);
+          }
+        }));
+      }
+
       function updateGame(dt) {
         if (!state || !state.running || (mode === "online" && !state.host)) return;
         state.elapsed += dt;
         state.players.forEach(player => updatePlayer(player, dt));
+        updatePets(dt);
         updateObjects(dt);
         updateNames();
         const dead = state.players.find(player => player.hp <= 0);
@@ -844,20 +1417,20 @@
       function drawCosmetic(player) {
         if (player.cosmetic === "sign") {
           ctx.fillStyle = "#ffb9d1";
-          ctx.fillRect(player.x - 29, player.y - 51, 58, 15);
-          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(player.x - 29, player.y - 51, 58, 15);
-          ctx.fillStyle = "#57284a"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.fillText("最帅猫球", player.x, player.y - 40);
+          ctx.fillRect(-29, -51, 58, 15);
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(-29, -51, 58, 15);
+          ctx.fillStyle = "#57284a"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.fillText("最帅猫球", 0, -40);
         } else if (player.cosmetic === "ingot") {
           ctx.fillStyle = "#ffd45f"; ctx.strokeStyle = "#a76b13"; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.moveTo(player.x + 19, player.y + 11); ctx.lineTo(player.x + 28, player.y + 15);
-          ctx.lineTo(player.x + 25, player.y + 25); ctx.lineTo(player.x + 13, player.y + 25);
-          ctx.lineTo(player.x + 10, player.y + 15); ctx.closePath(); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(19, 11); ctx.lineTo(28, 15);
+          ctx.lineTo(25, 25); ctx.lineTo(13, 25);
+          ctx.lineTo(10, 15); ctx.closePath(); ctx.fill(); ctx.stroke();
         } else if (player.cosmetic === "scooter") {
           ctx.strokeStyle = "#6abce9"; ctx.lineWidth = 3; ctx.beginPath();
-          ctx.moveTo(player.x - 20, player.y + 24); ctx.lineTo(player.x + 20, player.y + 24);
-          ctx.lineTo(player.x + 10, player.y + 14); ctx.moveTo(player.x + 20, player.y + 24); ctx.lineTo(player.x + 15, player.y + 13);
+          ctx.moveTo(-20, 24); ctx.lineTo(20, 24);
+          ctx.lineTo(10, 14); ctx.moveTo(20, 24); ctx.lineTo(15, 13);
           ctx.stroke(); ctx.fillStyle = "#795ca5";
-          [-16, 17].forEach(dx => { ctx.beginPath(); ctx.arc(player.x + dx, player.y + 25, 4, 0, Math.PI * 2); ctx.fill(); });
+          [-16, 17].forEach(dx => { ctx.beginPath(); ctx.arc(dx, 25, 4, 0, Math.PI * 2); ctx.fill(); });
         }
       }
 
@@ -887,6 +1460,44 @@
           if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, player.x - 16, player.y + 30, 18, 18);
           ctx.fillStyle = item ? item.color : "#fff";
           ctx.font = "bold 12px sans-serif"; ctx.fillText(String(player.ammo), player.x + 9, player.y + 44);
+        }
+      }
+
+      function drawPet(pet) {
+        if (!pet.alive) return;
+        ctx.save();
+        ctx.translate(pet.x, pet.y + Math.sin(state.elapsed * 7 + pet.phase) * (pet.type === "drone" ? 4 : 1));
+        ctx.globalAlpha = pet.type === "drone" ? .92 : 1;
+        if (pet.type === "elephant" && elephantImage.complete && elephantImage.naturalWidth) {
+          ctx.drawImage(elephantImage, -34, -34, 68, 68);
+        } else if (pet.type === "dog" && dogImage.complete && dogImage.naturalWidth) {
+          ctx.drawImage(dogImage, -27, -27, 54, 54);
+        } else if (pet.type === "drone") {
+          ctx.strokeStyle = "#52677b"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(-20, -12); ctx.lineTo(-27, -17);
+          ctx.moveTo(20, -12); ctx.lineTo(27, -17); ctx.moveTo(-19, 12); ctx.lineTo(-27, 17);
+          ctx.moveTo(19, 12); ctx.lineTo(27, 17); ctx.stroke();
+          ctx.fillStyle = pet.color; ctx.beginPath(); ctx.roundRect(-18, -12, 36, 24, 9); ctx.fill();
+          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#52677b"; ctx.lineWidth = 2;
+          [[-27, -17, -19, -17], [19, -17, 27, -17], [-27, 17, -19, 17], [19, 17, 27, 17]]
+            .forEach(([x1, y1, x2, y2]) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); });
+        } else {
+          ctx.fillStyle = "#66717c"; ctx.strokeStyle = "#333d46"; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.roundRect(-24, -20, 48, 40, 6); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#a9b5bf"; ctx.fillRect(-6, -7, 33, 14);
+          ctx.fillStyle = "#69757f"; ctx.beginPath(); ctx.arc(-5, 0, 12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#d5e0e7"; ctx.beginPath(); ctx.arc(-5, 0, 5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+        const width = pet.type === "elephant" ? 44 : 34;
+        const y = pet.y - (pet.type === "elephant" ? 41 : 34);
+        ctx.fillStyle = "#fff"; ctx.fillRect(pet.x - width / 2, y, width, 4);
+        ctx.fillStyle = pet.color;
+        ctx.fillRect(pet.x - width / 2, y, width * clamp(pet.hp / pet.maxHp, 0, 1), 4);
+        if (pet.type === "drone" && pet.foodAvailable) {
+          const icon = itemIcons.food;
+          if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, pet.x + 14, pet.y - 27, 14, 14);
         }
       }
 
@@ -930,7 +1541,10 @@
             ctx.globalAlpha = 1;
           });
           state.projectiles.forEach(shot => {
-            if (shot.kind === "grenade") {
+            if (shot.kind === "pearl") {
+              ctx.fillStyle = "#9ce3ff"; ctx.strokeStyle = "#2676a0"; ctx.lineWidth = 2;
+              ctx.beginPath(); ctx.arc(shot.x, shot.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            } else if (shot.kind === "grenade") {
               ctx.fillStyle = shot.fuse >= 0 ? (Math.sin(state.elapsed * 25) > 0 ? "#fff0a0" : "#ff765f") : "#ffbd5b";
               ctx.beginPath(); ctx.arc(shot.x, shot.y, 8, 0, Math.PI * 2); ctx.fill();
             } else {
@@ -943,6 +1557,7 @@
             ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
           });
           ctx.globalAlpha = 1;
+          state.players.forEach(player => player.pets.forEach(drawPet));
           state.players.forEach(drawPlayer);
         } else {
           ctx.fillStyle = "rgba(255,255,255,.06)"; ctx.font = "700 20px sans-serif"; ctx.textAlign = "center";
@@ -958,6 +1573,19 @@
         $("itemStatus").textContent = info ? `道具：${info.label}　剩余 ${localPlayer.ammo}` : "道具：空手（靠近后按出击键肉搏）";
         $("p1Health").style.width = `${Math.max(0, state.players[0].hp)}%`;
         $("p2Health").style.width = `${Math.max(0, state.players[1].hp)}%`;
+        [0, 1].forEach(index => {
+          const player = state.players[index], prefix = index === 0 ? "p1" : "p2";
+          $(`${prefix}ShieldWrap`).hidden = player.equipment.maxShield <= 0;
+          $(`${prefix}Shield`).style.width = `${player.equipment.maxShield ? player.equipment.shield / player.equipment.maxShield * 100 : 0}%`;
+        });
+        const pets = localPlayer.pets.filter(pet => pet.alive).length;
+        const gear = localPlayer.equipment;
+        const extras = [];
+        if (pets) extras.push(`宠物 ${pets}`);
+        if (gear.shield) extras.push(`盾 ${Math.ceil(gear.shield)}`);
+        if (gear.pearlAvailable) extras.push("珍珠 E/K");
+        if (gear.phase) extras.push("穿墙");
+        if (extras.length) $("itemStatus").textContent += `　· ${extras.join(" · ")}`;
       }
 
       function frame(now) {
@@ -1001,6 +1629,12 @@
         if (!keys.has(event.code)) {
           if (event.code === "Space" && (mode !== "online" || state)) firePulse("p1");
           if (event.code === "KeyM" && mode === "local") firePulse("p2");
+          const canControlP1 = mode !== "online" || state && state.host;
+          const canControlP2 = mode === "local" || mode === "online" && state && !state.host;
+          if (event.code === "KeyE" && canControlP1) activateAbility("p1", "pearl");
+          if (event.code === "KeyF" && canControlP1) activateAbility("p1", "drone");
+          if (event.code === "KeyK" && canControlP2) activateAbility("p2", "pearl");
+          if (event.code === "KeyL" && canControlP2) activateAbility("p2", "drone");
         }
         keys.add(event.code);
       });
@@ -1029,6 +1663,12 @@
         button.addEventListener("pointerdown", down);
         button.addEventListener("lostpointercapture", event => releaseTouchPointer(event.pointerId));
       });
+      document.querySelectorAll("[data-ability]").forEach(button => {
+        button.addEventListener("click", () => {
+          const playerId = mode === "online" && state && !state.host ? "p2" : "p1";
+          activateAbility(playerId, button.dataset.ability);
+        });
+      });
       window.addEventListener("pointerup", event => releaseTouchPointer(event.pointerId));
       window.addEventListener("pointercancel", event => releaseTouchPointer(event.pointerId));
       function clearInputs() {
@@ -1051,33 +1691,49 @@
         return `catball-pvp-${window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
       }
       async function startOnline() {
+        const attemptId = ++onlineAttemptId;
         mode = "online";
         peers.clear();
         showWaiting("正在连接 GoEasy…");
         if (!window.GoEasy || typeof window.GoEasy.getInstance !== "function") {
+          refundStake();
           showMenu("联机服务加载失败", "请检查网络后刷新页面，或选择人机/本地双人模式。");
           $("overlayStatus").textContent = "GoEasy SDK 未能加载。";
           return;
         }
         try {
-          goeasy = window.GoEasy.getInstance({ host: GOEASY_HOST, appkey: GOEASY_KEY, modules: ["pubsub"] });
+          const client = window.GoEasy.getInstance({ host: GOEASY_HOST, appkey: GOEASY_KEY, modules: ["pubsub"] });
+          goeasy = client;
+          const stillWaiting = () => onlineAttemptId === attemptId && mode === "online" && overlayState === "waiting";
+          const stopCancelledAttempt = () => {
+            if (goeasy === client) {
+              try { client.disconnect({}); }
+              catch (error) { console.error("关闭已取消的 GoEasy 连接失败：", error); }
+              goeasy = null;
+              connected = false;
+            }
+          };
           peerId = randomId();
-          await goEasyOperation(callbacks => goeasy.connect({
+          await goEasyOperation(callbacks => client.connect({
             id: peerId,
             data: { nickname: catName, catName, cosmetic },
             ...callbacks
           }));
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
           connected = true;
-          await goEasyOperation(callbacks => goeasy.pubsub.subscribe({
+          await goEasyOperation(callbacks => client.pubsub.subscribe({
             channel: LOBBY, presence: { enable: true }, onMessage: onLobbyMessage, ...callbacks
           }));
-          await goEasyOperation(callbacks => goeasy.pubsub.subscribe({
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          await goEasyOperation(callbacks => client.pubsub.subscribe({
             channel: `${INBOX}${peerId}`, onMessage: onDirectMessage, ...callbacks
           }));
-          await goEasyOperation(callbacks => goeasy.pubsub.subscribePresence({
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          await goEasyOperation(callbacks => client.pubsub.subscribePresence({
             channel: LOBBY, onPresence: handlePresence, ...callbacks
           }));
-          await goEasyOperation(callbacks => goeasy.pubsub.hereNow({
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          await goEasyOperation(callbacks => client.pubsub.hereNow({
             channel: LOBBY, limit: 100, onSuccess: response => {
               const members = response && response.content && response.content.members;
               if (!Array.isArray(members)) { callbacks.onFailed(new Error("GoEasy 在线成员数据格式异常")); return; }
@@ -1085,6 +1741,7 @@
               callbacks.onSuccess();
             }, onFailed: callbacks.onFailed
           }));
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
           publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic } });
           queueTimer = setInterval(() => {
             if (!opponentId && connected) {
@@ -1095,7 +1752,9 @@
           tryMatch();
           $("overlayStatus").textContent = peers.size ? `找到 ${peers.size} 位在线玩家，正在匹配…` : "已连接，正在等待对手加入…";
         } catch (error) {
+          if (onlineAttemptId !== attemptId) return;
           console.error("GoEasy 联机失败：", error);
+          refundStake();
           closeOnline();
           showMenu("暂时无法联机", "请确认网络连接和 GoEasy 服务状态。");
           $("overlayStatus").textContent = error.message || "连接失败，请稍后重试。";
@@ -1117,11 +1776,17 @@
           tryMatch();
         } else if (event.action === "leave") {
           peers.delete(event.member.id);
-          if (event.member.id === opponentId && state && state.running) {
-            closeOnline(false);
-            state = null;
-            mode = "";
-            showMenu("对手已离线", "联机对手离开了游戏。请返回菜单重新匹配。");
+          if (event.member.id === opponentId) {
+            if (state && state.running) {
+              const localSide = state.host ? "p1" : "p2";
+              showResult(state.players.find(player => player.id === localSide), "对手已离线，本局判你获胜。");
+            } else if (!state && stakeReserved) {
+              refundStake();
+              closeOnline(false);
+              showMenu("对手已离线", "本局尚未开始，战利品已退还。请重新匹配。");
+            } else {
+              closeOnline(false);
+            }
           }
         }
       }
@@ -1153,7 +1818,8 @@
         opponentId = candidate;
         opponentProfile = profile;
         publishDirect(candidate, {
-          type: "offer", from: peerId, profile: { name: catName, cosmetic }
+          type: "offer", from: peerId, profile: { name: catName, cosmetic },
+          stake: lockedStake, loadout: selectedLoadoutData()
         });
         $("overlayStatus").textContent = `正在与 ${profile.name} 握手…`;
       }
@@ -1172,25 +1838,44 @@
         if (!envelope || envelope.to !== peerId || typeof envelope.from !== "string" || !envelope.data) return;
         const { from, data } = envelope;
         if (data.type === "offer" && overlayState === "waiting" && !opponentId) {
+          if (!Number.isSafeInteger(data.stake) || data.stake < 0 ||
+              data.stake > 1000000 || !data.loadout || typeof data.loadout !== "object") return;
           opponentId = from;
+          opponentStake = data.stake;
           const profile = data.profile || {};
           opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : "" };
-          publishDirect(from, { type: "accept", profile: { name: catName, cosmetic } });
+          publishDirect(from, {
+            type: "accept", profile: { name: catName, cosmetic },
+            stake: lockedStake, loadout: selectedLoadoutData()
+          });
           $("overlayStatus").textContent = `已连接 ${opponentProfile.name}，等待开战…`;
         } else if (data.type === "accept" && from === opponentId && !state) {
+          if (!Number.isSafeInteger(data.stake) || data.stake < 0 ||
+              data.stake > 1000000 || !data.loadout || typeof data.loadout !== "object") return;
+          opponentStake = data.stake;
           const profile = data.profile || {};
           opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : "" };
           makeGame("online", {
-            host: true, opponentName: opponentProfile.name, opponentCosmetic: opponentProfile.cosmetic
+            host: true, opponentName: opponentProfile.name, opponentCosmetic: opponentProfile.cosmetic,
+            opponentStake, opponentLoadout: sanitizeLoadout(data.loadout)
           });
           publishDirect(from, {
             type: "start", hostName: catName, hostCosmetic: cosmetic,
-            guestName: opponentProfile.name, guestCosmetic: opponentProfile.cosmetic, gameId: state.id
+            guestName: opponentProfile.name, guestCosmetic: opponentProfile.cosmetic, gameId: state.id,
+            hostStake: lockedStake, guestStake: opponentStake,
+            hostLoadout: selectedLoadoutData(), guestLoadout: sanitizeLoadout(data.loadout)
           });
         } else if (data.type === "start" && from === opponentId && !state) {
+          if (typeof data.gameId !== "string" ||
+              !Number.isSafeInteger(data.hostStake) || data.hostStake !== opponentStake ||
+              !Number.isSafeInteger(data.guestStake) || data.guestStake !== lockedStake ||
+              !data.hostLoadout || typeof data.hostLoadout !== "object") return;
           const profile = { name: String(data.hostName || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(data.hostCosmetic) ? data.hostCosmetic : "" };
           opponentProfile = profile;
-          makeGame("online", { host: false, opponentName: profile.name, opponentCosmetic: profile.cosmetic, gameId: data.gameId });
+          makeGame("online", {
+            host: false, opponentName: profile.name, opponentCosmetic: profile.cosmetic,
+            opponentStake, hostLoadout: sanitizeLoadout(data.hostLoadout), gameId: data.gameId
+          });
         } else if (data.type === "input" && from === opponentId && state && state.host && state.running &&
                    data.input && typeof data.input === "object") {
           const remote = state.players[1];
@@ -1199,6 +1884,9 @@
             aim: Number.isFinite(data.input.aim) ? data.input.aim : remote.aim,
             fire: Boolean(data.input.fire), pulse: Boolean(data.input.pulse)
           };
+        } else if (data.type === "action" && from === opponentId && state && state.host && state.running &&
+                   data.playerId === "p2" && ["pearl", "drone"].includes(data.ability)) {
+          activateAbility("p2", data.ability);
         } else if (data.type === "state" && from === opponentId && state && !state.host && data.state && data.state.id === state.id) {
           state = { ...data.state, host: false };
           updateNames();
@@ -1207,10 +1895,17 @@
           if (winner) winner.name = String(data.winnerName || winner.name).slice(0, 16);
           showResult(winner, winner ? `${winner.name} 获胜！` : "平局。");
         } else if (data.type === "quit" && from === opponentId) {
-          closeOnline(false);
-          state = null;
-          mode = "";
-          showMenu("对手已离开", "本场联机对战已结束。");
+          if (state && state.running) {
+            const localSide = state.host ? "p1" : "p2";
+            showResult(state.players.find(player => player.id === localSide), "对手离开对战，本局判你获胜。");
+            closeOnline(false);
+          } else if (!state && stakeReserved) {
+            refundStake();
+            closeOnline(false);
+            showMenu("对手已离开", "本局尚未开始，战利品已退还。");
+          } else {
+            closeOnline(false);
+          }
         }
       }
       function sendInput(pulse = false) {
@@ -1230,6 +1925,7 @@
         if (opponentId) publishDirect(opponentId, data);
       }
       function closeOnline(notifyOpponent = true) {
+        onlineAttemptId++;
         clearInterval(queueTimer);
         queueTimer = null;
         if (notifyOpponent && opponentId && connected) publishDirect(opponentId, { type: "quit" });
@@ -1241,19 +1937,70 @@
         opponentProfile = null; peers.clear();
       }
       function returnToMenu() {
-        if (mode === "online") closeOnline();
+        if (mode === "online") {
+          if (state && state.running) {
+            const localSide = state.host ? "p1" : "p2";
+            settleMatch(state.players.find(player => player.id !== localSide), false);
+          } else if (!state && stakeReserved) {
+            refundStake();
+          }
+          closeOnline();
+        } else if (state && state.running) {
+          settleMatch(null, false);
+        }
         state = null; mode = ""; keys.clear();
         showMenu();
       }
 
       document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => {
-        if (button.dataset.mode === "ai") { makeGame("ai"); spawnItem(); spawnItem(); }
-        else if (button.dataset.mode === "local") { makeGame("local"); spawnItem(); spawnItem(); }
-        else startOnline();
+        if (button.dataset.mode === "ai") showSetup("ai", true);
+        else if (button.dataset.mode === "local") { makeGame("local", null, emptyLoadout()); spawnItem(); spawnItem(); }
+        else showSetup("online", true);
       }));
+      $("setupStart").addEventListener("click", () => {
+        const gameMode = setupMode;
+        const loadout = selectedLoadoutData();
+        readProfile();
+        if (loadout.pets.length > PET_LIMIT || loadout.equipment.length > EQUIPMENT_LIMIT) {
+          $("setupStatus").textContent = "最多装备 2 个宠物和 2 件装备。";
+          return;
+        }
+        if (gameMode === "online") {
+          const stake = Number($("bountyInput").value);
+          if (!Number.isSafeInteger(stake) || stake < 0 || stake > points) {
+            $("setupStatus").textContent = `战利品必须是 0 到当前积分 ${points} 之间的整数。`;
+            return;
+          }
+          if (!persistArenaChanges(-stake, arenaBag)) {
+            $("setupStatus").textContent = "战利品锁定失败，请检查积分数据后重试。";
+            return;
+          }
+          lockedStake = stake;
+          opponentStake = 0;
+          stakeReserved = true;
+          setupMode = "";
+          startOnline();
+        } else {
+          setupMode = "";
+          makeGame("ai", null, loadout);
+          spawnItem(); spawnItem();
+        }
+      });
+      $("setupCancel").addEventListener("click", () => showMenu());
       $("overlayAction").addEventListener("click", () => {
         if (overlayState === "waiting") returnToMenu();
         else if (overlayState === "result") returnToMenu();
+      });
+      $("shopButton").addEventListener("click", openShop);
+      $("loadoutShopButton").addEventListener("click", openShop);
+      $("shopClose").addEventListener("click", closeShop);
+      $("shopProducts").addEventListener("click", event => {
+        const button = event.target.closest("[data-buy]");
+        if (button) buyItem(button.dataset.buy);
+      });
+      $("bagList").addEventListener("click", event => {
+        const button = event.target.closest("[data-heal]");
+        if (button) healBagPet(button.dataset.heal);
       });
       $("menuButton").addEventListener("click", returnToMenu);
       window.addEventListener("storage", event => {
