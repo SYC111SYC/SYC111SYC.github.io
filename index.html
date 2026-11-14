@@ -248,6 +248,51 @@
             height: 30px;
         }
 
+        .pet-glasses {
+            top: 33px;
+            left: 15px;
+            width: 64px;
+            height: 28px;
+        }
+
+        .pet-glasses svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .pet-glasses.active:not(.floating) {
+            cursor: grab;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .pet-glasses.floating {
+            position: absolute;
+            z-index: 10001;
+            width: 68px;
+            height: 30px;
+            margin: 0;
+            cursor: grabbing;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+            pointer-events: auto;
+            touch-action: none;
+            transform: none;
+        }
+
+        .pet-wrap.angry::after {
+            position: absolute;
+            top: -10px;
+            right: 3px;
+            content: "💢";
+            font-size: 19px;
+            animation: anger-bounce 0.35s ease-in-out infinite alternate;
+        }
+
+        @keyframes anger-bounce {
+            to { transform: translateY(-4px) rotate(12deg); }
+        }
+
         .pet:hover {
             transform: scale(1.08);
             filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.22));
@@ -1091,6 +1136,10 @@
                             <svg viewBox="0 0 40 40" aria-hidden="true"><path d="m6 22 5-11h18l5 11-5 10H11L6 22Z" fill="#f6bd35" stroke="#a76b13" stroke-width="2"/><path d="M11 11l4 7h10l4-7M15 18l-4 14m14-14 4 14M15 18h10" fill="none" stroke="#ffe98b" stroke-width="2"/><path d="M17 25h6" stroke="#fff4b0" stroke-width="2"/></svg>
                             <span class="economy-product-copy"><strong>史诗 · 幸运元宝 · 32积分</strong><small>15天；装备后大吉概率+60%、二等奖及以上+30%</small></span>
                         </button>
+                        <button class="economy-product" type="button" data-product="glasses" data-cost="8">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M4 17h4l3-7h8l2 5 2-5h8l3 7h4" fill="none" stroke="#384c68" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><rect x="6" y="15" width="12" height="13" rx="4" fill="#88dcf2" fill-opacity=".72" stroke="#26364f" stroke-width="2.5"/><rect x="22" y="15" width="12" height="13" rx="4" fill="#88dcf2" fill-opacity=".72" stroke="#26364f" stroke-width="2.5"/><path d="M18 19h4" stroke="#26364f" stroke-width="2.5"/></svg>
+                            <span class="economy-product-copy"><strong>给我怪的眼镜 · 8积分</strong><small>限时15天；拖走眼镜，猫球会追着要回来</small></span>
+                        </button>
                         <button class="economy-product" type="button" data-product="lotteryBasic" data-cost="8">
                             <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 6h22v28H9z" fill="#fff3c4" stroke="#d79c28" stroke-width="2"/><path d="M14 12h12m-12 6h12m-12 6h8" stroke="#bd7e17" stroke-width="2" stroke-linecap="round"/><path d="m27 26 2 3 4-6" fill="none" stroke="#59a96a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <span class="economy-product-copy"><strong>初级抽奖 · 8积分/次</strong><small>2%+80 · 8%+20 · 15%+10 · 60%+5 · 15%未中奖</small></span>
@@ -1128,6 +1177,7 @@
             <a href="calendar.html">日历与倒数日</a>
             <a href="clock.html">世界时间</a>
             <a href="connect.html">联机</a>
+            <a href="pvpgame.html">对战游戏~</a>
         </nav>
     </header>
 
@@ -1228,6 +1278,15 @@
             <path d="M31 9h12" stroke="#ff9d55" stroke-width="4" stroke-linecap="round"/>
         </svg>
         <div id="pet" class="pet"></div>
+        <div class="pet-cosmetic pet-glasses" id="petGlasses" title="拖走眼镜，猫球会追着要回来">
+            <svg viewBox="0 0 70 30" aria-hidden="true">
+                <path d="M2 8h6l3 3m50 0 3-3h4" fill="none" stroke="#26364f" stroke-width="3" stroke-linecap="round"/>
+                <rect x="7" y="8" width="23" height="17" rx="6" fill="#8be0f5" fill-opacity=".7" stroke="#26364f" stroke-width="3"/>
+                <rect x="40" y="8" width="23" height="17" rx="6" fill="#8be0f5" fill-opacity=".7" stroke="#26364f" stroke-width="3"/>
+                <path d="M30 13h10" stroke="#26364f" stroke-width="3" stroke-linecap="round"/>
+                <path d="M12 12h13m30 0H43" stroke="#fff" stroke-opacity=".8" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </div>
         <div id="petSpeech" class="pet-speech" aria-live="polite"></div>
     </div>
 
@@ -1496,6 +1555,7 @@
            ========================================================= */
         const petWrap = document.getElementById('petWrap');
         const pet = document.getElementById('pet');
+        const petGlasses = document.getElementById('petGlasses');
         const petSpeech = document.getElementById('petSpeech');
         const petNameLabel = document.getElementById('petNameLabel');
         const petNameInput = document.getElementById('petNameInput');
@@ -1572,10 +1632,26 @@
             nextEatSpeechAt: 0,
             chasingWand: false,
             nextWandSpeechAt: 0,
+            chasingGlasses: false,
+            nextGlassesSpeechAt: 0,
             goingToBoard: false,
             atBoard: false,
             boardTargetX: 0,
             boardTargetY: 0
+        };
+        const GLASSES_SIZE = { width: 68, height: 30 };
+        const GLASSES_CATCH_DISTANCE = 27;
+        const glassesDrag = {
+            active: false,
+            dragging: false,
+            pointerId: null,
+            offsetX: 0,
+            offsetY: 0,
+            startX: 0,
+            startY: 0,
+            moved: false,
+            x: 0,
+            y: 0
         };
 
         function randomRange(min, max) {
@@ -1640,6 +1716,9 @@
             if (!petState.lastTime) petState.lastTime = timestamp;
             const delta = (timestamp - petState.lastTime) / 16.67;
             petState.lastTime = timestamp;
+            if (!isGlassesActive() && (glassesDrag.active || glassesDrag.dragging)) {
+                returnGlassesToPet();
+            }
 
             if (petState.goingToBoard) {
                 const dx = petState.boardTargetX - petState.x;
@@ -1667,6 +1746,27 @@
             } else if (petState.atBoard) {
                 petState.vx = 0;
                 petState.vy = 0;
+            } else if (petState.chasingGlasses && glassesDrag.active) {
+                const gc = getGlassesCenter();
+                const pcx = petState.x + petWrap.offsetWidth / 2;
+                const pcy = petState.y + petWrap.offsetHeight / 2;
+                const dx = gc.x - pcx;
+                const dy = gc.y - pcy;
+                const dist = Math.hypot(dx, dy) || 1;
+
+                if (dist <= GLASSES_CATCH_DISTANCE) {
+                    petState.vx = 0;
+                    petState.vy = 0;
+                    returnGlassesToPet();
+                    say('给我~！', 1000);
+                } else {
+                    petState.vx = (dx / dist) * 10.5;
+                    petState.vy = (dy / dist) * 10.5;
+                    if (timestamp > petState.nextGlassesSpeechAt) {
+                        say('给我~！', 900);
+                        petState.nextGlassesSpeechAt = timestamp + 650;
+                    }
+                }
             } else if (petState.chasingWand && wandDrag.active) {
                 const wc = getWandCenter();
                 const pcx = petState.x + petWrap.offsetWidth / 2;
@@ -1890,8 +1990,9 @@
                         scooterUntil: Number.isFinite(inventory.scooterUntil) ? inventory.scooterUntil : 0,
                         speedPotionUntil: Number.isFinite(inventory.speedPotionUntil) ? inventory.speedPotionUntil : 0,
                         ingotUntil: Number.isFinite(inventory.ingotUntil) ? inventory.ingotUntil : 0,
+                        glassesUntil: Number.isFinite(inventory.glassesUntil) ? inventory.glassesUntil : 0,
                         vipUntil: Number.isFinite(inventory.vipUntil) ? inventory.vipUntil : 0,
-                        equipped: ['sign', 'scooter', 'ingot'].includes(inventory.equipped) ? inventory.equipped : '',
+                        equipped: ['sign', 'scooter', 'ingot', 'glasses'].includes(inventory.equipped) ? inventory.equipped : '',
                         pvpBag: Array.isArray(inventory.pvpBag) ? inventory.pvpBag : []
                     }
                 };
@@ -1899,7 +2000,7 @@
                 console.error('无法读取积分和商店库存：', e);
                 return {
                     points: 0,
-                    inventory: { signUntil: 0, scooterUntil: 0, speedPotionUntil: 0, ingotUntil: 0, vipUntil: 0, equipped: '' }
+                    inventory: { signUntil: 0, scooterUntil: 0, speedPotionUntil: 0, ingotUntil: 0, glassesUntil: 0, vipUntil: 0, equipped: '', pvpBag: [] }
                 };
             }
         }
@@ -1935,6 +2036,10 @@
 
         function isIngotActive() {
             return storeInventory.ingotUntil > Date.now() && storeInventory.equipped === 'ingot';
+        }
+
+        function isGlassesActive() {
+            return storeInventory.glassesUntil > Date.now() && storeInventory.equipped === 'glasses';
         }
 
         function todayStr() {
@@ -2534,6 +2639,108 @@
 
         updateWandUI();
 
+        function getGlassesCenter() {
+            return {
+                x: glassesDrag.x + GLASSES_SIZE.width / 2,
+                y: glassesDrag.y + GLASSES_SIZE.height / 2
+            };
+        }
+
+        function floatGlasses() {
+            const rect = petGlasses.getBoundingClientRect();
+            glassesDrag.x = rect.left + window.scrollX;
+            glassesDrag.y = rect.top + window.scrollY;
+            document.body.appendChild(petGlasses);
+            petGlasses.classList.add('floating');
+            petGlasses.style.left = glassesDrag.x + 'px';
+            petGlasses.style.top = glassesDrag.y + 'px';
+            petGlasses.style.transform = '';
+        }
+
+        function moveGlassesTo(clientX, clientY) {
+            glassesDrag.x = clamp(clientX + window.scrollX - glassesDrag.offsetX, 0,
+                Math.max(0, Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - GLASSES_SIZE.width));
+            glassesDrag.y = clamp(clientY + window.scrollY - glassesDrag.offsetY, 0,
+                Math.max(0, Math.max(document.documentElement.scrollHeight, document.body.scrollHeight) - GLASSES_SIZE.height));
+            petGlasses.style.left = glassesDrag.x + 'px';
+            petGlasses.style.top = glassesDrag.y + 'px';
+        }
+
+        function returnGlassesToPet() {
+            petGlasses.classList.remove('floating', 'dragging');
+            petGlasses.style.left = '';
+            petGlasses.style.top = '';
+            petGlasses.style.transform = '';
+            petWrap.insertBefore(petGlasses, petSpeech);
+            glassesDrag.active = false;
+            glassesDrag.dragging = false;
+            glassesDrag.pointerId = null;
+            glassesDrag.moved = false;
+            petState.chasingGlasses = false;
+            petWrap.classList.remove('angry');
+            petGlasses.classList.toggle('active', isGlassesActive());
+            if (!petState.running && !petState.chasingFood && !petState.chasingWand &&
+                !petState.eating && !petState.atBoard && !petState.goingToBoard) {
+                setRandomIdleDirection();
+            }
+        }
+
+        function startGlassesChase() {
+            if (petState.atBoard || petState.goingToBoard) leaveBoard();
+            if (foodDrag.active && !foodDrag.caught) {
+                resetFoodToSlot();
+                petState.chasingFood = false;
+            }
+            if (wandDrag.active) resetWandToSlot();
+            petState.running = false;
+            petState.eating = false;
+            pet.classList.remove('running');
+            petState.chasingGlasses = true;
+            petState.nextGlassesSpeechAt = 0;
+            petWrap.classList.add('angry');
+            say('给我~！', 900);
+        }
+
+        petGlasses.addEventListener('pointerdown', function(e) {
+            if (!isGlassesActive()) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = petGlasses.getBoundingClientRect();
+            glassesDrag.offsetX = e.clientX - rect.left;
+            glassesDrag.offsetY = e.clientY - rect.top;
+            glassesDrag.startX = e.clientX;
+            glassesDrag.startY = e.clientY;
+            glassesDrag.pointerId = e.pointerId;
+            glassesDrag.dragging = true;
+            glassesDrag.moved = false;
+            if (!petGlasses.classList.contains('floating')) floatGlasses();
+            petGlasses.classList.add('dragging');
+            if (petGlasses.setPointerCapture) petGlasses.setPointerCapture(e.pointerId);
+        });
+
+        document.addEventListener('pointermove', function(e) {
+            if (!glassesDrag.dragging || e.pointerId !== glassesDrag.pointerId) return;
+            moveGlassesTo(e.clientX, e.clientY);
+            if (!glassesDrag.moved && Math.hypot(e.clientX - glassesDrag.startX, e.clientY - glassesDrag.startY) >= 6) {
+                glassesDrag.moved = true;
+                glassesDrag.active = true;
+                startGlassesChase();
+            }
+        });
+
+        function onGlassesPointerEnd(e) {
+            if (!glassesDrag.dragging || e.pointerId !== glassesDrag.pointerId) return;
+            glassesDrag.dragging = false;
+            glassesDrag.pointerId = null;
+            petGlasses.classList.remove('dragging');
+            if (!glassesDrag.active) returnGlassesToPet();
+        }
+
+        petGlasses.addEventListener('lostpointercapture', onGlassesPointerEnd);
+        document.addEventListener('pointerup', onGlassesPointerEnd);
+        document.addEventListener('pointercancel', onGlassesPointerEnd);
+        petGlasses.addEventListener('click', e => e.stopPropagation());
+
         /* =========================================================
            积分、商店与装扮
            ========================================================= */
@@ -2572,6 +2779,8 @@
 
         function renderPetCosmetics() {
             const equipped = storeInventory.equipped;
+            const glassesActive = equipped === 'glasses' && storeInventory.glassesUntil > Date.now();
+            if (!glassesActive && (glassesDrag.active || glassesDrag.dragging)) returnGlassesToPet();
             document.getElementById('petSign').classList.toggle(
                 'active', equipped === 'sign' && storeInventory.signUntil > Date.now()
             );
@@ -2581,6 +2790,7 @@
             document.getElementById('petScooter').classList.toggle(
                 'active', equipped === 'scooter' && isScooterActive()
             );
+            petGlasses.classList.toggle('active', glassesActive);
             siteBrand.classList.toggle('vip-brand', isVipActive());
         }
 
@@ -2593,7 +2803,8 @@
             const available = [
                 { id: 'sign', name: '网红灯牌', until: storeInventory.signUntil },
                 { id: 'scooter', name: '滑板车', until: storeInventory.scooterUntil },
-                { id: 'ingot', name: '幸运元宝', until: storeInventory.ingotUntil }
+                { id: 'ingot', name: '幸运元宝', until: storeInventory.ingotUntil },
+                { id: 'glasses', name: '给我怪的眼镜', until: storeInventory.glassesUntil }
             ].filter(item => item.until > Date.now());
             choices.innerHTML = '';
             const none = document.createElement('button');
@@ -2622,6 +2833,7 @@
             if (nextInventory.scooterUntil <= now) nextInventory.scooterUntil = 0;
             if (nextInventory.speedPotionUntil <= now) nextInventory.speedPotionUntil = 0;
             if (nextInventory.ingotUntil <= now) nextInventory.ingotUntil = 0;
+            if (nextInventory.glassesUntil <= now) nextInventory.glassesUntil = 0;
             if (nextInventory.vipUntil <= now) nextInventory.vipUntil = 0;
             if (!nextInventory[`${nextInventory.equipped}Until`]) nextInventory.equipped = '';
             if (JSON.stringify(nextInventory) !== JSON.stringify(storeInventory)) {
@@ -2731,6 +2943,9 @@
             } else if (product === 'ingot') {
                 nextInventory.ingotUntil = Math.max(now, nextInventory.ingotUntil) + 15 * 86400000;
                 nextInventory.equipped = 'ingot';
+            } else if (product === 'glasses') {
+                nextInventory.glassesUntil = Math.max(now, nextInventory.glassesUntil) + 15 * 86400000;
+                nextInventory.equipped = 'glasses';
             } else if (product === 'vip') {
                 nextInventory.vipUntil = Math.max(now, nextInventory.vipUntil) + 7 * 86400000;
             } else {
@@ -3302,6 +3517,7 @@
                         scooterUntil: 0,
                         speedPotionUntil: 0,
                         ingotUntil: 0,
+                        glassesUntil: 0,
                         vipUntil: 0,
                         equipped: ''
                     };

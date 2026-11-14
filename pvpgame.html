@@ -376,7 +376,7 @@
               return entry;
             }).slice(0, BAG_CAPACITY);
           const equipped = inventory.equipped;
-          cosmetic = ["sign", "scooter", "ingot"].includes(equipped) &&
+          cosmetic = ["sign", "scooter", "ingot", "glasses"].includes(equipped) &&
             Number.isFinite(inventory[`${equipped}Until`]) && inventory[`${equipped}Until`] > Date.now() ? equipped : "";
         } catch (error) {
           console.error("无法读取猫球积分或装扮：", error);
@@ -1415,7 +1415,13 @@
       }
 
       function drawCosmetic(player) {
-        if (player.cosmetic === "sign") {
+        if (player.cosmetic === "glasses") {
+          ctx.fillStyle = "rgba(139,224,245,.62)"; ctx.strokeStyle = "#26364f"; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.roundRect(-22, -9, 18, 14, 5); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.roundRect(4, -9, 18, 14, 5); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(4, -4);
+          ctx.moveTo(-22, -5); ctx.lineTo(-27, -8); ctx.moveTo(22, -5); ctx.lineTo(27, -8); ctx.stroke();
+        } else if (player.cosmetic === "sign") {
           ctx.fillStyle = "#ffb9d1";
           ctx.fillRect(-29, -51, 58, 15);
           ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(-29, -51, 58, 15);
@@ -1765,7 +1771,7 @@
         const profile = member.data || {};
         peers.set(member.id, {
           name: String(profile.nickname || profile.catName || "联机玩家").slice(0, 16),
-          cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : ""
+          cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(profile.cosmetic) ? profile.cosmetic : ""
         });
       }
       function handlePresence(event) {
@@ -1803,7 +1809,7 @@
           if (!data || data.type !== "ready" || typeof data.from !== "string" || data.from === peerId) return;
           peers.set(data.from, {
             name: String((data.profile && data.profile.name) || "联机玩家").slice(0, 16),
-            cosmetic: ["sign", "scooter", "ingot"].includes(data.profile && data.profile.cosmetic) ? data.profile.cosmetic : ""
+            cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(data.profile && data.profile.cosmetic) ? data.profile.cosmetic : ""
           });
           tryMatch();
         } catch (error) {
@@ -1843,7 +1849,7 @@
           opponentId = from;
           opponentStake = data.stake;
           const profile = data.profile || {};
-          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : "" };
+          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(profile.cosmetic) ? profile.cosmetic : "" };
           publishDirect(from, {
             type: "accept", profile: { name: catName, cosmetic },
             stake: lockedStake, loadout: selectedLoadoutData()
@@ -1854,7 +1860,7 @@
               data.stake > 1000000 || !data.loadout || typeof data.loadout !== "object") return;
           opponentStake = data.stake;
           const profile = data.profile || {};
-          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(profile.cosmetic) ? profile.cosmetic : "" };
+          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(profile.cosmetic) ? profile.cosmetic : "" };
           makeGame("online", {
             host: true, opponentName: opponentProfile.name, opponentCosmetic: opponentProfile.cosmetic,
             opponentStake, opponentLoadout: sanitizeLoadout(data.loadout)
@@ -1870,7 +1876,7 @@
               !Number.isSafeInteger(data.hostStake) || data.hostStake !== opponentStake ||
               !Number.isSafeInteger(data.guestStake) || data.guestStake !== lockedStake ||
               !data.hostLoadout || typeof data.hostLoadout !== "object") return;
-          const profile = { name: String(data.hostName || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot"].includes(data.hostCosmetic) ? data.hostCosmetic : "" };
+          const profile = { name: String(data.hostName || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(data.hostCosmetic) ? data.hostCosmetic : "" };
           opponentProfile = profile;
           makeGame("online", {
             host: false, opponentName: profile.name, opponentCosmetic: profile.cosmetic,
