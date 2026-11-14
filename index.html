@@ -1891,7 +1891,8 @@
                         speedPotionUntil: Number.isFinite(inventory.speedPotionUntil) ? inventory.speedPotionUntil : 0,
                         ingotUntil: Number.isFinite(inventory.ingotUntil) ? inventory.ingotUntil : 0,
                         vipUntil: Number.isFinite(inventory.vipUntil) ? inventory.vipUntil : 0,
-                        equipped: ['sign', 'scooter', 'ingot'].includes(inventory.equipped) ? inventory.equipped : ''
+                        equipped: ['sign', 'scooter', 'ingot'].includes(inventory.equipped) ? inventory.equipped : '',
+                        pvpBag: Array.isArray(inventory.pvpBag) ? inventory.pvpBag : []
                     }
                 };
             } catch (e) {
