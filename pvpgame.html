@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#10172b">
+  <meta name="theme-color" content="#f5f7fa">
   <title>猫球对决 · Catball Arena</title>
   <style>
     :root {
@@ -123,6 +123,63 @@
       .touch-controls { gap: 4px; padding: 7px; }
       .touch-controls button { min-height: 42px; font-size: 9px; }
     }
+    :root {
+      color-scheme: light;
+      --bg: #fff;
+      --panel: #fff;
+      --line: #ccc;
+      --muted: #657184;
+      --mint: #557a6c;
+      --pink: #c65b74;
+      --gold: #8a641c;
+    }
+    body { color: #303545; background: #fff; font-family: system-ui, "Microsoft YaHei", sans-serif; }
+    .page { width: min(900px, calc(100% - 24px)); padding: 0 0 18px; }
+    .topbar { margin-bottom: 12px; }
+    .brand-mark { border-color: #b7c8bc; border-radius: 8px; color: #557a6c; background: #f3f7f4; box-shadow: none; }
+    .quiet, .mode-button, .primary, .touch-controls button { border-color: #cbd1dc; border-radius: 6px; color: #303545; background: #f3f4f6; }
+    .quiet { min-height: 34px; }
+    .quiet:hover, .mode-button:hover { border-color: #8fb0ff; background: #eef3ff; }
+    .heading { align-items: center; margin-bottom: 10px; }
+    .eyebrow { color: #648574; }
+    .points, .info { border-color: #ccc; border-radius: 8px; background: #fff; }
+    .points strong { color: #765a19; }
+    .game-card { border: 1px solid #ccc; border-radius: 8px; background: #fff; box-shadow: none; }
+    .hud { min-height: 62px; padding: 8px 12px; border-bottom-color: #ddd; }
+    .player-name { color: #303545; }
+    .health { background: #e5e8ed; }
+    .vs { color: #707a8b; }
+    .overlay { background: rgba(245,247,250,.84); backdrop-filter: blur(2px); }
+    .overlay-card { border-color: #cbd1dc; border-radius: 8px; background: #fff; box-shadow: 0 5px 20px #00000012; }
+    .overlay-icon { border-color: #b7c8bc; border-radius: 8px; color: #557a6c; background: #f3f7f4; }
+    .overlay-card p { color: #657184; }
+    .mode-button span { color: #657184; }
+    .primary { border: 0; color: #fff; background: #8fb0ff; }
+    .primary:hover { background: #769cf3; }
+    .overlay-status { color: #557a6c; }
+    .info { min-height: 58px; }
+    .info span { color: #657184; }
+    .touch-controls { grid-template-columns: minmax(150px, 1fr) minmax(118px, .75fr); align-items: center; gap: 12px; padding: 10px; }
+    .dpad { display: grid; width: 144px; grid-template: repeat(3, 42px) / repeat(3, 42px); justify-self: center; gap: 3px; }
+    .dpad button { min-height: 42px; padding: 0; font-size: 17px; }
+    .dpad .up { grid-area: 1 / 2; }
+    .dpad .left { grid-area: 2 / 1; }
+    .dpad .center { grid-area: 2 / 2; display: grid; place-items: center; color: #9aa2af; font-size: 14px; }
+    .dpad .right { grid-area: 2 / 3; }
+    .dpad .down { grid-area: 3 / 2; }
+    .touch-controls button { min-height: 43px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .touch-controls button:active, .touch-controls button.active { border-color: #8fb0ff; color: #3357a4; background: #e8efff; }
+    .footer { color: #657184; }
+    @media (max-width: 700px) {
+      .page { width: min(100% - 20px, 620px); padding-top: 8px; }
+      .topbar { margin-bottom: 10px; }
+      .touch-controls { grid-template-columns: minmax(140px, 1fr) minmax(105px, .75fr); }
+    }
+    @media (max-width: 390px) {
+      .touch-controls { gap: 6px; padding: 7px; }
+      .dpad { width: 132px; grid-template: repeat(3, 39px) / repeat(3, 39px); }
+      .dpad button { min-height: 39px; }
+    }
   </style>
 </head>
 <body>
@@ -172,10 +229,13 @@
         </div>
       </div>
       <div class="touch-controls" aria-label="触屏操作">
-        <button type="button" data-control="up">▲</button>
-        <button type="button" data-control="left">◀</button>
-        <button type="button" data-control="down">▼</button>
-        <button type="button" data-control="right">▶</button>
+        <div class="dpad" aria-label="移动">
+          <button class="up" type="button" data-control="up" aria-label="上移">▲</button>
+          <button class="left" type="button" data-control="left" aria-label="左移">◀</button>
+          <span class="center" aria-hidden="true">●</span>
+          <button class="right" type="button" data-control="right" aria-label="右移">▶</button>
+          <button class="down" type="button" data-control="down" aria-label="下移">▼</button>
+        </div>
         <button type="button" data-control="fire">使用 / 攻击</button>
       </div>
     </section>
@@ -190,13 +250,15 @@
     (() => {
       "use strict";
       const W = 960, H = 540, ECONOMY_KEY = "catball_economy_v1";
-      const NAME_KEY = "catball_pet_name_v1", GOEASY_KEY = "BC-6c13f16b8b4f45548f069666edacbd91";
+      const NAME_KEY = "catball_pet_name_v1", GOEASY_KEY = "BC-6c13f16b458f45548f069666edacbd91";
       const GOEASY_HOST = "hangzhou.goeasy.io", LOBBY = "catball-pvp-lobby-syc111syc-v1";
       const INBOX = "catball-pvp-inbox-";
       const canvas = document.getElementById("arenaCanvas");
       const ctx = canvas.getContext("2d");
       const $ = id => document.getElementById(id);
       const keys = new Set(), touchInput = { up: false, down: false, left: false, right: false, fire: false };
+      const activeTouchPointers = new Map();
+      let pointerTarget = null;
       const catImage = new Image();
       catImage.src = "images/catball.png";
       let cosmetic = "", catName = "猫球", points = 0, mode = "", state = null, lastFrame = 0;
@@ -208,14 +270,20 @@
         { x: 457, y: 95, w: 47, h: 34 }, { x: 442, y: 405, w: 55, h: 38 }
       ];
       const itemInfo = {
-        grenade: { icon: "💣", label: "手雷", color: "#ffc767" },
-        pistol: { icon: "🔫", label: "手枪", color: "#83d7ff" },
-        shotgun: { icon: "✦", label: "霰弹枪", color: "#ff9dbe" },
-        rifle: { icon: "▰", label: "步枪", color: "#8df0c0" },
-        cover: { icon: "▥", label: "掩体", color: "#c5a5ff" },
-        food: { icon: "🍖", label: "猫粮", color: "#ffbf80" },
-        medkit: { icon: "✚", label: "药包", color: "#ff879c" }
+        grenade: { label: "手雷", color: "#ffc767", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M12 8h8v4h4v11a8 8 0 0 1-16 0V12h4z" fill="#ffc767" stroke="#573d20" stroke-width="2"/><path d="M14 8V5h5l3 3" fill="none" stroke="#573d20" stroke-width="2.5" stroke-linecap="round"/><path d="m23 4 2-2m1 5 3-1" stroke="#ff745e" stroke-width="2" stroke-linecap="round"/></svg>' },
+        pistol: { label: "手枪", color: "#83d7ff", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M4 10h23v7h-8l-1 4h-5l-1-4H4z" fill="#83d7ff" stroke="#24485b" stroke-width="2" stroke-linejoin="round"/><path d="M18 17v4h-5l-1-4m11-7V7h4v3" fill="#b9edff" stroke="#24485b" stroke-width="1.5" stroke-linejoin="round"/></svg>' },
+        shotgun: { label: "霰弹枪", color: "#ff9dbe", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M3 11h20v5H12v5H8l-1-5H3z" fill="#ff9dbe" stroke="#573342" stroke-width="2" stroke-linejoin="round"/><path d="M23 12h6v3h-6m-11 1v6h-4" fill="none" stroke="#573342" stroke-width="2" stroke-linecap="round"/></svg>' },
+        rifle: { label: "步枪", color: "#8df0c0", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M2 12h19v4H12v5H8l-1-5H2z" fill="#8df0c0" stroke="#294d40" stroke-width="2" stroke-linejoin="round"/><path d="M21 13h8v2h-8m-8 0v-3h4m-9 10 2-3" fill="none" stroke="#294d40" stroke-width="2" stroke-linecap="round"/></svg>' },
+        cover: { label: "掩体", color: "#c5a5ff", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M5 8h22v18H5z" fill="#c5a5ff" stroke="#493a62" stroke-width="2"/><path d="M5 14h22M13 8v6m8 0v6m-8 0v6" stroke="#493a62" stroke-width="2"/></svg>' },
+        food: { label: "猫粮", color: "#ffbf80", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M8 11 5 8m19 3 3-3M7 17a9 9 0 1 1 18 0v7H7z" fill="#ffbf80" stroke="#67472f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18h.1m8 0h.1M13 22q3 3 6 0" fill="none" stroke="#67472f" stroke-width="2" stroke-linecap="round"/></svg>' },
+        medkit: { label: "药包", color: "#ff879c", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="5" y="9" width="22" height="18" rx="3" fill="#ff879c" stroke="#623640" stroke-width="2"/><path d="M12 9V6h8v3m-4 4v10m-5-5h10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>' }
       };
+      const itemIcons = {};
+      Object.entries(itemInfo).forEach(([type, info]) => {
+        const image = new Image();
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(info.svg)}`;
+        itemIcons[type] = image;
+      });
 
       function readProfile() {
         try {
@@ -259,12 +327,14 @@
           id, name, x, y: H / 2, vx: 0, vy: 0, aim: id === "p1" ? 0 : Math.PI,
           hp: 100, maxHp: 100, held: "", ammo: 0, attackCooldown: 0, meleeCooldown: 0,
           invulnerable: 0, medTimer: 0, fireWasDown: false, input: { x: 0, y: 0, fire: false, pulse: false, aim: 0 },
-          color, kind, cosmetic: look || "", recoil: 0, walked: 0
+          color, kind, cosmetic: look || "", recoil: 0, walked: 0,
+          navPath: [], navIndex: 0, navKey: "", navTimer: 0, stuckFor: 0, lastX: x, lastY: H / 2
         };
       }
 
       function makeGame(gameMode, remote = null) {
         mode = gameMode;
+        pointerTarget = null;
         const onlineGuest = gameMode === "online" && remote && !remote.host;
         const p1 = makePlayer(
           "p1",
@@ -457,35 +527,153 @@
         const nextY = clamp(player.y + dy, 48 + radius, H - 48 - radius);
         if (safePosition(player.x, nextY, radius)) player.y = nextY;
       }
+      const navGrid = { x: 68, y: 68, step: 28, cols: 30, rows: 15 };
+      function gridPosition(index) {
+        return {
+          x: navGrid.x + index % navGrid.cols * navGrid.step,
+          y: navGrid.y + Math.floor(index / navGrid.cols) * navGrid.step
+        };
+      }
+      function navigationPath(player, target, arriveRadius) {
+        const total = navGrid.cols * navGrid.rows;
+        const walkable = new Uint8Array(total);
+        for (let index = 0; index < total; index++) {
+          const point = gridPosition(index);
+          walkable[index] = safePosition(point.x, point.y, 22) ? 1 : 0;
+        }
+        let start = -1, startDistance = Infinity;
+        for (let index = 0; index < total; index++) {
+          if (!walkable[index]) continue;
+          const point = gridPosition(index), d = Math.hypot(point.x - player.x, point.y - player.y);
+          if (d < startDistance) { start = index; startDistance = d; }
+        }
+        if (start < 0 || startDistance > 50) return [];
+        const goals = new Set();
+        for (let index = 0; index < total; index++) {
+          if (!walkable[index]) continue;
+          const point = gridPosition(index);
+          if (Math.hypot(point.x - target.x, point.y - target.y) <= arriveRadius) goals.add(index);
+        }
+        if (!goals.size) return [];
+        const cost = new Float32Array(total);
+        cost.fill(Infinity);
+        const previous = new Int32Array(total);
+        previous.fill(-1);
+        const open = [start], closed = new Uint8Array(total);
+        cost[start] = 0;
+        let goal = -1;
+        const heuristic = index => {
+          const point = gridPosition(index);
+          return Math.max(0, Math.hypot(point.x - target.x, point.y - target.y) - arriveRadius);
+        };
+        while (open.length) {
+          let bestPosition = 0;
+          for (let i = 1; i < open.length; i++) {
+            const a = open[i], b = open[bestPosition];
+            if (cost[a] + heuristic(a) < cost[b] + heuristic(b)) bestPosition = i;
+          }
+          const current = open.splice(bestPosition, 1)[0];
+          if (closed[current]) continue;
+          if (goals.has(current)) { goal = current; break; }
+          closed[current] = 1;
+          const column = current % navGrid.cols, row = Math.floor(current / navGrid.cols);
+          const neighbors = [];
+          if (column > 0) neighbors.push(current - 1);
+          if (column < navGrid.cols - 1) neighbors.push(current + 1);
+          if (row > 0) neighbors.push(current - navGrid.cols);
+          if (row < navGrid.rows - 1) neighbors.push(current + navGrid.cols);
+          for (const next of neighbors) {
+            if (!walkable[next] || closed[next]) continue;
+            const a = gridPosition(current), b = gridPosition(next);
+            if (!safePosition((a.x + b.x) / 2, (a.y + b.y) / 2, 22)) continue;
+            const nextCost = cost[current] + navGrid.step;
+            if (nextCost >= cost[next]) continue;
+            cost[next] = nextCost;
+            previous[next] = current;
+            open.push(next);
+          }
+        }
+        if (goal < 0) return [];
+        const path = [];
+        for (let index = goal; index !== -1; index = previous[index]) {
+          path.push(gridPosition(index));
+          if (index === start) break;
+        }
+        return path.reverse();
+      }
+      function navigate(player, target, key, arriveRadius, dt) {
+        player.navTimer -= dt;
+        const targetMoved = player.navPoint &&
+          Math.hypot(player.navPoint.x - target.x, player.navPoint.y - target.y) > 42;
+        if (player.navKey !== key || player.navTimer <= 0 || targetMoved) {
+          player.navPath = navigationPath(player, target, arriveRadius);
+          player.navIndex = player.navPath.length > 1 ? 1 : 0;
+          player.navKey = key;
+          player.navPoint = { x: target.x, y: target.y };
+          player.navTimer = .42;
+        }
+        if (distance(player, target) <= arriveRadius) {
+          player.input.x = 0; player.input.y = 0;
+          return;
+        }
+        while (player.navIndex < player.navPath.length - 1 &&
+               Math.hypot(player.navPath[player.navIndex].x - player.x, player.navPath[player.navIndex].y - player.y) < 10) {
+          player.navIndex++;
+        }
+        const waypoint = player.navPath[player.navIndex] || target;
+        const dx = waypoint.x - player.x, dy = waypoint.y - player.y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        player.input.x = dx / length;
+        player.input.y = dy / length;
+      }
+      function hasLineOfSight(from, to) {
+        const length = distance(from, to);
+        const steps = Math.ceil(length / 10);
+        for (let i = 1; i < steps; i++) {
+          const t = i / steps;
+          if (hitCover(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t)) return false;
+        }
+        return true;
+      }
       function aiInput(player, dt) {
-        const foe = state.players[0];
-        const lure = state.lures.reduce((best, item) => !best || item.life > best.life ? item : best, null);
-        const target = lure && lure.life > 0 ? lure : foe;
-        let wanted = null;
-        const useful = state.items.filter(item => item.type !== "medkit" || player.hp < 85)
+        const foe = state.players.find(other => other !== player);
+        const lure = state.lures.filter(item => item.owner !== player.id)
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
-        if (player.hp < 38 && useful && distance(player, useful) < 290) wanted = useful;
-        else if (lure) wanted = lure;
-        else if ((!player.held || player.ammo < 1) && useful && distance(player, useful) > 42) wanted = useful;
-        else if (player.held) wanted = target;
-        const aimTarget = player.held ? foe : target;
+        const healItem = state.items.filter(item => item.type === "medkit")
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const weapon = state.items.filter(item => item.type !== "medkit")
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        let destination = foe, destinationKey = `foe-${foe.id}`, arriveRadius = 48;
+        if (player.hp < 82 && healItem && (!player.held || player.held === "medkit")) {
+          destination = healItem; destinationKey = `item-${healItem.id}`; arriveRadius = 22;
+        } else if (lure) {
+          destination = lure; destinationKey = `lure-${lure.id}`; arriveRadius = 18;
+        } else if ((!player.held || player.ammo <= 0) && weapon) {
+          destination = weapon; destinationKey = `item-${weapon.id}`; arriveRadius = 22;
+        } else if (player.held && ["pistol", "shotgun", "rifle", "grenade"].includes(player.held)) {
+          const dx = player.x - foe.x, dy = player.y - foe.y, length = Math.max(1, Math.hypot(dx, dy));
+          const desiredRange = player.held === "grenade" ? 205 : 245;
+          destination = { x: clamp(foe.x + dx / length * desiredRange, 70, W - 70), y: clamp(foe.y + dy / length * desiredRange, 70, H - 70) };
+          destinationKey = `combat-${foe.id}`;
+          arriveRadius = 26;
+        }
+        const aimTarget = player.held ? foe : destination;
         player.input.aim = Math.atan2(aimTarget.y - player.y, aimTarget.x - player.x);
         player.aim = player.input.aim;
-        const dx = wanted ? wanted.x - player.x : target.x - player.x;
-        const dy = wanted ? wanted.y - player.y : target.y - player.y;
-        const d = Math.max(1, Math.hypot(dx, dy));
-        if (player.held && !lure && d < 380 && player.ammo > 0) {
-          player.input.fire = player.held === "rifle";
-          player.input.pulse = player.attackCooldown <= 0;
-        } else if (!player.held && d < 62) {
-          player.input.pulse = player.meleeCooldown <= 0;
+        if (destination === foe && player.held === "cover" || destination === foe && player.held === "food") {
+          arriveRadius = player.held === "food" ? 140 : 120;
         }
-        if (wanted && d > (wanted === target ? 72 : 30)) {
-          player.input.x = dx / d;
-          player.input.y = dy / d;
+        navigate(player, destination, destinationKey, arriveRadius, dt);
+        const foeDistance = distance(player, foe);
+        const canAttack = !lure && hasLineOfSight(player, foe);
+        if (player.held && player.ammo > 0 && player.held !== "medkit" && canAttack && foeDistance < 420) {
+          player.input.fire = player.held === "rifle";
+          player.input.pulse = player.held !== "rifle" && player.attackCooldown <= 0;
+        } else if (!player.held && !lure && foeDistance < 64) {
+          player.input.pulse = player.meleeCooldown <= 0;
         } else {
-          player.input.x = 0;
-          player.input.y = 0;
+          player.input.fire = false;
+          player.input.pulse = false;
         }
       }
 
@@ -548,8 +736,20 @@
           const magnitude = Math.hypot(player.input.x, player.input.y) || 1;
           const speed = player.held === "scooter" ? 205 : 180;
           const dx = player.input.x / magnitude * speed * dt, dy = player.input.y / magnitude * speed * dt;
+          const beforeX = player.x, beforeY = player.y;
           collisionMove(player, dx, dy);
-          player.walked += Math.hypot(dx, dy);
+          const moved = Math.hypot(player.x - beforeX, player.y - beforeY);
+          player.walked += moved;
+          if (player.kind === "ai" && moved < .2) {
+            player.stuckFor += dt;
+            if (player.stuckFor > .32) {
+              player.navTimer = 0;
+              player.navPath = [];
+              player.stuckFor = 0;
+            }
+          } else {
+            player.stuckFor = 0;
+          }
         }
         if (Number.isFinite(player.input.aim)) player.aim = player.input.aim;
         if (player.held === "medkit") {
@@ -576,6 +776,7 @@
       function updateObjects(dt) {
         state.spawnTimer -= dt;
         if (state.spawnTimer <= 0) { spawnItem(); state.spawnTimer = rand(4.5, 7.5); }
+        state.items = state.items.filter(item => state.elapsed - item.born < 20);
         state.covers.forEach(cover => cover.life -= dt);
         state.covers = state.covers.filter(cover => cover.life > 0);
         state.lures.forEach(lure => { lure.life -= dt; lure.phase += dt; });
@@ -682,9 +883,10 @@
         ctx.beginPath(); ctx.roundRect(player.x - 31, player.y - 43, 62, 16, 7); ctx.fill();
         ctx.fillStyle = "#f4f6ff"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center"; ctx.fillText(player.name.slice(0, 12), player.x, player.y - 32);
         if (player.held) {
-          const item = itemInfo[player.held];
+          const item = itemInfo[player.held], icon = itemIcons[player.held];
+          if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, player.x - 16, player.y + 30, 18, 18);
           ctx.fillStyle = item ? item.color : "#fff";
-          ctx.font = "bold 13px sans-serif"; ctx.fillText(`${item ? item.icon : ""} ${player.ammo}`, player.x, player.y + 43);
+          ctx.font = "bold 12px sans-serif"; ctx.fillText(String(player.ammo), player.x + 9, player.y + 44);
         }
       }
 
@@ -717,12 +919,14 @@
             ctx.save(); ctx.translate(item.x, item.y + float);
             ctx.fillStyle = info.color + "33"; ctx.beginPath(); ctx.arc(0, 0, 24 + Math.sin(state.elapsed * 4 + item.phase) * 2, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = "#162333"; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = info.color; ctx.font = "bold 19px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(info.icon, 0, 1);
+            const icon = itemIcons[item.type];
+            if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, -12, -12, 24, 24);
             ctx.restore();
           });
           state.lures.forEach(lure => {
             ctx.globalAlpha = .7 + Math.sin(lure.phase * 9) * .2;
-            ctx.fillStyle = "#ffbd80"; ctx.font = "22px sans-serif"; ctx.textAlign = "center"; ctx.fillText("🍖", lure.x, lure.y);
+            const icon = itemIcons.food;
+            if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, lure.x - 13, lure.y - 13, 26, 26);
             ctx.globalAlpha = 1;
           });
           state.projectiles.forEach(shot => {
@@ -759,6 +963,10 @@
       function frame(now) {
         const dt = Math.min(.04, (now - (lastFrame || now)) / 1000);
         lastFrame = now;
+        if (state && state.running && pointerTarget) {
+          const localPlayer = mode === "online" && !state.host ? state.players[1] : state.players[0];
+          localPlayer.aim = Math.atan2(pointerTarget.y - localPlayer.y, pointerTarget.x - localPlayer.x);
+        }
         updateGame(dt);
         if (mode === "online" && state && !state.host && state.running) sendInput();
         draw();
@@ -771,11 +979,12 @@
         const rect = canvas.getBoundingClientRect();
         const x = (event.clientX - rect.left) * W / rect.width;
         const y = (event.clientY - rect.top) * H / rect.height;
+        pointerTarget = { x, y };
         const player = mode === "online" && !state.host ? state.players[1] : state.players[0];
         player.aim = Math.atan2(y - player.y, x - player.x);
       }
       canvas.addEventListener("pointerdown", event => { pointerAim(event); canvas.setPointerCapture(event.pointerId); });
-      canvas.addEventListener("pointermove", event => { if (event.buttons) pointerAim(event); });
+      canvas.addEventListener("pointermove", pointerAim);
 
       function firePulse(playerId) {
         if (!state || !state.running) return;
@@ -796,27 +1005,41 @@
         keys.add(event.code);
       });
       document.addEventListener("keyup", event => keys.delete(event.code));
-      window.addEventListener("blur", () => { keys.clear(); Object.keys(touchInput).forEach(key => touchInput[key] = false); });
+      function releaseTouchPointer(pointerId) {
+        const control = activeTouchPointers.get(pointerId);
+        if (!control) return;
+        activeTouchPointers.delete(pointerId);
+        const stillPressed = [...activeTouchPointers.values()].includes(control);
+        if (!stillPressed) {
+          touchInput[control] = false;
+          const button = document.querySelector(`[data-control="${control}"]`);
+          if (button) button.classList.remove("active");
+        }
+      }
       document.querySelectorAll("[data-control]").forEach(button => {
         const control = button.dataset.control;
         const down = event => {
           event.preventDefault();
+          activeTouchPointers.set(event.pointerId, control);
           if (control === "fire") { touchInput.fire = true; firePulse("p1"); }
           else touchInput[control] = true;
           button.classList.add("active");
           if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
         };
-        const up = event => {
-          if (event) event.preventDefault();
-          if (control === "fire") touchInput.fire = false;
-          else touchInput[control] = false;
-          button.classList.remove("active");
-        };
         button.addEventListener("pointerdown", down);
-        button.addEventListener("pointerup", up);
-        button.addEventListener("pointercancel", up);
-        button.addEventListener("lostpointercapture", up);
+        button.addEventListener("lostpointercapture", event => releaseTouchPointer(event.pointerId));
       });
+      window.addEventListener("pointerup", event => releaseTouchPointer(event.pointerId));
+      window.addEventListener("pointercancel", event => releaseTouchPointer(event.pointerId));
+      function clearInputs() {
+        keys.clear();
+        activeTouchPointers.clear();
+        Object.keys(touchInput).forEach(key => touchInput[key] = false);
+        document.querySelectorAll("[data-control].active").forEach(button => button.classList.remove("active"));
+        if (mode === "online" && state && !state.host) sendInput();
+      }
+      window.addEventListener("blur", clearInputs);
+      document.addEventListener("visibilitychange", () => { if (document.hidden) clearInputs(); });
 
       function goEasyOperation(start) {
         return new Promise((resolve, reject) => start({
