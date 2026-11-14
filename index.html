@@ -249,7 +249,7 @@
         }
 
         .pet-glasses {
-            top: 33px;
+            top: 24px;
             left: 15px;
             width: 64px;
             height: 28px;
@@ -1754,7 +1754,7 @@
                 const dy = gc.y - pcy;
                 const dist = Math.hypot(dx, dy) || 1;
 
-                if (dist <= GLASSES_CATCH_DISTANCE) {
+                if (!glassesDrag.dragging && dist <= GLASSES_CATCH_DISTANCE) {
                     petState.vx = 0;
                     petState.vy = 0;
                     returnGlassesToPet();
