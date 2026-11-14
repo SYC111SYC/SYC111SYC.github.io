@@ -1758,7 +1758,7 @@
                     petState.vx = 0;
                     petState.vy = 0;
                     returnGlassesToPet();
-                    say('给我~！', 1000);
+                    say(Math.random() < 0.5 ? '可恶~' : '你~！', 1000);
                 } else {
                     petState.vx = (dx / dist) * 10.5;
                     petState.vy = (dy / dist) * 10.5;
