@@ -340,15 +340,15 @@
       let lockedStake = 0, opponentStake = 0, stakeReserved = false, shopReturnSetup = false;
       const BAG_CAPACITY = 8, PET_LIMIT = 2, EQUIPMENT_LIMIT = 2;
       const petSpecs = {
-        elephant: { name: "象球", maxHp: 400, speed: 36, price: 40, description: "400 HP · 移速 0.2 倍 · 靠近后每秒踩踏 12 伤害", image: elephantImage },
-        drone: { name: "猫粮自动无人机", maxHp: 40, speed: 190, price: 25, description: "40 HP · 敌人附近盘旋 · F/L 空投一次 2 秒猫粮" },
-        dog: { name: "狗球", maxHp: 80, speed: 216, price: 17, description: "80 HP · 移速 1.2 倍 · 冲向敌人啃咬" , image: dogImage },
-        turret: { name: "枪塔", maxHp: 150, speed: 0, price: 18, description: "150 HP · 固定不动 · 每秒发射步枪子弹" }
+        elephant: { name: "象球", maxHp: 400, speed: 36, price: 45, description: "400 HP · 移速 0.2 倍 · 靠近后每秒踩踏 12 伤害", image: elephantImage },
+        drone: { name: "猫粮自动无人机", maxHp: 40, speed: 190, price: 30, description: "40 HP · 敌人附近盘旋 · F/L 空投一次 2 秒猫粮" },
+        dog: { name: "狗球", maxHp: 80, speed: 216, price: 22, description: "80 HP · 移速 1.2 倍 · 冲向敌人啃咬" , image: dogImage },
+        turret: { name: "枪塔", maxHp: 150, speed: 0, price: 23, description: "150 HP · 固定不动 · 每秒发射步枪子弹" }
       };
       const equipmentSpecs = {
-        shield: { name: "护盾", price: 20, description: "吸收伤害；3 秒未受击后每秒恢复 15 点" },
-        pearl: { name: "末影珍珠", price: 8, description: "P1 按 E / P2 按 K 投掷并传送到落点" },
-        phase: { name: "穿墙术", price: 12, description: "本局可穿过墙体与掩体" }
+        shield: { name: "护盾", price: 25, description: "吸收伤害；3 秒未受击后每秒恢复 15 点" },
+        pearl: { name: "末影珍珠", price: 13, description: "P1 按 E / P2 按 K 投掷并传送到落点" },
+        phase: { name: "穿墙术", price: 17, description: "本局可穿过墙体与掩体" }
       };
       const shopItems = { ...petSpecs, ...equipmentSpecs };
       const terrain = [
@@ -564,8 +564,8 @@
               const heal = document.createElement("button");
               heal.type = "button";
               heal.dataset.heal = item.id;
-              heal.textContent = "+25 HP · 2分";
-              heal.disabled = points < 2;
+              heal.textContent = "+25 HP · 7分";
+              heal.disabled = points < 7;
               row.appendChild(heal);
             }
             bagList.appendChild(row);
@@ -641,13 +641,13 @@
         readProfile();
         const item = arenaBag.find(entry => entry.id === id);
         if (!item || !petSpecs[item.type] || item.hp >= petSpecs[item.type].maxHp) return;
-        if (points < 2) {
-          $("shopStatus").textContent = "需要 2 积分才能修复 25 HP。";
+        if (points < 7) {
+          $("shopStatus").textContent = "需要 7 积分才能修复 25 HP。";
           return;
         }
         const nextBag = arenaBag.map(entry => entry.id === id
           ? { ...entry, hp: Math.min(petSpecs[entry.type].maxHp, entry.hp + 25) } : entry);
-        if (!persistArenaChanges(-2, nextBag)) {
+        if (!persistArenaChanges(-7, nextBag)) {
           $("shopStatus").textContent = "宠物修复失败，积分或背包保存失败。";
           return;
         }
@@ -767,9 +767,9 @@
           gameMode === "ai" && aiDifficulty >= 4 ? makeAiLoadout(aiDifficulty) : emptyLoadout();
         equipPlayer(p1, p1Loadout);
         equipPlayer(p2, p2Selected);
-        if (gameMode === "ai" && aiDifficulty >= 5) {
-          p2.maxHp = 200;
-          p2.hp = 200;
+        if (gameMode === "ai") {
+          p2.maxHp = 140 * (aiDifficulty >= 5 ? 2 : 1);
+          p2.hp = p2.maxHp;
         }
         const localStake = gameMode === "online" ? lockedStake : 0;
         const otherStake = gameMode === "online" ? Number(remote && remote.opponentStake) || 0 : 0;
@@ -1213,19 +1213,22 @@
         const enemyPet = foe.pets.filter(pet => pet.alive)
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         const target = enemyPet && distance(player, enemyPet) < distance(player, foe) + 52 ? enemyPet : foe;
-        const lure = aiDifficulty > 1
-          ? state.lures.filter(item => item.owner !== player.id && !item.drone)
-            .sort((a, b) => distance(player, a) - distance(player, b))[0]
-          : null;
+        const lure = state.lures.filter(item => item.owner !== player.id)
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const enemyDrone = foe.pets.filter(pet => pet.alive && pet.type === "drone")
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const droneAttraction = !lure && enemyDrone && distance(player, enemyDrone) < 190 ? enemyDrone : null;
         const healItem = aiDifficulty > 1 && state.items.filter(item => item.type === "medkit")
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         const weapon = aiDifficulty > 1 && state.items.filter(item => item.type !== "medkit")
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         let destination = target, destinationKey = `foe-${target.id}`, arriveRadius = 48;
-        if (aiDifficulty > 1 && player.hp < 82 && healItem && (!player.held || player.held === "medkit")) {
-          destination = healItem; destinationKey = `item-${healItem.id}`; arriveRadius = 22;
-        } else if (lure) {
+        if (lure) {
           destination = lure; destinationKey = `lure-${lure.id}`; arriveRadius = 18;
+        } else if (droneAttraction) {
+          destination = droneAttraction; destinationKey = `drone-${droneAttraction.id}`; arriveRadius = 30;
+        } else if (aiDifficulty > 1 && player.hp < 82 && healItem && (!player.held || player.held === "medkit")) {
+          destination = healItem; destinationKey = `item-${healItem.id}`; arriveRadius = 22;
         } else if (aiDifficulty > 1 && (!player.held || player.ammo <= 0) && weapon) {
           destination = weapon; destinationKey = `item-${weapon.id}`; arriveRadius = 22;
         } else if (player.held && ["pistol", "shotgun", "rifle", "grenade"].includes(player.held)) {
@@ -1245,12 +1248,12 @@
             distance(player, foe) < 340) {
           deployDroneFood(player);
         }
-        if (destination === foe && player.held === "cover" || destination === foe && player.held === "food") {
+        if (destination === target && (player.held === "cover" || player.held === "food")) {
           arriveRadius = player.held === "food" ? 140 : 120;
         }
         navigate(player, destination, destinationKey, arriveRadius, dt);
         const foeDistance = distance(player, target);
-        const canAttack = !lure && hasLineOfSight(player, target);
+        const canAttack = !lure && !droneAttraction && hasLineOfSight(player, target);
         if (aiDifficulty >= 3 && player.held === "cover" && player.ammo > 0 &&
             foeDistance > 105 && foeDistance < 320 && canAttack && player.attackCooldown <= 0) {
           player.input.fire = false;
@@ -1324,7 +1327,7 @@
             player.input.fire = false;
             player.input.pulse = false;
         }
-        const droneLure = state.lures.filter(item => item.owner !== player.id && item.drone)
+        const droneLure = player.kind !== "ai" && state.lures.filter(item => item.owner !== player.id && item.drone)
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         if (droneLure) {
           const dx = droneLure.x - player.x, dy = droneLure.y - player.y;
