@@ -1993,14 +1993,15 @@
                         glassesUntil: Number.isFinite(inventory.glassesUntil) ? inventory.glassesUntil : 0,
                         vipUntil: Number.isFinite(inventory.vipUntil) ? inventory.vipUntil : 0,
                         equipped: ['sign', 'scooter', 'ingot', 'glasses'].includes(inventory.equipped) ? inventory.equipped : '',
-                        pvpBag: Array.isArray(inventory.pvpBag) ? inventory.pvpBag : []
+                        pvpBag: Array.isArray(inventory.pvpBag) ? inventory.pvpBag : [],
+                        pvpProfessions: Array.isArray(inventory.pvpProfessions) ? inventory.pvpProfessions : []
                     }
                 };
             } catch (e) {
                 console.error('无法读取积分和商店库存：', e);
                 return {
                     points: 0,
-                    inventory: { signUntil: 0, scooterUntil: 0, speedPotionUntil: 0, ingotUntil: 0, glassesUntil: 0, vipUntil: 0, equipped: '', pvpBag: [] }
+                    inventory: { signUntil: 0, scooterUntil: 0, speedPotionUntil: 0, ingotUntil: 0, glassesUntil: 0, vipUntil: 0, equipped: '', pvpBag: [], pvpProfessions: [] }
                 };
             }
         }
@@ -3519,7 +3520,8 @@
                         ingotUntil: 0,
                         glassesUntil: 0,
                         vipUntil: 0,
-                        equipped: ''
+                        equipped: '',
+                        pvpProfessions: []
                     };
                     pointsBalance = 0;
                     storeInventory = economyData.inventory;
