@@ -344,12 +344,18 @@
       let arenaBag = [], selectedLoadout = { pets: [], equipment: [] }, setupMode = "";
       let unlockedProfessions = new Set(), selectedProfession = "";
       const professionSpecs = {
-        doctor: { name: "医生", description: "125 HP · 药包治疗效果 +10%" },
-        soldier: { name: "士兵", description: "枪械与手雷伤害 +10% · R 无中生有：随机手雷或霰弹，冷却 20 秒" },
-        giant: { name: "巨人", description: "130 HP · 移速 -15% · 肉搏伤害 +10%" },
-        gremlin: { name: "给我怪", description: "蓝色眼镜 · 生命低于 30% 时狂怒：移速 +15%、肉搏伤害 +5% · 捡枪多 1 发" },
-        wizard: { name: "巫师", description: "90 HP · 空手时每 4 秒发射昏迷咒 · 低血量时恢复生命" },
-        hunter: { name: "猎人", description: "枪械伤害 +5% · 移速 -5% · R 召唤猎狗，冷却 15 秒" }
+        doctor: { name: "医生", price: 25, description: "125 HP · 药包治疗效果 +10%" },
+        soldier: { name: "士兵", price: 25, description: "枪械与手雷伤害 +10% · R 无中生有：随机手雷或霰弹，冷却 20 秒" },
+        giant: { name: "巨人", price: 25, description: "130 HP · 移速 -15% · 肉搏伤害 +10%" },
+        gremlin: { name: "给我怪", price: 25, description: "蓝色眼镜 · 生命低于 30% 时狂怒：移速 +15%、肉搏伤害 +5% · 捡枪多 1 发" },
+        wizard: { name: "巫师", price: 25, description: "90 HP · 空手时每 4 秒发射昏迷咒 · 低血量时恢复生命" },
+        hunter: { name: "猎人", price: 25, description: "枪械伤害 +5% · 移速 -5% · R 召唤猎狗，冷却 15 秒" },
+        kungfu: { name: "功夫大师", price: 28, description: "血量 +15% · 每命中 4 次肉搏，使对手眩晕 2 秒" },
+        zombie: { name: "丧尸", price: 35, description: "可复活 2 次，每次最大生命 +10% · 移速 -10% · 肉搏施加 3 秒中毒" },
+        zookeeper: { name: "动物园管理员", price: 38, description: "猎人属性 · R 召唤持手枪小猫球和狗球，冷却 20 秒" },
+        commander: { name: "雇佣兵指挥官", price: 35, description: "R 召唤 3 只小猫球，冷却 25 秒" },
+        chef: { name: "厨师", price: 28, description: "R 发射 2 个猫粮无人机，冷却 20 秒" },
+        cardmaster: { name: "卡牌大师", price: 30, description: "R 洗 4 张牌并按牌型发射攻击，冷却 15 秒" }
       };
       let lockedStake = 0, opponentStake = 0, stakeReserved = false, shopReturnSetup = false;
       const BAG_CAPACITY = 8, PET_LIMIT = 2, EQUIPMENT_LIMIT = 2;
@@ -447,8 +453,8 @@
           if (unlockedProfessions.has(id)) {
             action.textContent = selectedProfession === id ? "已选择" : "选择";
           } else {
-            action.textContent = "解锁 · 25 积分";
-            action.disabled = points < 25;
+            action.textContent = `解锁 · ${profession.price} 积分`;
+            action.disabled = points < profession.price;
             action.dataset.professionUnlock = id;
           }
           row.append(copy, action);
@@ -458,15 +464,16 @@
 
       function unlockProfession(id) {
         if (!Object.prototype.hasOwnProperty.call(professionSpecs, id) || unlockedProfessions.has(id)) return;
-        if (points < 25) {
-          $("setupStatus").textContent = "需要 25 积分才能解锁该职业。";
+        const price = professionSpecs[id].price;
+        if (points < price) {
+          $("setupStatus").textContent = `需要 ${price} 积分才能解锁该职业。`;
           return;
         }
         try {
           const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
           if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("积分数据格式无效");
           const current = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
-          if (current < 25) {
+          if (current < price) {
             readProfile();
             $("setupStatus").textContent = "积分不足，无法解锁该职业。";
             return;
@@ -474,7 +481,7 @@
           if (!data.inventory || typeof data.inventory !== "object" || Array.isArray(data.inventory)) data.inventory = {};
           const professions = new Set(Array.isArray(data.inventory.pvpProfessions) ? data.inventory.pvpProfessions : []);
           professions.add(id);
-          data.points = current - 25;
+          data.points = current - price;
           data.inventory.pvpProfessions = [...professions].filter(value =>
             Object.prototype.hasOwnProperty.call(professionSpecs, value));
           localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
@@ -758,7 +765,8 @@
           id, name, x, y: H / 2, vx: 0, vy: 0, aim: id === "p1" ? 0 : Math.PI,
           hp: 100, maxHp: 100, held: "", ammo: 0, attackCooldown: 0, meleeCooldown: 0,
           profession: "", professionCooldown: 0, professionRegenTimer: 0, professionRegenActive: false,
-          glassesBroken: false, skillWeapon: "", stunned: 0,
+          glassesBroken: false, skillWeapon: "", stunned: 0, meleeHits: 0, revivesLeft: 0,
+          spawnX: x, spawnY: H / 2, poisonTimer: 0, poisonTick: 0, lastHand: [], lastHandTimer: 0,
           pets: [], equipment: { shield: 0, maxShield: 0, shieldHitAt: -Infinity, pearlAvailable: false, pearlUsed: false, phase: false },
           invulnerable: 0, medTimer: 0, fireWasDown: false, input: { x: 0, y: 0, fire: false, pulse: false, aim: 0 },
           color, kind, cosmetic: look || "", recoil: 0, walked: 0,
@@ -812,7 +820,8 @@
       }
       function professionHealthMultiplier(profession) {
         return profession === "doctor" ? 1.25 :
-          profession === "giant" ? 1.3 : profession === "wizard" ? .9 : 1;
+          profession === "giant" ? 1.3 : profession === "wizard" ? .9 :
+            profession === "kungfu" ? 1.15 : 1;
       }
       function applyProfessionHealth(player) {
         player.maxHp = 100 * professionHealthMultiplier(player.profession);
@@ -872,6 +881,9 @@
         p2.profession = gameMode === "local" ? "" :
           gameMode === "ai" ? randomProfession() :
             validProfession(onlineGuest ? selectedProfession : remote && remote.opponentProfession);
+        [p1, p2].forEach(player => {
+          if (player.profession === "zombie") player.revivesLeft = 2;
+        });
         const p1Loadout = gameMode === "online" && onlineGuest ? hostLoadout : localLoadout;
         const p2Selected = gameMode === "online" ? guestLoadout :
           gameMode === "ai" && aiDifficulty >= 4 ? makeAiLoadout(aiDifficulty) : emptyLoadout();
@@ -1079,23 +1091,93 @@
         if (type === "grenade" && player.profession === "soldier") return 1.1;
         if (isFirearm(type)) {
           return 1 + (player.profession === "soldier" ? .1 : 0) +
-            (player.profession === "hunter" ? .05 : 0);
+            (["hunter", "zookeeper"].includes(player.profession) ? .05 : 0);
         }
         return 1;
       }
-      function summonHunterDog(player) {
-        if (player.pets.some(pet => pet.summoned && pet.alive)) return false;
+      function summonPet(player, type, options = {}) {
+        const stats = type === "kitten"
+          ? { maxHp: 50, speed: 180, damage: 8 }
+          : { maxHp: petSpecs[type].maxHp, speed: petSpecs[type].speed, damage: type === "dog" ? 14.4 : 0 };
         const side = player.id === "p1" ? 1 : -1;
         player.pets.push({
-          id: `${player.id}-hunter-dog-${state.nextObjectId++}`, owner: player.id, type: "dog",
-          isPet: true, summoned: true, x: player.x + side * 34, y: player.y + 38,
-          hp: petSpecs.dog.maxHp, maxHp: petSpecs.dog.maxHp, alive: true,
-          speed: petSpecs.dog.speed, color: player.color, damage: 14.4, cooldown: 0,
-          phase: rand(0, Math.PI * 2), age: 0, lifetime: 10,
+          id: `${player.id}-summon-${state.nextObjectId++}`, owner: player.id, type,
+          isPet: true, summoned: true, x: player.x + side * (34 + (options.index || 0) * 28),
+          y: player.y + 38 + (options.index || 0) * 22,
+          hp: stats.maxHp, maxHp: stats.maxHp, alive: true,
+          speed: stats.speed, color: player.color, damage: stats.damage, cooldown: 0,
+          phase: rand(0, Math.PI * 2), age: 0, lifetime: options.lifetime || 0,
           navPath: [], navIndex: 0, navKey: "", navTimer: 0, navPoint: null, stuckFor: 0,
-          input: { x: 0, y: 0 }, foodAvailable: false, selfDestruct: false
+          input: { x: 0, y: 0 }, foodAvailable: type === "drone", selfDestruct: false,
+          ammo: type === "kitten" && options.armed ? 15 : 0, poisonTimer: 0, poisonTick: 0
         });
+      }
+      function summonHunterDog(player) {
+        if (player.pets.some(pet => pet.summoned && pet.alive)) return false;
+        summonPet(player, "dog", { lifetime: 10 });
         return true;
+      }
+      function displayCard(value) {
+        return value === 1 ? "A" : value === 11 ? "J" : value === 12 ? "Q" :
+          value === 13 ? "K" : value === 14 ? "JOKER" : String(value);
+      }
+      function fireCard(player, value, damage, angleOffset = 0) {
+        const angle = player.aim + angleOffset;
+        state.projectiles.push({
+          id: state.nextObjectId++, kind: "card", owner: player.id,
+          x: player.x + Math.cos(angle) * 25, y: player.y + Math.sin(angle) * 25,
+          vx: Math.cos(angle) * 600, vy: Math.sin(angle) * 600,
+          life: 1.25, damage, value
+        });
+      }
+      function useCardSkill(player) {
+        const deck = [];
+        for (let value = 1; value <= 13; value++) {
+          for (let suit = 0; suit < 4; suit++) deck.push(value);
+        }
+        deck.push(14, 14);
+        for (let index = deck.length - 1; index > 0; index--) {
+          const swap = Math.floor(Math.random() * (index + 1));
+          [deck[index], deck[swap]] = [deck[swap], deck[index]];
+        }
+        const hand = deck.slice(0, 4);
+        const sorted = [...hand].sort((a, b) => a - b);
+        const counts = new Map();
+        hand.forEach(value => counts.set(value, (counts.get(value) || 0) + 1));
+        const jokerBonus = hand.includes(1) && hand.includes(14) ? 10 : 1;
+        const uniqueCounts = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+        const fourKind = uniqueCounts.find(([, count]) => count === 4);
+        const threeKind = uniqueCounts.find(([, count]) => count === 3);
+        const runValues = [];
+        let currentRun = [];
+        [...new Set(sorted)].forEach(value => {
+          currentRun = currentRun.length && value === currentRun[currentRun.length - 1] + 1
+            ? [...currentRun, value] : [value];
+          if (currentRun.length >= 3 &&
+              (currentRun.length > runValues.length ||
+               currentRun.length === runValues.length && currentRun.reduce((sum, card) => sum + card, 0) >
+                 runValues.reduce((sum, card) => sum + card, 0))) {
+            runValues.splice(0, runValues.length, ...currentRun);
+          }
+        });
+        const run = runValues.length ? runValues : null;
+        const maxCard = sorted[sorted.length - 1];
+        const pair = uniqueCounts.find(([value, count]) => count === 2 && value * 2 > maxCard);
+        if (fourKind) {
+          fireCard(player, fourKind[0], fourKind[0] * 4 * 8 * jokerBonus);
+        } else if (threeKind) {
+          fireCard(player, threeKind[0], threeKind[0] * 3 * 3 * jokerBonus);
+        } else if (run) {
+          fireCard(player, run[2], run.reduce((sum, value) => sum + value, 0) * 5 * jokerBonus);
+        } else if (pair) {
+          fireCard(player, pair[0], pair[0] * jokerBonus, -.04);
+          fireCard(player, pair[0], pair[0] * jokerBonus, .04);
+        } else {
+          fireCard(player, maxCard, maxCard * jokerBonus);
+        }
+        player.lastHand = hand.map(displayCard);
+        player.lastHandTimer = 4;
+        addParticles(player.x, player.y, "#e5c25e", 12);
       }
       function activateProfessionSkill(playerId) {
         if (!state || !state.running || !["ai", "online"].includes(mode)) return;
@@ -1110,11 +1192,43 @@
           player.professionCooldown = 20;
         } else if (player.profession === "hunter" && summonHunterDog(player)) {
           player.professionCooldown = 15;
+        } else if (player.profession === "zookeeper") {
+          summonPet(player, "kitten", { armed: true });
+          summonPet(player, "dog", { index: 1 });
+          player.professionCooldown = 20;
+        } else if (player.profession === "commander") {
+          for (let index = 0; index < 3; index++) summonPet(player, "kitten", { index });
+          player.professionCooldown = 25;
+        } else if (player.profession === "chef") {
+          summonPet(player, "drone");
+          summonPet(player, "drone", { index: 1 });
+          player.professionCooldown = 20;
+        } else if (player.profession === "cardmaster") {
+          useCardSkill(player);
+          player.professionCooldown = 15;
         }
+      }
+      function applyPoison(target) {
+        if (!(target.poisonTimer > 0)) addParticles(target.x, target.y, "#80b85d", 8);
+        target.poisonTimer = 3;
+        target.poisonTick = 0;
+      }
+      function updatePoison(target, dt) {
+        if (!(target.poisonTimer > 0)) return;
+        const activeTime = Math.min(dt, target.poisonTimer);
+        target.poisonTimer = Math.max(0, target.poisonTimer - dt);
+        target.poisonTick += activeTime;
+        while (target.poisonTick >= 1) {
+          target.poisonTick -= 1;
+          applyDamage(target, 2);
+        }
+        if (target.poisonTimer <= 0) target.poisonTick = 0;
       }
       function updateProfession(player, dt) {
         player.professionCooldown = Math.max(0, player.professionCooldown - dt);
         player.stunned = Math.max(0, player.stunned - dt);
+        player.lastHandTimer = Math.max(0, player.lastHandTimer - dt);
+        updatePoison(player, dt);
         if (player.profession === "gremlin" && player.hp / player.maxHp < .3) player.glassesBroken = true;
         if (player.profession === "wizard" && player.hp < player.maxHp * .2) player.professionRegenActive = true;
         if (player.professionRegenActive && player.hp < player.maxHp * .5) {
@@ -1141,12 +1255,14 @@
           });
           player.professionCooldown = 4;
         }
-        if (player.kind === "ai" && player.profession === "soldier" &&
-            !player.skillWeapon && player.professionCooldown <= 0 && enemy && distance(player, enemy) < 390) {
-          activateProfessionSkill(player.id);
-        } else if (player.kind === "ai" && player.profession === "hunter" &&
-            player.professionCooldown <= 0 && summonHunterDog(player)) {
-          player.professionCooldown = 15;
+        if (player.kind === "ai" && enemy && player.professionCooldown <= 0) {
+          const range = distance(player, enemy);
+          if (player.profession === "soldier" && !player.skillWeapon && range < 390) activateProfessionSkill(player.id);
+          else if (player.profession === "hunter" && !player.pets.some(pet => pet.summoned && pet.alive)) activateProfessionSkill(player.id);
+          else if (player.profession === "zookeeper" && range < 420) activateProfessionSkill(player.id);
+          else if (player.profession === "commander" && range < 500) activateProfessionSkill(player.id);
+          else if (player.profession === "chef" && range < 420) activateProfessionSkill(player.id);
+          else if (player.profession === "cardmaster" && range < 560) activateProfessionSkill(player.id);
         }
       }
       function useItem(player) {
@@ -1176,10 +1292,20 @@
             .sort((a, b) => distance(player, a) - distance(player, b))[0];
           if (player.meleeCooldown <= 0 && meleeTarget) {
             applyDamage(meleeTarget, 11 * damageMultiplier(player, "melee"));
+            if (player.profession === "zombie") applyPoison(meleeTarget);
+            if (player.profession === "kungfu") {
+              player.meleeHits++;
+              if (player.meleeHits >= 4) {
+                player.meleeHits = 0;
+                const opponent = state.players.find(other => other !== player);
+                if (opponent) opponent.stunned = Math.max(opponent.stunned, 2);
+              }
+            }
             player.meleeCooldown = .52;
             player.recoil = .22;
             addParticles(meleeTarget.x, meleeTarget.y, player.color, 9);
-            if (!meleeTarget.isPet && meleeTarget.hp <= 0) showResult(player);
+            if (!meleeTarget.isPet && meleeTarget.hp <= 0 &&
+                !(meleeTarget.profession === "zombie" && meleeTarget.revivesLeft > 0)) showResult(player);
           }
           return;
         }
@@ -1557,7 +1683,8 @@
           const magnitude = Math.hypot(player.input.x, player.input.y) || 1;
           let speed = player.held === "scooter" ? 205 : 180;
           if (player.profession === "giant") speed *= .85;
-          if (player.profession === "hunter") speed *= .95;
+          if (["hunter", "zookeeper"].includes(player.profession)) speed *= .95;
+          if (player.profession === "zombie") speed *= .9;
           if (player.profession === "gremlin" && player.glassesBroken) speed *= 1.15;
           const dx = player.input.x / magnitude * speed * dt, dy = player.input.y / magnitude * speed * dt;
           const beforeX = player.x, beforeY = player.y;
@@ -1679,7 +1806,9 @@
       function updatePets(dt) {
         state.players.forEach(owner => owner.pets.forEach(pet => {
           if (!pet.alive) return;
-          if (pet.summoned) {
+          updatePoison(pet, dt);
+          if (!pet.alive) return;
+          if (pet.summoned && pet.lifetime > 0) {
             pet.age += dt;
             if (pet.age >= pet.lifetime) { pet.alive = false; return; }
           }
@@ -1726,13 +1855,39 @@
             }
             return;
           }
-          navigate(pet, enemy, `pet-${pet.id}-${enemy.id}`, 39, dt);
+          if (pet.type === "kitten" && pet.ammo > 0) {
+            const dx = pet.x - enemy.x, dy = pet.y - enemy.y;
+            const length = Math.max(1, Math.hypot(dx, dy));
+            const firingPoint = {
+              x: clamp(enemy.x + dx / length * 145, 70, W - 70),
+              y: clamp(enemy.y + dy / length * 145, 70, H - 70)
+            };
+            navigate(pet, firingPoint, `kitten-${pet.id}-${enemy.id}`, 14, dt);
+          } else {
+            navigate(pet, enemy, `pet-${pet.id}-${enemy.id}`, 39, dt);
+          }
           if (pet.input.x || pet.input.y) {
             const magnitude = Math.max(1, Math.hypot(pet.input.x, pet.input.y));
             const speed = pet.speed;
             collisionMove(pet, pet.input.x / magnitude * speed * dt, pet.input.y / magnitude * speed * dt);
           }
           const d = distance(pet, enemy);
+          if (pet.type === "kitten" && pet.ammo > 0 && d < 390 &&
+              pet.cooldown <= 0 && hasLineOfSight(pet, enemy)) {
+            const angle = Math.atan2(enemy.y - pet.y, enemy.x - pet.x);
+            state.projectiles.push({
+              id: state.nextObjectId++, kind: "bullet", owner: owner.id,
+              x: pet.x + Math.cos(angle) * 22, y: pet.y + Math.sin(angle) * 22,
+              vx: Math.cos(angle) * 640, vy: Math.sin(angle) * 640,
+              life: 1.1, damage: 12 * damageMultiplier(owner, "pistol")
+            });
+            pet.ammo--;
+            pet.cooldown = .42;
+          } else if (pet.type === "kitten" && pet.ammo <= 0 && d < 46 && pet.cooldown <= 0) {
+            applyDamage(enemy, pet.damage);
+            pet.cooldown = .8;
+            addParticles(enemy.x, enemy.y, "#e8a878", 6);
+          }
           if (pet.type === "elephant" && d < 50) applyDamage(enemy, pet.damage * dt);
           if (pet.type === "dog" && d < 46 && pet.cooldown <= 0) {
             applyDamage(enemy, pet.damage);
@@ -1749,6 +1904,24 @@
         updatePets(dt);
         updateObjects(dt);
         updateNames();
+        state.players.forEach(player => {
+          if (player.hp <= 0 && player.profession === "zombie" && player.revivesLeft > 0) {
+            player.revivesLeft--;
+            player.maxHp = Math.round(player.maxHp * 1.1);
+            player.hp = player.maxHp;
+            player.x = player.spawnX;
+            player.y = player.spawnY;
+            if (!safePosition(player.x, player.y, 22)) {
+              player.x = player.id === "p1" ? 145 : W - 145;
+              player.y = H / 2;
+            }
+            player.poisonTimer = 0;
+            player.poisonTick = 0;
+            player.stunned = 0;
+            player.invulnerable = 1.2;
+            addParticles(player.x, player.y, "#83bc75", 24);
+          }
+        });
         const dead = state.players.find(player => player.hp <= 0);
         if (dead && state.running) showResult(state.players.find(player => player !== dead));
         if (mode === "online" && state.running) {
@@ -1843,6 +2016,8 @@
           ctx.drawImage(elephantImage, -34, -34, 68, 68);
         } else if (pet.type === "dog" && dogImage.complete && dogImage.naturalWidth) {
           ctx.drawImage(dogImage, -27, -27, 54, 54);
+        } else if (pet.type === "kitten" && catImage.complete && catImage.naturalWidth) {
+          ctx.drawImage(catImage, -23, -23, 46, 46);
         } else if (pet.type === "drone") {
           ctx.strokeStyle = "#52677b"; ctx.lineWidth = 2;
           ctx.beginPath(); ctx.moveTo(-20, -12); ctx.lineTo(-27, -17);
@@ -1861,14 +2036,18 @@
           ctx.fillStyle = "#d5e0e7"; ctx.beginPath(); ctx.arc(-5, 0, 5, 0, Math.PI * 2); ctx.fill();
         }
         ctx.restore();
-        const width = pet.type === "elephant" ? 44 : 34;
-        const y = pet.y - (pet.type === "elephant" ? 41 : 34);
+        const width = pet.type === "elephant" ? 44 : pet.type === "kitten" ? 32 : 34;
+        const y = pet.y - (pet.type === "elephant" ? 41 : pet.type === "kitten" ? 30 : 34);
         ctx.fillStyle = "#fff"; ctx.fillRect(pet.x - width / 2, y, width, 4);
         ctx.fillStyle = pet.color;
         ctx.fillRect(pet.x - width / 2, y, width * clamp(pet.hp / pet.maxHp, 0, 1), 4);
         if (pet.type === "drone" && pet.foodAvailable) {
           const icon = itemIcons.food;
           if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, pet.x + 14, pet.y - 27, 14, 14);
+        }
+        if (pet.type === "kitten" && pet.ammo > 0) {
+          ctx.fillStyle = "#52616e"; ctx.font = "bold 9px sans-serif";
+          ctx.textAlign = "center"; ctx.fillText(String(pet.ammo), pet.x, pet.y + 38);
         }
       }
 
@@ -1919,6 +2098,12 @@
             } else if (shot.kind === "grenade") {
               ctx.fillStyle = shot.fuse >= 0 ? (Math.sin(state.elapsed * 25) > 0 ? "#fff0a0" : "#ff765f") : "#ffbd5b";
               ctx.beginPath(); ctx.arc(shot.x, shot.y, 8, 0, Math.PI * 2); ctx.fill();
+            } else if (shot.kind === "card") {
+              ctx.save(); ctx.translate(shot.x, shot.y); ctx.rotate(Math.atan2(shot.vy, shot.vx));
+              ctx.fillStyle = "#fff6d8"; ctx.strokeStyle = "#b48a3b"; ctx.lineWidth = 1.5;
+              ctx.beginPath(); ctx.roundRect(-9, -6, 18, 12, 2); ctx.fill(); ctx.stroke();
+              ctx.fillStyle = "#6b4b1d"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
+              ctx.fillText(displayCard(shot.value), 0, 3); ctx.restore();
             } else {
               ctx.fillStyle = shot.owner === "p1" ? "#b6ffe5" : "#ffd0de";
               ctx.beginPath(); ctx.ellipse(shot.x, shot.y, 7, 3, Math.atan2(shot.vy, shot.vx), 0, Math.PI * 2); ctx.fill();
@@ -1946,9 +2131,24 @@
         if (localPlayer.profession === "soldier" || localPlayer.profession === "hunter") {
           const cooldown = Math.ceil(localPlayer.professionCooldown);
           $("itemStatus").textContent += `　· ${localPlayer.profession === "soldier" ? "R技能" : "R猎狗"}：${cooldown ? `${cooldown}s` : "就绪"}`;
+        } else if (["zookeeper", "commander", "chef", "cardmaster"].includes(localPlayer.profession)) {
+          const cooldown = Math.ceil(localPlayer.professionCooldown);
+          const skillName = {
+            zookeeper: "R动物伙伴", commander: "R小猫球", chef: "R猫粮无人机", cardmaster: "R洗牌"
+          }[localPlayer.profession];
+          $("itemStatus").textContent += `　· ${skillName}：${cooldown ? `${cooldown}s` : "就绪"}`;
         } else if (localPlayer.profession === "wizard") {
           $("itemStatus").textContent += `　· 昏迷咒：${Math.ceil(localPlayer.professionCooldown)}s`;
+        } else if (localPlayer.profession === "kungfu") {
+          $("itemStatus").textContent += `　· 肉搏连击 ${localPlayer.meleeHits}/4`;
+        } else if (localPlayer.profession === "zombie") {
+          $("itemStatus").textContent += `　· 复活次数 ${localPlayer.revivesLeft}`;
         }
+        if (localPlayer.lastHandTimer > 0) {
+          $("itemStatus").textContent += `　· 手牌 ${localPlayer.lastHand.join(" ")}`;
+        }
+        if (localPlayer.stunned > 0) $("itemStatus").textContent += `　· 眩晕 ${localPlayer.stunned.toFixed(1)}s`;
+        if (localPlayer.poisonTimer > 0) $("itemStatus").textContent += `　· 中毒 ${localPlayer.poisonTimer.toFixed(1)}s`;
         $("p1Health").style.width = `${Math.max(0, state.players[0].hp / state.players[0].maxHp * 100)}%`;
         $("p2Health").style.width = `${Math.max(0, state.players[1].hp / state.players[1].maxHp * 100)}%`;
         [0, 1].forEach(index => {
