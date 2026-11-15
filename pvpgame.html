@@ -1117,6 +1117,11 @@
         summonPet(player, "dog", { lifetime: 10 });
         return true;
       }
+      function syncPetRoster(player) {
+        if (mode === "online" && state.host) {
+          broadcast({ type: "petRoster", playerId: player.id, pets: player.pets });
+        }
+      }
       function displayCard(value) {
         return value === 1 ? "A" : value === 11 ? "J" : value === 12 ? "Q" :
           value === 13 ? "K" : value === 14 ? "JOKER" : String(value);
@@ -1187,6 +1192,7 @@
         }
         const player = state.players.find(item => item.id === playerId);
         if (!player || player.professionCooldown > 0) return;
+        const petCount = player.pets.length;
         if (player.profession === "soldier") {
           player.skillWeapon = Math.random() < .5 ? "grenade" : "shotgun";
           player.professionCooldown = 20;
@@ -1207,6 +1213,7 @@
           useCardSkill(player);
           player.professionCooldown = 15;
         }
+        if (player.pets.length > petCount) syncPetRoster(player);
       }
       function applyPoison(target) {
         if (!(target.poisonTimer > 0)) addParticles(target.x, target.y, "#80b85d", 8);
@@ -2474,6 +2481,11 @@
                    data.playerId === "p2") {
           if (data.ability === "profession") activateProfessionSkill("p2");
           else if (["pearl", "drone"].includes(data.ability)) activateAbility("p2", data.ability);
+        } else if (data.type === "petRoster" && from === opponentId && state && !state.host &&
+                   state.running && (data.playerId === "p1" || data.playerId === "p2") &&
+                   Array.isArray(data.pets)) {
+          const owner = state.players.find(player => player.id === data.playerId);
+          if (owner) owner.pets = data.pets.map(pet => ({ ...pet }));
         } else if (data.type === "state" && from === opponentId && state && !state.host && data.state && data.state.id === state.id) {
           state = { ...data.state, host: false };
           updateNames();
