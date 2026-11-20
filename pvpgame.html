@@ -1433,6 +1433,15 @@
       function enemiesFor(player) {
         return state.players.filter(other => other.hp > 0 && isEnemy(player, other));
       }
+      function lureVictim(lure) {
+        let victim = null, bestDistance = Infinity;
+        state.players.forEach(player => {
+          if (player.hp <= 0 || player.id === lure.owner) return;
+          const d = distance(player, lure);
+          if (d < bestDistance) { bestDistance = d; victim = player; }
+        });
+        return victim;
+      }
       function deployDroneFood(player) {
         const drone = player.pets.find(pet => pet.type === "drone" && pet.alive && pet.foodAvailable);
         if (!drone) return false;
@@ -2052,7 +2061,7 @@
           pet.alive && pet.type !== "elephant").map(pet => ({ ...pet, enemyOwner: enemy })))
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         const target = enemyPet && distance(player, enemyPet) < distance(player, foe) + 52 ? enemyPet : foe;
-        const lure = state.lures.filter(item => item.owner !== player.id)
+        const lure = state.lures.filter(item => item.owner !== player.id && lureVictim(item) === player)
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         const enemyDrone = enemies.flatMap(enemy => enemy.pets.filter(pet => pet.alive && pet.type === "drone"))
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
@@ -2183,7 +2192,7 @@
             player.input.fire = keys.has(isP1 ? "Space" : "KeyM") || (isP1 && touchInput.fire);
           }
         }
-        const lure = state.lures.filter(item => item.owner !== player.id && !item.drone)
+        const lure = state.lures.filter(item => item.owner !== player.id && !item.drone && lureVictim(item) === player)
             .sort((a, b) => distance(player, a) - distance(player, b))[0];
         if (lure && player.kind !== "ai") {
             const dx = lure.x - player.x, dy = lure.y - player.y;
@@ -2193,7 +2202,7 @@
             player.input.fire = false;
             player.input.pulse = false;
         }
-        const droneLure = player.kind !== "ai" && state.lures.filter(item => item.owner !== player.id && item.drone)
+        const droneLure = player.kind !== "ai" && state.lures.filter(item => item.owner !== player.id && item.drone && lureVictim(item) === player)
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         if (droneLure) {
           const dx = droneLure.x - player.x, dy = droneLure.y - player.y;
