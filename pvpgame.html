@@ -184,6 +184,26 @@
     .setup-actions { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
     .large-setting { display: grid; grid-template-columns: 1fr minmax(150px, 42%); align-items: center; gap: 8px; margin: 8px 0; color: #404b5d; font-size: 11px; }
     .large-setting select { width: 100%; min-height: 34px; padding: 5px 8px; border: 1px solid #cbd1dc; border-radius: 6px; background: #fff; color: #303545; font: inherit; }
+    .large-profession-tools { margin-top: 8px; text-align: left; }
+    .large-profession-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 8px; max-height: 180px; overflow: auto; margin-top: 7px; padding: 7px; border: 1px solid #d5d9e0; border-radius: 6px; }
+    .large-profession-row { display: grid; grid-template-columns: minmax(65px, 1fr) minmax(85px, 1.2fr); align-items: center; gap: 5px; font-size: 10px; }
+    .large-profession-row select { width: 100%; min-height: 30px; border: 1px solid #cbd1dc; border-radius: 5px; background: #fff; color: #303545; font: inherit; }
+    .large-reward-note { margin: 7px 0 0 !important; color: #596578 !important; font-size: 10px !important; text-align: left; }
+    .battle-overview { padding: 6px 10px; border-bottom: 1px solid #ddd; background: #f7f9f7; }
+    .battle-overview[hidden] { display: none; }
+    .battle-overview-scroll { max-height: 104px; overflow: auto; }
+    .battle-overview table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; }
+    .battle-overview th, .battle-overview td { padding: 3px 7px; border-bottom: 1px solid #e6e9e6; white-space: nowrap; }
+    .battle-overview th { position: sticky; top: 0; color: #596578; background: #f7f9f7; }
+    .team-health-track { display: inline-block; width: min(120px, 24vw); height: 6px; margin-left: 5px; overflow: hidden; border-radius: 4px; background: #e2e7e2; vertical-align: middle; }
+    .team-health-track span { display: block; height: 100%; background: #6cae78; }
+    .minimap-panel { position: absolute; z-index: 2; top: 8px; right: 8px; width: min(180px, 25%); min-width: 120px; padding: 5px; border: 1px solid #aeb9ad; border-radius: 6px; background: rgba(255,255,255,.92); pointer-events: none; }
+    .minimap-panel[hidden] { display: none; }
+    .minimap-title { margin-bottom: 3px; color: #303545; font-size: 9px; font-weight: 800; }
+    .minimap-canvas { display: block; width: 100%; height: auto; border: 1px solid #d5ddd3; background: #eef4ea; }
+    .minimap-legend { display: flex; justify-content: space-between; gap: 3px; margin-top: 4px; color: #4b5663; font-size: 8px; }
+    .minimap-legend span { display: inline-flex; align-items: center; gap: 3px; }
+    .minimap-dot { width: 6px; height: 6px; border-radius: 50%; }
     .info { min-height: 58px; }
     .info span { color: #657184; }
     .touch-controls { grid-template-columns: minmax(150px, 1fr) minmax(118px, .75fr); align-items: center; gap: 12px; padding: 10px; }
@@ -205,6 +225,11 @@
       .page { width: min(100% - 20px, 620px); padding-top: 8px; }
       .topbar { margin-bottom: 10px; }
       .touch-controls { grid-template-columns: minmax(140px, 1fr) minmax(105px, .75fr); }
+      .large-profession-list { grid-template-columns: 1fr; }
+      .battle-overview { padding: 4px; }
+      .battle-overview th, .battle-overview td { padding: 3px 4px; }
+      .minimap-panel { width: 31%; min-width: 105px; top: 5px; right: 5px; }
+      .minimap-legend { font-size: 7px; }
     }
     @media (max-width: 390px) {
       .touch-controls { gap: 6px; padding: 7px; }
@@ -243,8 +268,26 @@
           <img class="cat-icon" src="images/catball.png" alt="">
         </div>
       </div>
+      <div class="battle-overview" id="teamOverview" hidden>
+        <div class="battle-overview-scroll">
+          <table aria-label="大战场队伍总览">
+            <thead><tr><th>队伍</th><th>剩余人数</th><th>剩余总生命</th></tr></thead>
+            <tbody id="teamOverviewBody"></tbody>
+          </table>
+        </div>
+      </div>
       <div class="arena">
         <canvas id="arenaCanvas" width="960" height="540" aria-label="猫球战斗场地"></canvas>
+        <div class="minimap-panel" id="minimapPanel" hidden>
+          <div class="minimap-title">战场小地图</div>
+          <canvas class="minimap-canvas" id="minimapCanvas" width="180" height="102" aria-label="敌人、队友和道具位置"></canvas>
+          <div class="minimap-legend">
+            <span><i class="minimap-dot" style="background:#268fc1"></i>玩家</span>
+            <span><i class="minimap-dot" style="background:#47a56e"></i>队友</span>
+            <span><i class="minimap-dot" style="background:#d54f55"></i>敌人</span>
+            <span><i class="minimap-dot" style="background:#dd9a30"></i>道具</span>
+          </div>
+        </div>
         <div class="overlay" id="overlay">
           <div class="overlay-card">
             <div class="overlay-icon" id="overlayIcon">🐾</div>
@@ -270,7 +313,7 @@
               </div>
             </section>
             <section id="largePanel" hidden>
-              <p class="setup-note">大战场是普通战场的 4 倍尺寸，障碍物随机生成。选择玩法和人数。</p>
+              <p class="setup-note">大战场为普通战场的 4 倍尺寸，障碍物更多、道具刷新更快；小地图显示队伍和道具位置。</p>
               <label class="large-setting">玩法
                 <select id="largeType">
                   <option value="teams">人机组队对抗</option>
@@ -294,6 +337,15 @@
               <label class="large-setting">职业
                 <select id="largeProfession"></select>
               </label>
+              <div class="large-profession-tools" id="largeProfessionTools">
+                <button class="quiet" id="largeProfessionToggle" type="button" aria-expanded="false" aria-controls="largeProfessionPanel">自定义队友与对手职业</button>
+                <div id="largeProfessionPanel" hidden>
+                  <p class="setup-note">逐个设置 AI 队友和对手；随机职业会从全部职业中抽取。</p>
+                  <div class="large-profession-list" id="largeProfessionAssignments"></div>
+                  <button class="quiet" id="largeProfessionReset" type="button">AI 角色恢复随机职业</button>
+                </div>
+              </div>
+              <p class="large-reward-note" id="largeRewardNote"></p>
               <div class="overlay-status" id="largeStatus" role="status" aria-live="polite"></div>
               <div class="setup-actions">
                 <button class="primary" id="largeStart" type="button">开始大战场</button>
@@ -367,6 +419,8 @@
       const BIG_INBOX = "catball-pvp-big-inbox-";
       const canvas = document.getElementById("arenaCanvas");
       const ctx = canvas.getContext("2d");
+      const minimapCanvas = document.getElementById("minimapCanvas");
+      const minimapContext = minimapCanvas.getContext("2d");
       const $ = id => document.getElementById(id);
       const keys = new Set(), touchInput = { up: false, down: false, left: false, right: false, fire: false };
       const activeTouchPointers = new Map();
@@ -383,6 +437,7 @@
       let activeLobby = LOBBY, activeInbox = INBOX, onlineRoster = [];
       let peers = new Map(), queueTimer = null, snapshotTimer = 0, lastInputSend = 0, inputSeq = 0;
       let overlayState = "menu", resultMessage = "", rewardedGameIds = new Set();
+      let overviewTimer = 0;
       let aiDifficulty = 2;
       let arenaBag = [], selectedLoadout = { pets: [], equipment: [] }, setupMode = "";
       let unlockedProfessions = new Set(), selectedProfession = "";
@@ -583,7 +638,20 @@
           }
         }
         let reward = 0, rewardLabel = "";
-        if (mode === "online" && !winner) {
+        if (mode === "large" && state.gameType === "survival") {
+          reward = Math.min(40, Math.floor(state.elapsed / 15) + Math.floor(state.survivalKills / 3));
+          if (reward) rewardLabel = `生存奖励 +${reward} 积分（单局上限 40）。`;
+        } else if (mode === "large" && state.gameType === "teams" && localWinner && winner) {
+          const teamSize = Number(largeConfig && largeConfig.teamSize) || 3;
+          reward = teamSize === 3 ? 15 : teamSize === 5 ? 25 : 40;
+          rewardLabel = `${teamSize}v${teamSize} 胜利奖励 +${reward} 积分。`;
+        } else if (mode === "large" && state.gameType === "brawl" && localWinner && winner) {
+          reward = 12 + Math.floor(Math.max(0, state.players.length - 1) / 2);
+          rewardLabel = `大混战冠军奖励 +${reward} 积分。`;
+        } else if (mode === "online" && state.bigOnline && localWinner && winner) {
+          reward = 15;
+          rewardLabel = `大战场联机胜利奖励 +${reward} 积分。`;
+        } else if (mode === "online" && !winner) {
           reward = state.stakes[localSide] || 0;
           rewardLabel = `平局，返还战利品 ${reward} 积分。`;
         } else if (localWinner && winner) {
@@ -951,7 +1019,7 @@
         const otherStake = gameMode === "online" ? Number(remote && remote.opponentStake) || 0 : 0;
         state = {
           id: remote && remote.gameId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
-          mode: gameMode, running: true, elapsed: 0, spawnTimer: 1.6, nextObjectId: 1,
+          mode: gameMode, running: true, elapsed: 0, spawnTimer: 1.6, itemSpawnTimer: 1.6, nextObjectId: 1,
           players: [p1, p2], items: [], projectiles: [], covers: [], lures: [], particles: [],
           arenaTerrain: terrain.map(rect => ({ ...rect })),
           winner: "", shake: 0,
@@ -978,12 +1046,12 @@
         mode = "large";
         const players = [];
         let nextPlayerNumber = 2;
-        const add = (id, name, kind, team, color, startX, startY, profession = "") => {
+        const add = (id, name, kind, team, color, startX, startY, profession = "", assignmentKey = "") => {
           const player = makePlayer(id, name, startX, color, kind, "");
           player.y = startY;
           player.spawnY = startY;
           player.team = team;
-          player.profession = profession || (kind === "ai" ? randomProfession() : "");
+          player.profession = kind === "ai" ? configuredAIProfession(config, assignmentKey) : validProfession(profession);
           if (player.profession === "zombie") player.revivesLeft = 2;
           applyProfessionHealth(player);
           if (kind === "ai") {
@@ -994,21 +1062,19 @@
           return player;
         };
         const firstPlayer = add("p1", catName, "human", 0, "#78f0cf", W * .12, H / 2, config.profession);
-        const allies = [];
         const opponentCount = config.type === "teams" ? config.teamSize :
           config.type === "brawl" ? config.enemyCount : 5;
         if (config.type === "teams") {
           for (let index = 1; index < config.teamSize; index++) {
-            const ally = add(`p${nextPlayerNumber++}`, `队友 ${index + 1}`, "ai", 0, "#76b7e8",
-              W * .12 + rand(-120, 120), H / 2 + rand(-180, 180));
-            allies.push(ally);
+            add(`p${nextPlayerNumber++}`, `队友 ${index + 1}`, "ai", 0, "#76b7e8",
+              W * .12 + rand(-120, 120), H / 2 + rand(-180, 180), "", `ally-${index}`);
           }
         }
         for (let index = 0; index < opponentCount; index++) {
           const team = config.type === "teams" ? 1 : index + 1;
           add(`p${nextPlayerNumber++}`, config.type === "teams" ? `敌方 ${index + 1}` : `对手 ${index + 1}`,
             "ai", team, ["#ff88ad", "#f0a15e", "#c79cff", "#e7d36b"][index % 4],
-            W * .88 + rand(-110, 110), H / 2 + rand(-240, 240));
+            W * .88 + rand(-110, 110), H / 2 + rand(-240, 240), "", `enemy-${index}`);
         }
         if (config.type === "survival") {
           for (let index = 0; index < players.length; index++) {
@@ -1017,16 +1083,17 @@
         }
         firstPlayer.name = catName + (config.profession ? ` · ${professionSpecs[config.profession].name}` : "");
         const enemyIndex = config.type === "teams" ? config.teamSize : 1;
-        if (players[enemyIndex]) {
+        if (players[enemyIndex] && players[enemyIndex].profession) {
           const enemy = players[enemyIndex];
           enemy.name += ` · ${professionSpecs[enemy.profession].name}`;
         }
         state = {
           id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
           mode: "large", gameType: config.type, running: true, elapsed: 0,
-          spawnTimer: config.type === "survival" ? 4 : 1.4, nextObjectId: 1,
+          spawnTimer: config.type === "survival" ? 4 : .7, itemSpawnTimer: .7, nextObjectId: 1,
           players, items: [], projectiles: [], covers: [], lures: [], particles: [],
-          winner: "", shake: 0, survivalKills: 0, loadouts: { p1: emptyLoadout() }, stakes: {}
+          winner: "", shake: 0, survivalKills: 0, nextSurvivalProfessionId: 5,
+          loadouts: { p1: emptyLoadout() }, stakes: {}
         };
         camera = { x: firstPlayer.x, y: firstPlayer.y };
         if (config.type === "teams") {
@@ -1039,7 +1106,7 @@
         $("shopButton").disabled = true;
         $("overlay").hidden = true;
         updateNames();
-        spawnItem(); spawnItem(); spawnItem();
+        for (let index = 0; index < 22; index++) spawnItem();
       }
 
       function makeLargeOnlineGame(roster, host) {
@@ -1066,7 +1133,7 @@
         state = {
           id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
           mode: "online", gameType: "largeOnline", bigOnline: true,
-          running: true, elapsed: 0, spawnTimer: 1.4, nextObjectId: 1,
+          running: true, elapsed: 0, spawnTimer: .7, itemSpawnTimer: .7, nextObjectId: 1,
           players, items: [], projectiles: [], covers: [], lures: [], particles: [],
           arenaTerrain: terrain.map(rect => ({ ...rect })),
           winner: "", shake: 0, loadouts: {}, stakes: {}, host, localPlayerId: host ? "p1" : ""
@@ -1088,6 +1155,7 @@
         $("shopButton").disabled = true;
         $("overlay").hidden = true;
         updateNames();
+        for (let index = 0; index < 22; index++) spawnItem();
       }
 
       function updateNames() {
@@ -1126,13 +1194,13 @@
           x: rect.x * scale, y: rect.y * scale, w: rect.w * scale, h: rect.h * scale
         }));
         if (randomObstacles) {
-          for (let index = 0; index < 70; index++) {
-            const rect = { x: rand(100, W - 220), y: rand(100, H - 160), w: rand(52, 150), h: rand(34, 95) };
+          for (let index = 0; index < 240; index++) {
+            const rect = { x: rand(100, W - 280), y: rand(100, H - 200), w: rand(78, 230), h: rand(46, 145) };
             const startClearance = Math.min(
-              Math.hypot(rect.x + rect.w / 2 - W * .15, rect.y + rect.h / 2 - H / 2),
-              Math.hypot(rect.x + rect.w / 2 - W * .85, rect.y + rect.h / 2 - H / 2)
+              Math.hypot(rect.x + rect.w / 2 - W * .12, rect.y + rect.h / 2 - H / 2),
+              Math.hypot(rect.x + rect.w / 2 - W * .88, rect.y + rect.h / 2 - H / 2)
             );
-            if (startClearance > 180) terrain.push(rect);
+            if (startClearance > 440) terrain.push(rect);
           }
         }
         terrain.forEach(rect => { rect.hitsLeft = 10; });
@@ -1159,9 +1227,61 @@
         if (unlockedProfessions.has(selectedProfession)) select.value = selectedProfession;
       }
 
+      function configuredAIProfession(config, key) {
+        const selected = config.aiProfessions && config.aiProfessions[key];
+        if (selected === "none") return "";
+        if (selected && selected !== "random") return validProfession(selected);
+        return randomProfession();
+      }
+
+      function largeAIAssignmentSlots() {
+        const type = $("largeType").value;
+        if (type === "teams") {
+          const teamSize = Number($("largeTeamSize").value);
+          return [
+            ...Array.from({ length: Math.max(0, teamSize - 1) }, (_, index) => ({
+              key: `ally-${index + 1}`, label: `队友 ${index + 2}`
+            })),
+            ...Array.from({ length: teamSize }, (_, index) => ({
+              key: `enemy-${index}`, label: `敌方 ${index + 1}`
+            }))
+          ];
+        }
+        const count = type === "brawl" ? Number($("largeEnemyCount").value) : type === "survival" ? 5 : 0;
+        return Array.from({ length: count }, (_, index) => ({
+          key: `enemy-${index}`, label: type === "survival" ? `初始敌人 ${index + 1}` : `对手 ${index + 1}`
+        }));
+      }
+
+      function renderLargeProfessionAssignments() {
+        const list = $("largeProfessionAssignments");
+        list.replaceChildren();
+        if (!largeConfig) return;
+        largeConfig.aiProfessions = largeConfig.aiProfessions || {};
+        largeAIAssignmentSlots().forEach(slot => {
+          const row = document.createElement("label");
+          row.className = "large-profession-row";
+          const title = document.createElement("span");
+          title.textContent = slot.label;
+          const select = document.createElement("select");
+          select.dataset.professionSlot = slot.key;
+          [["random", "随机"], ["none", "无职业"], ...Object.entries(professionSpecs)]
+            .forEach(([value, entry]) => {
+              const option = document.createElement("option");
+              option.value = value;
+              option.textContent = typeof entry === "string" ? entry : entry.name;
+              select.appendChild(option);
+            });
+          select.value = largeConfig.aiProfessions[slot.key] || "random";
+          select.addEventListener("change", () => { largeConfig.aiProfessions[slot.key] = select.value; });
+          row.append(title, select);
+          list.appendChild(row);
+        });
+      }
+
       function showLargeSetup() {
         readProfile();
-        largeConfig = { type: "teams", teamSize: 3, enemyCount: 5, difficulty: 2, onlineCount: 2 };
+        largeConfig = { type: "teams", teamSize: 3, enemyCount: 5, difficulty: 2, onlineCount: 2, aiProfessions: {} };
         $("overlayTitle").textContent = "大战场设置";
         $("overlayCopy").textContent = "地图为普通战场的 4 倍，障碍物随机生成。选择玩法和人数。";
         $("overlayIcon").textContent = "🗺️";
@@ -1173,8 +1293,12 @@
         $("overlayAction").hidden = true;
         $("largeType").value = "teams";
         $("largeStatus").textContent = "";
+        $("largeProfessionPanel").hidden = true;
+        $("largeProfessionToggle").setAttribute("aria-expanded", "false");
         renderLargeProfessionOptions();
         updateLargeSetupFields();
+        renderLargeProfessionAssignments();
+        updateLargeRewardNote();
         $("overlay").hidden = false;
       }
 
@@ -1184,6 +1308,29 @@
         $("largeEnemySetting").hidden = type !== "brawl";
         $("largeOnlineSetting").hidden = type !== "online";
         $("largeDifficultySetting").hidden = type === "online";
+        $("largeProfessionTools").hidden = type === "online";
+        if (type === "online") {
+          $("largeProfessionPanel").hidden = true;
+          $("largeProfessionToggle").setAttribute("aria-expanded", "false");
+        }
+      }
+
+      function updateLargeRewardNote() {
+        const type = $("largeType").value;
+        const teamSize = Number($("largeTeamSize").value);
+        const enemyCount = Number($("largeEnemyCount").value);
+        const note = type === "teams"
+          ? `积分奖励：获胜队伍每人 +${teamSize === 3 ? 15 : teamSize === 5 ? 25 : 40} 分。`
+          : type === "brawl" ? `积分奖励：大混战冠军 +${12 + Math.floor(enemyCount / 2)} 分。`
+            : type === "survival" ? "积分奖励：每生存 15 秒 +1 分、每击败 3 名敌人 +1 分，单局上限 40 分。"
+              : "积分奖励：联机大战场胜方每人 +15 分。";
+        $("largeRewardNote").textContent = note;
+      }
+
+      function refreshLargeSetup() {
+        updateLargeSetupFields();
+        renderLargeProfessionAssignments();
+        updateLargeRewardNote();
       }
 
       function controlledPlayer() {
@@ -1345,10 +1492,19 @@
           !state.covers.some(rect => x + radius > rect.x && x - radius < rect.x + rect.w && y + radius > rect.y && y - radius < rect.y + rect.h);
       }
       function spawnItem() {
-        if (state.items.length >= (largeConfig ? 20 : 8)) return;
+        if (state.items.length >= (largeConfig ? 80 : 8)) return;
         const types = Object.keys(itemInfo);
+        const nearbyPlayers = largeConfig ? state.players.filter(player => player.hp > 0) : [];
         for (let attempt = 0; attempt < 30; attempt++) {
-          const x = rand(100, W - 100), y = rand(100, H - 100);
+          const nearby = nearbyPlayers.length
+            ? nearbyPlayers[Math.floor(Math.random() * nearbyPlayers.length)]
+            : null;
+          const x = nearby
+            ? clamp(nearby.x + rand(-VIEW_W, VIEW_W), 100, W - 100)
+            : rand(100, W - 100);
+          const y = nearby
+            ? clamp(nearby.y + rand(-VIEW_H, VIEW_H), 100, H - 100)
+            : rand(100, H - 100);
           if (safePosition(x, y, 34) && !state.items.some(item => Math.hypot(item.x - x, item.y - y) < 75)) {
             const type = types[Math.floor(Math.random() * types.length)];
             state.items.push({ id: state.nextObjectId++, type, x, y, phase: rand(0, 6), born: state.elapsed });
@@ -2109,10 +2265,10 @@
       }
 
       function updateObjects(dt) {
-        state.spawnTimer -= dt;
-        if (state.spawnTimer <= 0) {
+        state.itemSpawnTimer -= dt;
+        if (state.itemSpawnTimer <= 0) {
           spawnItem();
-          state.spawnTimer = largeConfig ? rand(1.4, 2.4) : rand(3, 5);
+          state.itemSpawnTimer = largeConfig ? rand(.45, .8) : rand(3, 5);
         }
         state.items = state.items.filter(item => state.elapsed - item.born < 20);
         state.covers.forEach(cover => cover.life -= dt);
@@ -2305,7 +2461,7 @@
             enemy.spawnX = enemy.x;
             enemy.spawnY = enemy.y;
             enemy.team = 1;
-            enemy.profession = randomProfession();
+            enemy.profession = configuredAIProfession(largeConfig, `enemy-${state.nextSurvivalProfessionId++}`);
             if (enemy.profession === "zombie") enemy.revivesLeft = 2;
             applyProfessionHealth(enemy);
             enemy.maxHp *= 1.4;
@@ -2570,6 +2726,85 @@
         ctx.restore();
       }
 
+      function drawMinimap() {
+        const enabled = Boolean(state && (mode === "large" || state.bigOnline));
+        $("minimapPanel").hidden = !enabled;
+        if (!enabled) return;
+        const width = minimapCanvas.width, height = minimapCanvas.height;
+        const scaleX = width / W, scaleY = height / H;
+        const map = minimapContext;
+        map.clearRect(0, 0, width, height);
+        map.fillStyle = "#edf3e9";
+        map.fillRect(0, 0, width, height);
+        map.fillStyle = "#9eac98";
+        terrain.forEach(rect => map.fillRect(rect.x * scaleX, rect.y * scaleY,
+          Math.max(1, rect.w * scaleX), Math.max(1, rect.h * scaleY)));
+        state.items.forEach(item => {
+          map.fillStyle = "#dd9a30";
+          map.beginPath();
+          map.arc(item.x * scaleX, item.y * scaleY, 2, 0, Math.PI * 2);
+          map.fill();
+        });
+        const local = controlledPlayer();
+        state.players.forEach(player => {
+          if (player.hp <= 0) return;
+          map.fillStyle = player === local ? "#268fc1" : isEnemy(local, player) ? "#d54f55" : "#47a56e";
+          map.beginPath();
+          map.arc(player.x * scaleX, player.y * scaleY, player === local ? 3.2 : 2.4, 0, Math.PI * 2);
+          map.fill();
+        });
+        map.strokeStyle = "#416c9b";
+        map.lineWidth = 1;
+        map.strokeRect(
+          (camera.x - VIEW_W / 2) * scaleX,
+          (camera.y - VIEW_H / 2) * scaleY,
+          VIEW_W * scaleX,
+          VIEW_H * scaleY
+        );
+      }
+
+      function updateTeamOverview() {
+        const enabled = Boolean(state && (mode === "large" || state.bigOnline));
+        const overview = $("teamOverview");
+        overview.hidden = !enabled;
+        if (!enabled || performance.now() < overviewTimer) return;
+        overviewTimer = performance.now() + 300;
+        const teams = new Map();
+        state.players.forEach(player => {
+          if (!teams.has(player.team)) teams.set(player.team, []);
+          teams.get(player.team).push(player);
+        });
+        const local = controlledPlayer();
+        const body = $("teamOverviewBody");
+        body.replaceChildren();
+        [...teams.entries()].sort((a, b) => a[0] - b[0]).forEach(([team, players]) => {
+          const alive = players.filter(player => player.hp > 0);
+          const currentHp = players.reduce((sum, player) => sum + Math.max(0, player.hp), 0);
+          const maxHp = players.reduce((sum, player) => sum + player.maxHp, 0);
+          const label = mode === "large" && state.gameType === "brawl"
+            ? players[0].name
+            : state.gameType === "survival"
+              ? team === 0 ? "玩家" : "敌群"
+              : team === local.team ? "我方" : "敌方";
+          const row = document.createElement("tr");
+          const nameCell = document.createElement("td");
+          nameCell.textContent = label;
+          const countCell = document.createElement("td");
+          countCell.textContent = `${alive.length}/${players.length}`;
+          const healthCell = document.createElement("td");
+          const healthText = document.createElement("span");
+          healthText.textContent = `${Math.ceil(currentHp)}/${Math.ceil(maxHp)}`;
+          const track = document.createElement("span");
+          track.className = "team-health-track";
+          const fill = document.createElement("span");
+          fill.style.width = `${maxHp ? clamp(currentHp / maxHp * 100, 0, 100) : 0}%`;
+          track.appendChild(fill);
+          healthCell.append(healthText, track);
+          row.append(nameCell, countCell, healthCell);
+          body.appendChild(row);
+        });
+      }
+
       function updateHudInfo() {
         if (!state) { $("itemStatus").textContent = "道具：空手"; return; }
         const localPlayer = controlledPlayer();
@@ -2633,6 +2868,8 @@
         }
         if (mode === "online" && state && !state.host && state.running) sendInput();
         draw();
+        drawMinimap();
+        updateTeamOverview();
         updateHudInfo();
         requestAnimationFrame(frame);
       }
@@ -3116,41 +3353,30 @@
       for (let count = 2; count <= 20; count++) {
         $("largeOnlineCount").add(new Option(String(count), String(count)));
       }
-      $("largeType").addEventListener("change", updateLargeSetupFields);
+      $("largeType").addEventListener("change", refreshLargeSetup);
+      $("largeTeamSize").addEventListener("change", refreshLargeSetup);
+      $("largeEnemyCount").addEventListener("change", refreshLargeSetup);
+      $("largeProfessionToggle").addEventListener("click", () => {
+        const panel = $("largeProfessionPanel");
+        panel.hidden = !panel.hidden;
+        $("largeProfessionToggle").setAttribute("aria-expanded", String(!panel.hidden));
+      });
+      $("largeProfessionReset").addEventListener("click", () => {
+        if (largeConfig) largeConfig.aiProfessions = {};
+        renderLargeProfessionAssignments();
+      });
       $("largeCancel").addEventListener("click", () => { largeConfig = null; showMenu(); });
       $("largeStart").addEventListener("click", () => {
         const type = $("largeType").value;
         largeConfig = {
           type, teamSize: Number($("largeTeamSize").value), enemyCount: Number($("largeEnemyCount").value),
           onlineCount: Number($("largeOnlineCount").value), difficulty: Number($("largeDifficulty").value),
-          profession: $("largeProfession").value
+          profession: $("largeProfession").value,
+          aiProfessions: largeConfig && largeConfig.aiProfessions || {}
         };
         if (type === "online") {
           $("largeStatus").textContent = "正在准备大战场联机…";
           bigOnline = true;
-          startOnline();
-        } else {
-          makeLargeGame(largeConfig);
-        }
-      });
-      for (let count = 5; count <= 20; count++) {
-        $("largeEnemyCount").add(new Option(String(count), String(count)));
-      }
-      for (let count = 2; count <= 20; count++) {
-        $("largeOnlineCount").add(new Option(String(count), String(count)));
-      }
-      $("largeType").addEventListener("change", updateLargeSetupFields);
-      $("largeCancel").addEventListener("click", () => { largeConfig = null; showMenu(); });
-      $("largeStart").addEventListener("click", () => {
-        const type = $("largeType").value;
-        largeConfig = {
-          type, teamSize: Number($("largeTeamSize").value), enemyCount: Number($("largeEnemyCount").value),
-          onlineCount: Number($("largeOnlineCount").value), difficulty: Number($("largeDifficulty").value),
-          profession: $("largeProfession").value
-        };
-        if (type === "online") {
-          $("largeStatus").textContent = "正在准备大战场联机…";
-          largeOnline = true;
           startOnline();
         } else {
           makeLargeGame(largeConfig);
