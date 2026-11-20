@@ -182,9 +182,14 @@
     .shop-balance strong { color: #765a19; }
     .bag-title { margin: 12px 0 6px; font-size: 13px; }
     .setup-actions { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+    .large-setting { display: grid; grid-template-columns: 1fr minmax(150px, 42%); align-items: center; gap: 8px; margin: 8px 0; color: #404b5d; font-size: 11px; }
+    .large-setting select { width: 100%; min-height: 34px; padding: 5px 8px; border: 1px solid #cbd1dc; border-radius: 6px; background: #fff; color: #303545; font: inherit; }
     .info { min-height: 58px; }
     .info span { color: #657184; }
     .touch-controls { grid-template-columns: minmax(150px, 1fr) minmax(118px, .75fr); align-items: center; gap: 12px; padding: 10px; }
+    @media (pointer: coarse), (any-pointer: coarse) {
+      .touch-controls { display: grid; }
+    }
     .dpad { display: grid; width: 144px; grid-template: repeat(3, 42px) / repeat(3, 42px); justify-self: center; gap: 3px; }
     .touch-actions { display: grid; min-width: 0; gap: 6px; }
     .dpad button { min-height: 42px; padding: 0; font-size: 17px; }
@@ -248,6 +253,7 @@
             <div class="mode-list" id="modeList">
               <button class="mode-button" type="button" data-mode="ai"><strong>🤖 人机对战</strong><span>WASD 移动 · 鼠标瞄准 · 空格使用/攻击</span></button>
               <button class="mode-button" type="button" data-mode="local"><strong>⚔️ 本地 2 人</strong><span>P1：WASD + 空格　·　P2：方向键 + M</span></button>
+              <button class="mode-button" type="button" data-mode="large"><strong>🗺️ 大战场</strong><span>组队对战 · 大混战 · 生存赛 · 多人联机</span></button>
               <button class="mode-button" type="button" data-mode="online"><strong>🌐 联机双人</strong><span>GoEasy 自动匹配在线玩家</span></button>
             </div>
             <section id="difficultyPanel" hidden>
@@ -261,6 +267,37 @@
               </div>
               <div class="setup-actions">
                 <button class="quiet" id="difficultyCancel" type="button">返回</button>
+              </div>
+            </section>
+            <section id="largePanel" hidden>
+              <p class="setup-note">大战场是普通战场的 4 倍尺寸，障碍物随机生成。选择玩法和人数。</p>
+              <label class="large-setting">玩法
+                <select id="largeType">
+                  <option value="teams">人机组队对抗</option>
+                  <option value="brawl">大混战</option>
+                  <option value="survival">生存赛</option>
+                  <option value="online">GoEasy 多人联机</option>
+                </select>
+              </label>
+              <label class="large-setting" id="largeTeamSetting">每队人数
+                <select id="largeTeamSize"><option>3</option><option>5</option><option>10</option></select>
+              </label>
+              <label class="large-setting" id="largeEnemySetting" hidden>敌人数量
+                <select id="largeEnemyCount"></select>
+              </label>
+              <label class="large-setting" id="largeOnlineSetting" hidden>联机人数（含自己）
+                <select id="largeOnlineCount"></select>
+              </label>
+              <label class="large-setting" id="largeDifficultySetting">人机难度
+                <select id="largeDifficulty"><option value="1">菜鸟</option><option value="2" selected>普通</option><option value="3">高手</option><option value="4">困难</option><option value="5">噩梦</option></select>
+              </label>
+              <label class="large-setting">职业
+                <select id="largeProfession"></select>
+              </label>
+              <div class="overlay-status" id="largeStatus" role="status" aria-live="polite"></div>
+              <div class="setup-actions">
+                <button class="primary" id="largeStart" type="button">开始大战场</button>
+                <button class="quiet" id="largeCancel" type="button">返回</button>
               </div>
             </section>
             <section id="setupPanel" hidden>
@@ -320,10 +357,14 @@
   <script>
     (() => {
       "use strict";
-      const W = 960, H = 540, ECONOMY_KEY = "catball_economy_v1";
+      const VIEW_W = 960, VIEW_H = 540, ECONOMY_KEY = "catball_economy_v1";
+      let W = VIEW_W, H = VIEW_H;
       const NAME_KEY = "catball_pet_name_v1", GOEASY_KEY = "BC-6c13f16b458f45548f069666edacbd91";
+      const BIG_GO_EASY_KEY = "BC-cca123fa205040bdb2ec3d9c18682250";
       const GOEASY_HOST = "hangzhou.goeasy.io", LOBBY = "catball-pvp-lobby-syc111syc-v1";
       const INBOX = "catball-pvp-inbox-";
+      const BIG_LOBBY = "catball-pvp-big-lobby-syc111syc-v1";
+      const BIG_INBOX = "catball-pvp-big-inbox-";
       const canvas = document.getElementById("arenaCanvas");
       const ctx = canvas.getContext("2d");
       const $ = id => document.getElementById(id);
@@ -337,7 +378,9 @@
       const dogImage = new Image();
       dogImage.src = "images/dogball.png";
       let cosmetic = "", catName = "猫球", points = 0, mode = "", state = null, lastFrame = 0;
+      let arenaScale = 1, largeConfig = null, bigOnline = false, camera = { x: VIEW_W / 2, y: VIEW_H / 2 };
       let goeasy = null, connected = false, peerId = "", opponentId = "", opponentProfile = null, onlineAttemptId = 0;
+      let activeLobby = LOBBY, activeInbox = INBOX, onlineRoster = [];
       let peers = new Map(), queueTimer = null, snapshotTimer = 0, lastInputSend = 0, inputSeq = 0;
       let overlayState = "menu", resultMessage = "", rewardedGameIds = new Set();
       let aiDifficulty = 2;
@@ -355,7 +398,10 @@
         zookeeper: { name: "动物园管理员", price: 38, description: "猎人属性 · R 召唤持手枪小猫球和狗球，冷却 20 秒" },
         commander: { name: "雇佣兵指挥官", price: 35, description: "R 召唤 3 只小猫球，冷却 25 秒" },
         chef: { name: "厨师", price: 28, description: "R 发射 2 个猫粮无人机，冷却 20 秒" },
-        cardmaster: { name: "卡牌大师", price: 30, description: "R 洗 4 张牌并按牌型发射攻击，冷却 15 秒" }
+        cardmaster: { name: "卡牌大师", price: 30, description: "R 洗 4 张牌并按牌型发射攻击，冷却 15 秒" },
+        lightning: { name: "闪电侠", price: 50, description: "移速 +50% · R 朝瞄准方向冲刺 5 秒，撞击造成伤害并眩晕 2 秒，冷却 20 秒" },
+        miner: { name: "矿工", price: 55, description: "障碍物肉搏 10 次可击碎 · R 钻地至多 12 秒，再按 R 出土，冷却 25 秒" },
+        cyborg: { name: "生化人", price: 80, description: "生命 ×2 · 肉搏距离 ×2 并吸血 · 移速 -30%" }
       };
       let lockedStake = 0, opponentStake = 0, stakeReserved = false, shopReturnSetup = false;
       const BAG_CAPACITY = 8, PET_LIMIT = 2, EQUIPMENT_LIMIT = 2;
@@ -371,7 +417,7 @@
         phase: { name: "穿墙术", price: 17, description: "本局可穿过墙体与掩体" }
       };
       const shopItems = { ...petSpecs, ...equipmentSpecs };
-      const terrain = [
+      let terrain = [
         { x: 276, y: 167, w: 60, h: 44 }, { x: 614, y: 328, w: 65, h: 48 },
         { x: 457, y: 95, w: 47, h: 34 }, { x: 442, y: 405, w: 55, h: 38 }
       ];
@@ -517,7 +563,7 @@
         if (!state || state.matchSettled) return "";
         const rewardId = state.id;
         if (rewardId && rewardedGameIds.has(rewardId)) return "本局奖励已领取。";
-        const localSide = mode === "online" ? (state.host ? "p1" : "p2") : "p1";
+        const localSide = mode === "online" ? state.localPlayerId || (state.host ? "p1" : "p2") : "p1";
         const localPlayer = state.players.find(player => player.id === localSide);
         const selected = state.loadouts && state.loadouts[localSide];
         let nextBag = arenaBag.map(item => ({ ...item }));
@@ -676,6 +722,7 @@
         $("overlayIcon").textContent = gameMode === "online" ? "🌐" : "🎒";
         $("modeList").hidden = true;
         $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
         $("setupPanel").hidden = false;
         $("professionSetup").hidden = gameMode === "local";
         $("shopPanel").hidden = true;
@@ -697,6 +744,7 @@
         $("overlayIcon").textContent = "🛍️";
         $("modeList").hidden = true;
         $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
         $("setupPanel").hidden = true;
         $("shopPanel").hidden = false;
         $("overlayAction").hidden = true;
@@ -767,6 +815,7 @@
           profession: "", professionCooldown: 0, professionRegenTimer: 0, professionRegenActive: false,
           glassesBroken: false, skillWeapon: "", stunned: 0, meleeHits: 0, revivesLeft: 0,
           spawnX: x, spawnY: H / 2, poisonTimer: 0, poisonTick: 0, lastHand: [], lastHandTimer: 0,
+          underground: false, undergroundTimer: 0, lightningDash: 0, lightningDirection: 0, lightningHits: [],
           pets: [], equipment: { shield: 0, maxShield: 0, shieldHitAt: -Infinity, pearlAvailable: false, pearlUsed: false, phase: false },
           invulnerable: 0, medTimer: 0, fireWasDown: false, input: { x: 0, y: 0, fire: false, pulse: false, aim: 0 },
           color, kind, cosmetic: look || "", recoil: 0, walked: 0,
@@ -821,7 +870,7 @@
       function professionHealthMultiplier(profession) {
         return profession === "doctor" ? 1.25 :
           profession === "giant" ? 1.3 : profession === "wizard" ? .9 :
-            profession === "kungfu" ? 1.15 : 1;
+            profession === "kungfu" ? 1.15 : profession === "cyborg" ? 2 : 1;
       }
       function applyProfessionHealth(player) {
         player.maxHp = 100 * professionHealthMultiplier(player.profession);
@@ -857,6 +906,7 @@
       function makeGame(gameMode, remote = null, loadout = null) {
         mode = gameMode;
         pointerTarget = null;
+        configureArena(largeConfig ? 8 : 2, Boolean(largeConfig));
         const onlineGuest = gameMode === "online" && remote && !remote.host;
         const localLoadout = gameMode === "local" ? emptyLoadout() : sanitizeLoadout(loadout || selectedLoadoutData());
         const hostLoadout = onlineGuest ? sanitizeLoadout(remote.hostLoadout) : localLoadout;
@@ -865,7 +915,7 @@
         const p1 = makePlayer(
           "p1",
           onlineGuest ? (remote.opponentName || "联机玩家") : catName,
-          145,
+          W * .15,
           "#78f0cf",
           "human",
           onlineGuest ? (remote.opponentCosmetic || "") : cosmetic
@@ -875,7 +925,7 @@
           gameMode === "online" ? (onlineGuest ? catName : (remote && remote.opponentName || "联机玩家")) : "玩家 2";
         const p2Cosmetic = gameMode === "online" ? (onlineGuest ? cosmetic : (remote && remote.opponentCosmetic || "")) :
           (opponentProfile && opponentProfile.cosmetic || "");
-        const p2 = makePlayer("p2", p2Name, W - 145, "#ff88ad", p2Kind, p2Cosmetic);
+        const p2 = makePlayer("p2", p2Name, W * .85, "#ff88ad", p2Kind, p2Cosmetic);
         p1.profession = gameMode === "local" ? "" :
           validProfession(gameMode === "online" && onlineGuest ? remote.hostProfession : selectedProfession);
         p2.profession = gameMode === "local" ? "" :
@@ -903,6 +953,7 @@
           id: remote && remote.gameId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
           mode: gameMode, running: true, elapsed: 0, spawnTimer: 1.6, nextObjectId: 1,
           players: [p1, p2], items: [], projectiles: [], covers: [], lures: [], particles: [],
+          arenaTerrain: terrain.map(rect => ({ ...rect })),
           winner: "", shake: 0,
           loadouts: { p1: p1Loadout, p2: p2Selected },
           stakes: gameMode === "online" ? (onlineGuest ? { p1: otherStake, p2: localStake } : { p1: localStake, p2: otherStake }) : { p1: 0, p2: 0 }
@@ -920,17 +971,225 @@
         $("overlay").hidden = true;
       }
 
+      function makeLargeGame(config) {
+        largeConfig = config;
+        selectedProfession = validProfession(config.profession);
+        configureArena(8, true);
+        mode = "large";
+        const players = [];
+        let nextPlayerNumber = 2;
+        const add = (id, name, kind, team, color, startX, startY, profession = "") => {
+          const player = makePlayer(id, name, startX, color, kind, "");
+          player.y = startY;
+          player.spawnY = startY;
+          player.team = team;
+          player.profession = profession || (kind === "ai" ? randomProfession() : "");
+          if (player.profession === "zombie") player.revivesLeft = 2;
+          applyProfessionHealth(player);
+          if (kind === "ai") {
+            player.maxHp *= 1.4 * (config.difficulty >= 5 ? 2 : 1);
+            player.hp = player.maxHp;
+          }
+          players.push(player);
+          return player;
+        };
+        const firstPlayer = add("p1", catName, "human", 0, "#78f0cf", W * .12, H / 2, config.profession);
+        const allies = [];
+        const opponentCount = config.type === "teams" ? config.teamSize :
+          config.type === "brawl" ? config.enemyCount : 5;
+        if (config.type === "teams") {
+          for (let index = 1; index < config.teamSize; index++) {
+            const ally = add(`p${nextPlayerNumber++}`, `队友 ${index + 1}`, "ai", 0, "#76b7e8",
+              W * .12 + rand(-120, 120), H / 2 + rand(-180, 180));
+            allies.push(ally);
+          }
+        }
+        for (let index = 0; index < opponentCount; index++) {
+          const team = config.type === "teams" ? 1 : index + 1;
+          add(`p${nextPlayerNumber++}`, config.type === "teams" ? `敌方 ${index + 1}` : `对手 ${index + 1}`,
+            "ai", team, ["#ff88ad", "#f0a15e", "#c79cff", "#e7d36b"][index % 4],
+            W * .88 + rand(-110, 110), H / 2 + rand(-240, 240));
+        }
+        if (config.type === "survival") {
+          for (let index = 0; index < players.length; index++) {
+            players[index].team = index === 0 ? 0 : 1;
+          }
+        }
+        firstPlayer.name = catName + (config.profession ? ` · ${professionSpecs[config.profession].name}` : "");
+        const enemyIndex = config.type === "teams" ? config.teamSize : 1;
+        if (players[enemyIndex]) {
+          const enemy = players[enemyIndex];
+          enemy.name += ` · ${professionSpecs[enemy.profession].name}`;
+        }
+        state = {
+          id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+          mode: "large", gameType: config.type, running: true, elapsed: 0,
+          spawnTimer: config.type === "survival" ? 4 : 1.4, nextObjectId: 1,
+          players, items: [], projectiles: [], covers: [], lures: [], particles: [],
+          winner: "", shake: 0, survivalKills: 0, loadouts: { p1: emptyLoadout() }, stakes: {}
+        };
+        camera = { x: firstPlayer.x, y: firstPlayer.y };
+        if (config.type === "teams") {
+          $("gameStatus").textContent = `${config.teamSize}v${config.teamSize} · ${["", "菜鸟", "普通", "高手", "困难", "噩梦"][config.difficulty]} · 大战场`;
+        } else if (config.type === "brawl") {
+          $("gameStatus").textContent = `大混战 · ${config.enemyCount} 名敌人 · 大战场`;
+        } else {
+          $("gameStatus").textContent = "生存赛 · 敌人将持续刷新";
+        }
+        $("shopButton").disabled = true;
+        $("overlay").hidden = true;
+        updateNames();
+        spawnItem(); spawnItem(); spawnItem();
+      }
+
+      function makeLargeOnlineGame(roster, host) {
+        configureArena(8, true);
+        mode = "online";
+        const players = roster.map((profile, index) => {
+          const angle = Math.PI * 2 * index / roster.length;
+          const player = makePlayer(
+            `p${index + 1}`, profile.name || "联机玩家",
+            W / 2 + Math.cos(angle) * W * .28,
+            ["#78f0cf", "#ff88ad", "#f0a15e", "#c79cff", "#e7d36b"][index % 5],
+            "human", profile.cosmetic || ""
+          );
+          player.y = clamp(H / 2 + Math.sin(angle) * H * .28, 90, H - 90);
+          player.spawnX = player.x;
+          player.spawnY = player.y;
+          player.team = index % 2;
+          player.peerId = profile.peerId;
+          player.profession = validProfession(profile.profession);
+          if (player.profession === "zombie") player.revivesLeft = 2;
+          applyProfessionHealth(player);
+          return player;
+        });
+        state = {
+          id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+          mode: "online", gameType: "largeOnline", bigOnline: true,
+          running: true, elapsed: 0, spawnTimer: 1.4, nextObjectId: 1,
+          players, items: [], projectiles: [], covers: [], lures: [], particles: [],
+          arenaTerrain: terrain.map(rect => ({ ...rect })),
+          winner: "", shake: 0, loadouts: {}, stakes: {}, host, localPlayerId: host ? "p1" : ""
+        };
+        if (host) {
+          state.localPlayerId = players[0].id;
+          onlineRoster = roster;
+          opponentId = roster.find(profile => profile.peerId !== peerId).peerId;
+          const snapshot = serializableState();
+          roster.slice(1).forEach(profile => publishDirect(profile.peerId, {
+            type: "bigStart", hostId: peerId, roster, state: snapshot
+          }));
+        } else {
+          state.localPlayerId = players.find(player => player.peerId === peerId).id;
+        }
+        camera = { x: players.find(player => player.id === state.localPlayerId).x,
+          y: players.find(player => player.id === state.localPlayerId).y };
+        $("gameStatus").textContent = `大战场联机 · ${roster.length} 名玩家`;
+        $("shopButton").disabled = true;
+        $("overlay").hidden = true;
+        updateNames();
+      }
+
       function updateNames() {
         if (!state) return;
-        $("p1Name").textContent = state.players[0].name;
-        $("p2Name").textContent = state.players[1].name;
-        $("p1Health").style.width = `${Math.max(0, state.players[0].hp / state.players[0].maxHp * 100)}%`;
-        $("p2Health").style.width = `${Math.max(0, state.players[1].hp / state.players[1].maxHp * 100)}%`;
+        const [first, second] = hudPlayers();
+        $("p1Name").textContent = first.name;
+        $("p2Name").textContent = second.name;
+        $("p1Health").style.width = `${Math.max(0, first.hp / first.maxHp * 100)}%`;
+        $("p2Health").style.width = `${Math.max(0, second.hp / second.maxHp * 100)}%`;
+      }
+      function hudPlayers() {
+        if ((mode === "large" || state.bigOnline) && state.players.length > 1) {
+          const local = mode === "online" ? controlledPlayer() : state.players[0];
+          const opponent = state.players.find(player => isEnemy(local, player)) ||
+            state.players.find(player => player !== local);
+          return [local, opponent];
+        }
+        return [state.players[0], state.players[1]];
         [0, 1].forEach(index => {
           const player = state.players[index], prefix = index === 0 ? "p1" : "p2";
           $(`${prefix}ShieldWrap`).hidden = player.equipment.maxShield <= 0;
           $(`${prefix}Shield`).style.width = `${player.equipment.maxShield ? player.equipment.shield / player.equipment.maxShield * 100 : 0}%`;
         });
+      }
+
+      function configureArena(scale, randomObstacles) {
+        arenaScale = scale;
+        W = VIEW_W * scale;
+        H = VIEW_H * scale;
+        pointerTarget = null;
+        const baseTerrain = [
+          { x: 276, y: 167, w: 60, h: 44 }, { x: 614, y: 328, w: 65, h: 48 },
+          { x: 457, y: 95, w: 47, h: 34 }, { x: 442, y: 405, w: 55, h: 38 }
+        ];
+        terrain = randomObstacles ? [] : baseTerrain.map(rect => ({
+          x: rect.x * scale, y: rect.y * scale, w: rect.w * scale, h: rect.h * scale
+        }));
+        if (randomObstacles) {
+          for (let index = 0; index < 70; index++) {
+            const rect = { x: rand(100, W - 220), y: rand(100, H - 160), w: rand(52, 150), h: rand(34, 95) };
+            const startClearance = Math.min(
+              Math.hypot(rect.x + rect.w / 2 - W * .15, rect.y + rect.h / 2 - H / 2),
+              Math.hypot(rect.x + rect.w / 2 - W * .85, rect.y + rect.h / 2 - H / 2)
+            );
+            if (startClearance > 180) terrain.push(rect);
+          }
+        }
+        terrain.forEach(rect => { rect.hitsLeft = 10; });
+        navGrid.step = scale >= 8 ? 72 : 40;
+        navGrid.cols = Math.floor((W - 136) / navGrid.step) + 1;
+        navGrid.rows = Math.floor((H - 136) / navGrid.step) + 1;
+        camera = { x: W / 2, y: H / 2 };
+      }
+
+      function renderLargeProfessionOptions() {
+        const select = $("largeProfession");
+        select.replaceChildren();
+        const none = document.createElement("option");
+        none.value = "";
+        none.textContent = "无职业";
+        select.appendChild(none);
+        Object.entries(professionSpecs).forEach(([id, profession]) => {
+          if (!unlockedProfessions.has(id)) return;
+          const option = document.createElement("option");
+          option.value = id;
+          option.textContent = profession.name;
+          select.appendChild(option);
+        });
+        if (unlockedProfessions.has(selectedProfession)) select.value = selectedProfession;
+      }
+
+      function showLargeSetup() {
+        readProfile();
+        largeConfig = { type: "teams", teamSize: 3, enemyCount: 5, difficulty: 2, onlineCount: 2 };
+        $("overlayTitle").textContent = "大战场设置";
+        $("overlayCopy").textContent = "地图为普通战场的 4 倍，障碍物随机生成。选择玩法和人数。";
+        $("overlayIcon").textContent = "🗺️";
+        $("modeList").hidden = true;
+        $("difficultyPanel").hidden = true;
+        $("setupPanel").hidden = true;
+        $("largePanel").hidden = false;
+        $("shopPanel").hidden = true;
+        $("overlayAction").hidden = true;
+        $("largeType").value = "teams";
+        $("largeStatus").textContent = "";
+        renderLargeProfessionOptions();
+        updateLargeSetupFields();
+        $("overlay").hidden = false;
+      }
+
+      function updateLargeSetupFields() {
+        const type = $("largeType").value;
+        $("largeTeamSetting").hidden = type !== "teams";
+        $("largeEnemySetting").hidden = type !== "brawl";
+        $("largeOnlineSetting").hidden = type !== "online";
+        $("largeDifficultySetting").hidden = type === "online";
+      }
+
+      function controlledPlayer() {
+        if (!state) return null;
+        const id = mode === "online" ? state.localPlayerId || (state.host ? "p1" : "p2") : "p1";
+        return state.players.find(player => player.id === id) || state.players[0];
       }
 
       function showMenu(title = "准备好开战了吗？", copy = "收集场地道具并击败对手。生命值归零时战斗结束。") {
@@ -941,6 +1200,7 @@
         $("overlayIcon").textContent = "🐾";
         $("modeList").hidden = false;
         $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
         $("setupPanel").hidden = true;
         $("shopPanel").hidden = true;
         $("overlayAction").hidden = true;
@@ -955,6 +1215,7 @@
         $("overlayIcon").textContent = "🤖";
         $("modeList").hidden = true;
         $("difficultyPanel").hidden = false;
+        $("largePanel").hidden = true;
         $("setupPanel").hidden = true;
         $("shopPanel").hidden = true;
         $("overlayAction").hidden = true;
@@ -969,6 +1230,7 @@
         $("overlayIcon").textContent = "🌐";
         $("modeList").hidden = true;
         $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
         $("setupPanel").hidden = true;
         $("shopPanel").hidden = true;
         $("overlayAction").hidden = false;
@@ -983,9 +1245,12 @@
         state.running = false;
         state.winner = winner ? winner.id : "";
         overlayState = "result";
-        const localSide = mode === "online" ? (state.host ? "p1" : "p2") : "p1";
+        const localSide = mode === "online" ? state.localPlayerId || (state.host ? "p1" : "p2") : "p1";
         const localWinner = winner && (mode === "ai" ? winner.id === "p1" :
-          mode === "online" ? winner.id === localSide : true);
+          mode === "large" ? winner.team === 0 :
+          mode === "online" ? state.bigOnline
+            ? winner.team === (state.players.find(player => player.id === localSide) || {}).team
+            : winner.id === localSide : true);
         const rewardText = settleMatch(winner, Boolean(localWinner));
         const heading = winner ? `${winner.name} 获胜！` : "平局";
         resultMessage = `${message || heading}${rewardText ? ` ${rewardText}` : ""}`;
@@ -1008,6 +1273,13 @@
       function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
       function itemAt(x, y) {
         return state.items.find(item => Math.hypot(item.x - x, item.y - y) < 27);
+      }
+      function isEnemy(first, second) {
+        const teamsEnabled = mode === "large" || Boolean(state && state.bigOnline);
+        return first !== second && (!teamsEnabled || first.team !== second.team);
+      }
+      function enemiesFor(player) {
+        return state.players.filter(other => other.hp > 0 && isEnemy(player, other));
       }
       function deployDroneFood(player) {
         const drone = player.pets.find(pet => pet.type === "drone" && pet.alive && pet.foodAvailable);
@@ -1054,6 +1326,10 @@
       }
       function activateAbility(playerId, ability) {
         if (!state || !state.running) return;
+        if (mode === "online" && !state.host && state.bigOnline) {
+          publishDirect(opponentId, { type: "action", playerId, ability });
+          return;
+        }
         if (mode === "online" && !state.host && playerId === "p2") {
           publishDirect(opponentId, { type: "action", playerId, ability });
           return;
@@ -1069,7 +1345,7 @@
           !state.covers.some(rect => x + radius > rect.x && x - radius < rect.x + rect.w && y + radius > rect.y && y - radius < rect.y + rect.h);
       }
       function spawnItem() {
-        if (state.items.length >= 5) return;
+        if (state.items.length >= (largeConfig ? 20 : 8)) return;
         const types = Object.keys(itemInfo);
         for (let attempt = 0; attempt < 30; attempt++) {
           const x = rand(100, W - 100), y = rand(100, H - 100);
@@ -1185,7 +1461,11 @@
         addParticles(player.x, player.y, "#e5c25e", 12);
       }
       function activateProfessionSkill(playerId) {
-        if (!state || !state.running || !["ai", "online"].includes(mode)) return;
+        if (!state || !state.running || !["ai", "online", "large"].includes(mode)) return;
+        if (mode === "online" && !state.host && state.bigOnline) {
+          publishDirect(opponentId, { type: "action", playerId, ability: "profession" });
+          return;
+        }
         if (mode === "online" && !state.host && playerId === "p2") {
           publishDirect(opponentId, { type: "action", playerId, ability: "profession" });
           return;
@@ -1193,7 +1473,23 @@
         const player = state.players.find(item => item.id === playerId);
         if (!player || player.professionCooldown > 0) return;
         const petCount = player.pets.length;
-        if (player.profession === "soldier") {
+        if (player.profession === "miner") {
+          if (player.underground) {
+            player.underground = false;
+            player.undergroundTimer = 0;
+            player.professionCooldown = 25;
+            player.invulnerable = .35;
+          } else if (player.professionCooldown <= 0) {
+            player.underground = true;
+            player.undergroundTimer = 12;
+            player.lightningHits = [];
+          }
+        } else if (player.profession === "lightning") {
+          player.lightningDash = 5;
+          player.lightningDirection = player.aim;
+          player.lightningHits = [];
+          player.professionCooldown = 20;
+        } else if (player.profession === "soldier") {
           player.skillWeapon = Math.random() < .5 ? "grenade" : "shotgun";
           player.professionCooldown = 20;
         } else if (player.profession === "hunter" && summonHunterDog(player)) {
@@ -1236,6 +1532,15 @@
         player.stunned = Math.max(0, player.stunned - dt);
         player.lastHandTimer = Math.max(0, player.lastHandTimer - dt);
         updatePoison(player, dt);
+        if (player.underground) {
+          player.undergroundTimer -= dt;
+          if (player.undergroundTimer <= 0) {
+            player.underground = false;
+            player.professionCooldown = 25;
+            player.invulnerable = .35;
+          }
+        }
+        player.lightningDash = Math.max(0, player.lightningDash - dt);
         if (player.profession === "gremlin" && player.hp / player.maxHp < .3) player.glassesBroken = true;
         if (player.profession === "wizard" && player.hp < player.maxHp * .2) player.professionRegenActive = true;
         if (player.professionRegenActive && player.hp < player.maxHp * .5) {
@@ -1249,7 +1554,7 @@
           player.professionRegenTimer = 0;
           player.professionRegenActive = false;
         }
-        const enemy = state.players.find(other => other !== player);
+        const enemy = enemiesFor(player).sort((a, b) => distance(player, a) - distance(player, b))[0];
         const hasGun = isFirearm(player.held) || player.held === "grenade";
         if (player.profession === "wizard" && !hasGun && player.professionCooldown <= 0 &&
             player.stunned <= 0 && enemy) {
@@ -1269,11 +1574,13 @@
           else if (player.profession === "zookeeper" && range < 420) activateProfessionSkill(player.id);
           else if (player.profession === "commander" && range < 500) activateProfessionSkill(player.id);
           else if (player.profession === "chef" && range < 420) activateProfessionSkill(player.id);
-          else if (player.profession === "cardmaster" && range < 560) activateProfessionSkill(player.id);
+          else if (["cardmaster", "lightning"].includes(player.profession) && range < 560) activateProfessionSkill(player.id);
+          else if (player.profession === "miner" && range < 280 && !player.underground) activateProfessionSkill(player.id);
         }
       }
       function useItem(player) {
         if (!state || !state.running) return;
+        if (player.underground && player.held !== "grenade") return;
         if (player.skillWeapon && player.input.pulse && player.attackCooldown <= 0) {
           const held = player.held, ammo = player.ammo, skillWeapon = player.skillWeapon;
           player.skillWeapon = "";
@@ -1284,35 +1591,57 @@
           player.ammo = ammo;
           return;
         }
-        const target = state.players.find(other => other !== player);
+        const target = enemiesFor(player).sort((a, b) => distance(player, a) - distance(player, b))[0];
         if (!player.held || player.ammo <= 0) {
           if (player.profession === "wizard") return;
-          const targets = player.kind === "ai" && target
-            ? [target, ...target.pets.filter(pet => pet.alive)] : target ? [target] : [];
+          const targets = player.kind === "ai"
+            ? enemiesFor(player).flatMap(enemy => [enemy, ...enemy.pets.filter(pet => pet.alive && pet.type !== "elephant")])
+            : target ? [target] : [];
           const meleeTarget = targets
             .filter(candidate => {
               const d = distance(player, candidate);
-              return d < 72 &&
+              const meleeRange = player.profession === "cyborg" ? 144 : 72;
+              return d < meleeRange &&
                 Math.cos(player.aim) * (candidate.x - player.x) / Math.max(1, d) +
                 Math.sin(player.aim) * (candidate.y - player.y) / Math.max(1, d) > .15;
             })
             .sort((a, b) => distance(player, a) - distance(player, b))[0];
           if (player.meleeCooldown <= 0 && meleeTarget) {
+            const previousHp = meleeTarget.hp;
             applyDamage(meleeTarget, 11 * damageMultiplier(player, "melee"));
+            const dealt = Math.max(0, previousHp - meleeTarget.hp);
+            if (player.profession === "cyborg") player.hp = Math.min(player.maxHp, player.hp + dealt * .35);
             if (player.profession === "zombie") applyPoison(meleeTarget);
             if (player.profession === "kungfu") {
               player.meleeHits++;
               if (player.meleeHits >= 4) {
                 player.meleeHits = 0;
-                const opponent = state.players.find(other => other !== player);
+                const opponent = meleeTarget.isPet ? enemiesFor(player)
+                  .sort((a, b) => distance(player, a) - distance(player, b))[0] : meleeTarget;
                 if (opponent) opponent.stunned = Math.max(opponent.stunned, 2);
               }
             }
             player.meleeCooldown = .52;
             player.recoil = .22;
             addParticles(meleeTarget.x, meleeTarget.y, player.color, 9);
-            if (!meleeTarget.isPet && meleeTarget.hp <= 0 &&
+            if (!meleeTarget.isPet && meleeTarget.hp <= 0 && mode !== "large" &&
                 !(meleeTarget.profession === "zombie" && meleeTarget.revivesLeft > 0)) showResult(player);
+          } else if (player.profession === "miner" && player.meleeCooldown <= 0) {
+            const facingX = Math.cos(player.aim), facingY = Math.sin(player.aim);
+            const obstacle = terrain.map(rect => {
+              const nearestX = clamp(player.x, rect.x, rect.x + rect.w);
+              const nearestY = clamp(player.y, rect.y, rect.y + rect.h);
+              const dx = nearestX - player.x, dy = nearestY - player.y;
+              return { rect, distance: Math.hypot(dx, dy), direction: dx * facingX + dy * facingY };
+            }).filter(entry => entry.rect.hitsLeft > 0 && entry.distance < 64 && entry.direction >= -5)
+              .sort((a, b) => a.distance - b.distance)[0];
+            if (obstacle) {
+              obstacle.rect.hitsLeft--;
+              player.meleeCooldown = .52;
+              addParticles(player.x + facingX * 28, player.y + facingY * 28,
+                obstacle.rect.hitsLeft ? "#aab6a2" : "#c59668", obstacle.rect.hitsLeft ? 4 : 16);
+              if (!obstacle.rect.hitsLeft) terrain = terrain.filter(rect => rect !== obstacle.rect);
+            }
           }
           return;
         }
@@ -1363,6 +1692,7 @@
       }
       function applyDamage(target, amount) {
         if (!target || amount <= 0) return;
+        if (target.underground) return;
         if (target.isPet) {
           if (!target.alive) return;
           target.hp = Math.max(0, target.hp - amount);
@@ -1392,6 +1722,7 @@
         addParticles(projectile.x, projectile.y, "#ffbd68", 30);
         state.shake = .24;
         state.players.forEach(player => {
+          if (owner && (mode === "large" || state.bigOnline) && !isEnemy(owner, player)) return;
           const d = Math.hypot(projectile.x - player.x, projectile.y - player.y);
           if (d < 118 && !hitCover((projectile.x + player.x) / 2, (projectile.y + player.y) / 2)) {
             applyDamage(player, Math.round(44 * (1 - d / 150) * damageScale));
@@ -1440,7 +1771,7 @@
           player.y = safeCandidates[0].y;
         }
       }
-      const navGrid = { x: 68, y: 68, step: 28, cols: 30, rows: 15 };
+      const navGrid = { x: 68, y: 68, step: 40, cols: 45, rows: 25 };
       function gridPosition(index) {
         return {
           x: navGrid.x + index % navGrid.cols * navGrid.step,
@@ -1549,13 +1880,19 @@
         return true;
       }
       function aiInput(player, dt) {
-        const foe = state.players.find(other => other !== player);
-        const enemyPet = foe.pets.filter(pet => pet.alive)
+        const enemies = enemiesFor(player);
+        const foe = enemies.sort((a, b) => distance(player, a) - distance(player, b))[0];
+        if (!foe) {
+          player.input.x = 0; player.input.y = 0; player.input.fire = false; player.input.pulse = false;
+          return;
+        }
+        const enemyPet = enemies.flatMap(enemy => enemy.pets.filter(pet =>
+          pet.alive && pet.type !== "elephant").map(pet => ({ ...pet, enemyOwner: enemy })))
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         const target = enemyPet && distance(player, enemyPet) < distance(player, foe) + 52 ? enemyPet : foe;
         const lure = state.lures.filter(item => item.owner !== player.id)
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
-        const enemyDrone = foe.pets.filter(pet => pet.alive && pet.type === "drone")
+        const enemyDrone = enemies.flatMap(enemy => enemy.pets.filter(pet => pet.alive && pet.type === "drone"))
           .sort((a, b) => distance(player, a) - distance(player, b))[0];
         const droneAttraction = !lure && enemyDrone && distance(player, enemyDrone) < 190 ? enemyDrone : null;
         const healItem = aiDifficulty > 1 && state.items.filter(item => item.type === "medkit")
@@ -1629,7 +1966,24 @@
           const controls = isP1
             ? { up: keys.has("KeyW"), down: keys.has("KeyS"), left: keys.has("KeyA"), right: keys.has("KeyD") }
             : { up: keys.has("ArrowUp"), down: keys.has("ArrowDown"), left: keys.has("ArrowLeft"), right: keys.has("ArrowRight") };
-          if (mode === "online" && state.host && player.id === "p2") {
+          if (mode === "online" && state.bigOnline && state.host && player.peerId !== peerId) {
+            player.input.x = player.remoteInput ? player.remoteInput.x : 0;
+            player.input.y = player.remoteInput ? player.remoteInput.y : 0;
+            player.input.aim = player.remoteInput ? player.remoteInput.aim : player.aim;
+            player.input.fire = player.remoteInput ? player.remoteInput.fire : false;
+            player.input.pulse = Boolean(player.remoteInput && player.remoteInput.pulse);
+            if (player.remoteInput) player.remoteInput.pulse = false;
+          } else if (mode === "online" && state.bigOnline && state.host && player.peerId === peerId) {
+            player.input.x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+            player.input.y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("Space") || touchInput.fire;
+          } else if (mode === "online" && state.bigOnline && !state.host && player.peerId === peerId) {
+            player.input.x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+            player.input.y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("Space") || touchInput.fire;
+          } else if (mode === "online" && state.host && player.id === "p2") {
             player.input.x = player.remoteInput ? player.remoteInput.x : 0;
             player.input.y = player.remoteInput ? player.remoteInput.y : 0;
             player.input.aim = player.remoteInput ? player.remoteInput.aim : player.aim;
@@ -1680,24 +2034,46 @@
           player.input.x = clamp(player.input.x + dx / length * .22, -1, 1);
           player.input.y = clamp(player.input.y + dy / length * .22, -1, 1);
         }
+        if (player.underground && player.held !== "grenade") {
+          player.input.fire = false;
+          player.input.pulse = false;
+        }
         if (player.stunned > 0) {
           player.input.x = 0;
           player.input.y = 0;
           player.input.fire = false;
           player.input.pulse = false;
         }
-        if (player.input.x || player.input.y) {
+        if (player.lightningDash > 0 || player.input.x || player.input.y) {
+          if (player.lightningDash > 0 && player.stunned <= 0) {
+            player.input.x = Math.cos(player.lightningDirection);
+            player.input.y = Math.sin(player.lightningDirection);
+          }
           const magnitude = Math.hypot(player.input.x, player.input.y) || 1;
           let speed = player.held === "scooter" ? 205 : 180;
           if (player.profession === "giant") speed *= .85;
           if (["hunter", "zookeeper"].includes(player.profession)) speed *= .95;
           if (player.profession === "zombie") speed *= .9;
+          if (player.profession === "lightning") speed *= 1.5;
+          if (player.profession === "cyborg") speed *= .7;
+          if (player.underground) speed *= 1.2;
+          if (player.lightningDash > 0) speed *= 3;
           if (player.profession === "gremlin" && player.glassesBroken) speed *= 1.15;
           const dx = player.input.x / magnitude * speed * dt, dy = player.input.y / magnitude * speed * dt;
           const beforeX = player.x, beforeY = player.y;
           collisionMove(player, dx, dy);
           const moved = Math.hypot(player.x - beforeX, player.y - beforeY);
           player.walked += moved;
+          if (player.lightningDash > 0 && player.stunned <= 0) {
+            enemiesFor(player).forEach(enemy => {
+              if (distance(player, enemy) < 38 && !player.lightningHits.includes(enemy.id)) {
+                player.lightningHits.push(enemy.id);
+                applyDamage(enemy, 22);
+                enemy.stunned = Math.max(enemy.stunned, 2);
+                addParticles(enemy.x, enemy.y, "#ffe65f", 18);
+              }
+            });
+          }
           if (player.kind === "ai" && moved < .2) {
             player.stuckFor += dt;
             if (player.stuckFor > .32) {
@@ -1734,7 +2110,10 @@
 
       function updateObjects(dt) {
         state.spawnTimer -= dt;
-        if (state.spawnTimer <= 0) { spawnItem(); state.spawnTimer = rand(4.5, 7.5); }
+        if (state.spawnTimer <= 0) {
+          spawnItem();
+          state.spawnTimer = largeConfig ? rand(1.4, 2.4) : rand(3, 5);
+        }
         state.items = state.items.filter(item => state.elapsed - item.born < 20);
         state.covers.forEach(cover => cover.life -= dt);
         state.covers = state.covers.filter(cover => cover.life > 0);
@@ -1762,7 +2141,8 @@
             }
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
             shot.vx *= Math.pow(.982, dt * 60); shot.vy *= Math.pow(.982, dt * 60);
-            const hitTarget = state.players.filter(player => player.id !== shot.owner)
+            const owner = state.players.find(player => player.id === shot.owner);
+            const hitTarget = state.players.filter(player => owner ? isEnemy(owner, player) : player.id !== shot.owner)
               .some(player => distance(player, shot) < 25 ||
                 player.pets.some(pet => pet.alive && distance(pet, shot) < 23));
             if (hitTarget || hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 || shot.y < 52 || shot.y > H - 52 || shot.age > .9) {
@@ -1771,7 +2151,8 @@
           } else if (shot.kind === "spell") {
             shot.life -= dt;
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
-            const target = state.players.find(player => player.id !== shot.owner &&
+            const owner = state.players.find(player => player.id === shot.owner);
+            const target = state.players.find(player => (owner ? isEnemy(owner, player) : player.id !== shot.owner) &&
               distance(player, shot) < 23 && !hitCover((player.x + shot.x) / 2, (player.y + shot.y) / 2));
             if (target) {
               applyDamage(target, shot.damage);
@@ -1787,7 +2168,8 @@
             shot.life -= dt;
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
             let hitTarget = null, hitDistance = Infinity;
-            state.players.filter(player => player.id !== shot.owner).forEach(player => {
+            const owner = state.players.find(player => player.id === shot.owner);
+            state.players.filter(player => owner ? isEnemy(owner, player) : player.id !== shot.owner).forEach(player => {
               const playerDistance = distance(player, shot);
               if (playerDistance < 23 && playerDistance < hitDistance) { hitTarget = player; hitDistance = playerDistance; }
               player.pets.filter(pet => pet.alive).forEach(pet => {
@@ -1820,8 +2202,10 @@
             if (pet.age >= pet.lifetime) { pet.alive = false; return; }
           }
           pet.cooldown = Math.max(0, pet.cooldown - dt);
-          const enemyPlayer = state.players.find(player => player.id !== owner.id);
-          const enemyPet = enemyPlayer.pets.filter(target => target.alive)
+          const enemyPlayer = enemiesFor(owner).sort((a, b) => distance(pet, a) - distance(pet, b))[0];
+          if (!enemyPlayer) return;
+          const enemyPet = enemiesFor(owner).flatMap(player => player.pets).filter(target =>
+            target.alive && (owner.kind !== "ai" || target.type !== "elephant"))
             .sort((a, b) => distance(pet, a) - distance(pet, b))[0];
           const enemy = enemyPet && distance(pet, enemyPet) < distance(pet, enemyPlayer) + 30
             ? enemyPet : enemyPlayer;
@@ -1910,6 +2294,40 @@
         state.players.forEach(player => updatePlayer(player, dt));
         updatePets(dt);
         updateObjects(dt);
+        if ((mode === "large" || state.bigOnline) && state.gameType === "survival") {
+          const enemies = state.players.filter(player => player.team !== 0 && player.hp > 0);
+          state.spawnTimer -= dt;
+          if (state.spawnTimer <= 0 && enemies.length < 8) {
+            const id = `p${state.nextObjectId++}`;
+            const enemy = makePlayer(id, `来袭 ${state.survivalKills + enemies.length + 1}`,
+              rand(100, W - 100), "#ff88ad", "ai", "");
+            enemy.y = rand(100, H - 100);
+            enemy.spawnX = enemy.x;
+            enemy.spawnY = enemy.y;
+            enemy.team = 1;
+            enemy.profession = randomProfession();
+            if (enemy.profession === "zombie") enemy.revivesLeft = 2;
+            applyProfessionHealth(enemy);
+            enemy.maxHp *= 1.4;
+            enemy.hp = enemy.maxHp;
+            state.players.push(enemy);
+            state.spawnTimer = Math.max(1.2, 4 - state.elapsed / 90);
+          }
+          state.players.forEach(player => {
+            if (player.team !== 0 && player.hp <= 0 && !player.killCounted) {
+              player.killCounted = true;
+              state.survivalKills++;
+            }
+          });
+          $("gameStatus").textContent =
+            `生存 ${Math.floor(state.elapsed)} 秒 · 击败 ${state.survivalKills} 名敌人 · 场上 ${enemies.length} 个`;
+        }
+        if (state.players[0]) {
+          camera.x += (state.players[0].x - camera.x) * Math.min(1, dt * 7);
+          camera.y += (state.players[0].y - camera.y) * Math.min(1, dt * 7);
+          camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
+          camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
+        }
         updateNames();
         state.players.forEach(player => {
           if (player.hp <= 0 && player.profession === "zombie" && player.revivesLeft > 0) {
@@ -1929,8 +2347,24 @@
             addParticles(player.x, player.y, "#83bc75", 24);
           }
         });
-        const dead = state.players.find(player => player.hp <= 0);
-        if (dead && state.running) showResult(state.players.find(player => player !== dead));
+        if ((mode === "large" || state.bigOnline) && state.gameType !== "survival") {
+          const aliveTeams = new Set(state.players.filter(player => player.hp > 0).map(player => player.team));
+          if (aliveTeams.size <= 1) {
+            const survivingTeam = aliveTeams.values().next().value;
+            const winner = state.players.find(player => player.hp > 0 && player.team === survivingTeam) || null;
+            showResult(winner, winner ? `${winner.team === 0 ? "你的队伍" : winner.name} 获胜！` : "无人存活。");
+          }
+        } else {
+          const human = state.players[0];
+          if (human.hp <= 0 && state.running) {
+            showResult(null, mode === "large"
+              ? `生存结束：${Math.floor(state.elapsed)} 秒，击败 ${state.survivalKills} 名敌人。`
+              : "");
+          } else if (mode !== "large" && !state.bigOnline) {
+            const dead = state.players.find(player => player.hp <= 0);
+            if (dead && state.running) showResult(state.players.find(player => player !== dead));
+          }
+        }
         if (mode === "online" && state.running) {
           snapshotTimer += dt;
           if (snapshotTimer >= .05) {
@@ -1978,7 +2412,8 @@
         const bob = Math.sin(player.walked / 12) * (player.input.x || player.input.y ? 2 : 1);
         ctx.save();
         ctx.translate(player.x, player.y + bob);
-        ctx.globalAlpha = player.invulnerable > 0 ? .55 + Math.sin(state.elapsed * 38) * .3 : 1;
+        ctx.globalAlpha = player.underground ? .24 :
+          player.invulnerable > 0 ? .55 + Math.sin(state.elapsed * 38) * .3 : 1;
         ctx.fillStyle = player.color + "30";
         ctx.beginPath(); ctx.ellipse(0, 21, 28, 12, 0, 0, Math.PI * 2); ctx.fill();
         if (catImage.complete && catImage.naturalWidth) ctx.drawImage(catImage, -28, -29, 56, 56);
@@ -1993,6 +2428,10 @@
           ctx.beginPath(); ctx.arc(-7, -5, 6, 0, Math.PI * 2); ctx.arc(7, -5, 6, 0, Math.PI * 2);
           ctx.moveTo(-1, -5); ctx.lineTo(1, -5); ctx.moveTo(-13, -7); ctx.lineTo(-18, -9);
           ctx.moveTo(13, -7); ctx.lineTo(18, -9); ctx.stroke();
+        }
+        if (player.underground) {
+          ctx.fillStyle = "rgba(110,125,94,.8)";
+          ctx.beginPath(); ctx.ellipse(0, 13, 29, 11, 0, 0, Math.PI * 2); ctx.fill();
         }
         if (player.profession === "wizard" && !isFirearm(player.held) && player.held !== "grenade") {
           ctx.strokeStyle = "#9277e8"; ctx.lineWidth = 4;
@@ -2061,9 +2500,10 @@
       function draw() {
         ctx.save();
         if (state && state.shake > 0) ctx.translate(rand(-5, 5) * state.shake * 4, rand(-4, 4) * state.shake * 4);
-        const sky = ctx.createLinearGradient(0, 0, 0, H);
+        const sky = ctx.createLinearGradient(0, 0, 0, VIEW_H);
         sky.addColorStop(0, "#f1f7e9"); sky.addColorStop(.7, "#e5f0df"); sky.addColorStop(1, "#dcebd8");
-        ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+        if (state) ctx.translate(VIEW_W / 2 - camera.x, VIEW_H / 2 - camera.y);
         ctx.fillStyle = "rgba(89,129,84,.2)";
         for (let x = 25; x < W; x += 74) for (let y = 33; y < H; y += 68) {
           ctx.beginPath(); ctx.arc(x + Math.sin(y + x) * 14, y, 1.5, 0, Math.PI * 2); ctx.fill();
@@ -2125,14 +2565,14 @@
           state.players.forEach(drawPlayer);
         } else {
           ctx.fillStyle = "#52616e"; ctx.font = "700 20px sans-serif"; ctx.textAlign = "center";
-          ctx.fillText("选择一种模式，开始猫球对决", W / 2, H / 2);
+          ctx.fillText("选择一种模式，开始猫球对决", VIEW_W / 2, VIEW_H / 2);
         }
         ctx.restore();
       }
 
       function updateHudInfo() {
         if (!state) { $("itemStatus").textContent = "道具：空手"; return; }
-        const localPlayer = mode === "online" && !state.host ? state.players[1] : state.players[0];
+        const localPlayer = controlledPlayer();
         const info = itemInfo[localPlayer.held];
         $("itemStatus").textContent = info ? `道具：${info.label}　剩余 ${localPlayer.ammo}` : "道具：空手（靠近后按出击键肉搏）";
         if (localPlayer.profession === "soldier" || localPlayer.profession === "hunter") {
@@ -2156,10 +2596,11 @@
         }
         if (localPlayer.stunned > 0) $("itemStatus").textContent += `　· 眩晕 ${localPlayer.stunned.toFixed(1)}s`;
         if (localPlayer.poisonTimer > 0) $("itemStatus").textContent += `　· 中毒 ${localPlayer.poisonTimer.toFixed(1)}s`;
-        $("p1Health").style.width = `${Math.max(0, state.players[0].hp / state.players[0].maxHp * 100)}%`;
-        $("p2Health").style.width = `${Math.max(0, state.players[1].hp / state.players[1].maxHp * 100)}%`;
+        const [first, second] = hudPlayers();
+        $("p1Health").style.width = `${Math.max(0, first.hp / first.maxHp * 100)}%`;
+        $("p2Health").style.width = `${Math.max(0, second.hp / second.maxHp * 100)}%`;
         [0, 1].forEach(index => {
-          const player = state.players[index], prefix = index === 0 ? "p1" : "p2";
+          const player = index === 0 ? first : second, prefix = index === 0 ? "p1" : "p2";
           $(`${prefix}ShieldWrap`).hidden = player.equipment.maxShield <= 0;
           $(`${prefix}Shield`).style.width = `${player.equipment.maxShield ? player.equipment.shield / player.equipment.maxShield * 100 : 0}%`;
         });
@@ -2177,10 +2618,19 @@
         const dt = Math.min(.04, (now - (lastFrame || now)) / 1000);
         lastFrame = now;
         if (state && state.running && pointerTarget) {
-          const localPlayer = mode === "online" && !state.host ? state.players[1] : state.players[0];
-          localPlayer.aim = Math.atan2(pointerTarget.y - localPlayer.y, pointerTarget.x - localPlayer.x);
+          const localPlayer = controlledPlayer();
+          const targetX = camera.x - VIEW_W / 2 + pointerTarget.x;
+          const targetY = camera.y - VIEW_H / 2 + pointerTarget.y;
+          localPlayer.aim = Math.atan2(targetY - localPlayer.y, targetX - localPlayer.x);
         }
         updateGame(dt);
+        if (state && mode === "online" && state.bigOnline && !state.host) {
+          const player = controlledPlayer();
+          camera.x += (player.x - camera.x) * Math.min(1, dt * 7);
+          camera.y += (player.y - camera.y) * Math.min(1, dt * 7);
+          camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
+          camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
+        }
         if (mode === "online" && state && !state.host && state.running) sendInput();
         draw();
         updateHudInfo();
@@ -2190,11 +2640,13 @@
       function pointerAim(event) {
         if (!state || !state.running) return;
         const rect = canvas.getBoundingClientRect();
-        const x = (event.clientX - rect.left) * W / rect.width;
-        const y = (event.clientY - rect.top) * H / rect.height;
+        const x = (event.clientX - rect.left) * VIEW_W / rect.width;
+        const y = (event.clientY - rect.top) * VIEW_H / rect.height;
         pointerTarget = { x, y };
-        const player = mode === "online" && !state.host ? state.players[1] : state.players[0];
-        player.aim = Math.atan2(y - player.y, x - player.x);
+        const player = controlledPlayer();
+        const targetX = camera.x - VIEW_W / 2 + x;
+        const targetY = camera.y - VIEW_H / 2 + y;
+        player.aim = Math.atan2(targetY - player.y, targetX - player.x);
       }
       canvas.addEventListener("pointerdown", event => { pointerAim(event); canvas.setPointerCapture(event.pointerId); });
       canvas.addEventListener("pointermove", pointerAim);
@@ -2208,24 +2660,40 @@
         const player = state.players.find(item => item.id === playerId);
         if (player) player.input.pulse = true;
       }
+      const keyboardCodes = {
+        " ": "Space", Spacebar: "Space", ArrowUp: "ArrowUp", ArrowDown: "ArrowDown",
+        ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight", w: "KeyW", W: "KeyW",
+        a: "KeyA", A: "KeyA", s: "KeyS", S: "KeyS", d: "KeyD", D: "KeyD",
+        m: "KeyM", M: "KeyM", r: "KeyR", R: "KeyR", e: "KeyE", E: "KeyE",
+        f: "KeyF", F: "KeyF", k: "KeyK", K: "KeyK", l: "KeyL", L: "KeyL"
+      };
+      function normalizedKey(event) { return event.code && event.code !== "Unidentified" ? event.code : keyboardCodes[event.key]; }
       document.addEventListener("keydown", event => {
+        const code = normalizedKey(event);
         const keysUsed = ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyR"];
-        if (keysUsed.includes(event.code)) event.preventDefault();
-        if (!keys.has(event.code)) {
-          if (event.code === "Space" && (mode !== "online" || state)) firePulse("p1");
-          if (event.code === "KeyM" && mode === "local") firePulse("p2");
+        if (keysUsed.includes(code)) event.preventDefault();
+        if (code && !keys.has(code)) {
+          if (code === "Space" && (mode !== "online" || state)) firePulse("p1");
+          if (code === "KeyM" && mode === "local") firePulse("p2");
           const canControlP1 = mode !== "online" || state && state.host;
           const canControlP2 = mode === "local" || mode === "online" && state && !state.host;
-          if (event.code === "KeyR" && canControlP1 && mode !== "local") activateProfessionSkill("p1");
-          if (event.code === "KeyR" && canControlP2 && mode === "online") activateProfessionSkill("p2");
-          if (event.code === "KeyE" && canControlP1) activateAbility("p1", "pearl");
-          if (event.code === "KeyF" && canControlP1) activateAbility("p1", "drone");
-          if (event.code === "KeyK" && canControlP2) activateAbility("p2", "pearl");
-          if (event.code === "KeyL" && canControlP2) activateAbility("p2", "drone");
+          const controlledId = mode === "online" && state && state.bigOnline
+            ? state.localPlayerId : mode === "online" && state && !state.host ? "p2" : "p1";
+          if (code === "KeyR" && mode !== "local" &&
+              (canControlP1 || canControlP2) && (mode !== "online" || state)) activateProfessionSkill(controlledId);
+          const canUseP1Abilities = canControlP1 || Boolean(state && state.bigOnline);
+          const canUseP2Abilities = canControlP2 || Boolean(state && state.bigOnline);
+          if (code === "KeyE" && canUseP1Abilities) activateAbility(controlledId, "pearl");
+          if (code === "KeyF" && canUseP1Abilities) activateAbility(controlledId, "drone");
+          if (code === "KeyK" && canUseP2Abilities) activateAbility(controlledId, "pearl");
+          if (code === "KeyL" && canUseP2Abilities) activateAbility(controlledId, "drone");
+          if (code) keys.add(code);
         }
-        keys.add(event.code);
       });
-      document.addEventListener("keyup", event => keys.delete(event.code));
+      document.addEventListener("keyup", event => {
+        const code = normalizedKey(event);
+        if (code) keys.delete(code);
+      });
       function releaseTouchPointer(pointerId) {
         const control = activeTouchPointers.get(pointerId);
         if (!control) return;
@@ -2252,7 +2720,7 @@
       });
       document.querySelectorAll("[data-ability]").forEach(button => {
         button.addEventListener("click", () => {
-          const playerId = mode === "online" && state && !state.host ? "p2" : "p1";
+          const playerId = controlledPlayer() ? controlledPlayer().id : "p1";
           if (button.dataset.ability === "profession") activateProfessionSkill(playerId);
           else activateAbility(playerId, button.dataset.ability);
         });
@@ -2282,6 +2750,8 @@
         const attemptId = ++onlineAttemptId;
         mode = "online";
         peers.clear();
+        activeLobby = bigOnline ? BIG_LOBBY : LOBBY;
+        activeInbox = bigOnline ? BIG_INBOX : INBOX;
         showWaiting("正在连接 GoEasy…");
         if (!window.GoEasy || typeof window.GoEasy.getInstance !== "function") {
           refundStake();
@@ -2290,7 +2760,9 @@
           return;
         }
         try {
-          const client = window.GoEasy.getInstance({ host: GOEASY_HOST, appkey: GOEASY_KEY, modules: ["pubsub"] });
+          const client = window.GoEasy.getInstance({
+            host: GOEASY_HOST, appkey: bigOnline ? BIG_GO_EASY_KEY : GOEASY_KEY, modules: ["pubsub"]
+          });
           goeasy = client;
           const stillWaiting = () => onlineAttemptId === attemptId && mode === "online" && overlayState === "waiting";
           const stopCancelledAttempt = () => {
@@ -2304,25 +2776,25 @@
           peerId = randomId();
           await goEasyOperation(callbacks => client.connect({
             id: peerId,
-            data: { nickname: catName, catName, cosmetic },
+            data: { nickname: catName, catName, cosmetic, profession: selectedProfession },
             ...callbacks
           }));
           if (!stillWaiting()) { stopCancelledAttempt(); return; }
           connected = true;
           await goEasyOperation(callbacks => client.pubsub.subscribe({
-            channel: LOBBY, presence: { enable: true }, onMessage: onLobbyMessage, ...callbacks
+            channel: activeLobby, presence: { enable: true }, onMessage: onLobbyMessage, ...callbacks
           }));
           if (!stillWaiting()) { stopCancelledAttempt(); return; }
           await goEasyOperation(callbacks => client.pubsub.subscribe({
-            channel: `${INBOX}${peerId}`, onMessage: onDirectMessage, ...callbacks
+            channel: `${activeInbox}${peerId}`, onMessage: onDirectMessage, ...callbacks
           }));
           if (!stillWaiting()) { stopCancelledAttempt(); return; }
           await goEasyOperation(callbacks => client.pubsub.subscribePresence({
-            channel: LOBBY, onPresence: handlePresence, ...callbacks
+            channel: activeLobby, onPresence: handlePresence, ...callbacks
           }));
           if (!stillWaiting()) { stopCancelledAttempt(); return; }
           await goEasyOperation(callbacks => client.pubsub.hereNow({
-            channel: LOBBY, limit: 100, onSuccess: response => {
+            channel: activeLobby, limit: 100, onSuccess: response => {
               const members = response && response.content && response.content.members;
               if (!Array.isArray(members)) { callbacks.onFailed(new Error("GoEasy 在线成员数据格式异常")); return; }
               members.forEach(addPeer);
@@ -2332,7 +2804,7 @@
           if (!stillWaiting()) { stopCancelledAttempt(); return; }
           publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession } });
           queueTimer = setInterval(() => {
-            if (!opponentId && connected) {
+            if ((!opponentId || bigOnline) && connected && overlayState === "waiting") {
               publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession } });
               tryMatch();
             }
@@ -2365,9 +2837,15 @@
           tryMatch();
         } else if (event.action === "leave") {
           peers.delete(event.member.id);
+          if (bigOnline && state && state.host && state.running && onlineRoster.some(profile => profile.peerId === event.member.id)) {
+            const departed = state.players.find(player => player.peerId === event.member.id);
+            if (departed) departed.hp = 0;
+            if (departed) addParticles(departed.x, departed.y, "#89949c", 14);
+          }
+          if (bigOnline && state && state.host) return;
           if (event.member.id === opponentId) {
             if (state && state.running) {
-              const localSide = state.host ? "p1" : "p2";
+              const localSide = state.localPlayerId || (state.host ? "p1" : "p2");
               showResult(state.players.find(player => player.id === localSide), "对手已离线，本局判你获胜。");
             } else if (!state && stakeReserved) {
               refundStake();
@@ -2382,7 +2860,7 @@
       function publishLobby(data) {
         if (!connected || !goeasy) return;
         goeasy.pubsub.publish({
-          channel: LOBBY, message: JSON.stringify(data),
+          channel: activeLobby, message: JSON.stringify(data),
           onSuccess: () => {}, onFailed: error => console.error("GoEasy 匹配消息发送失败：", error)
         });
       }
@@ -2401,6 +2879,22 @@
         }
       }
       function tryMatch() {
+        if (bigOnline) {
+          if (!connected || state || overlayState !== "waiting") return;
+          const ids = [...new Set([peerId, ...peers.keys()])].sort();
+          const targetCount = largeConfig ? largeConfig.onlineCount : 2;
+          if (ids.length < targetCount || ids[0] !== peerId) return;
+          const roster = ids.slice(0, targetCount).map(id => ({
+            peerId: id,
+            ...(id === peerId
+              ? { name: catName, cosmetic, profession: selectedProfession }
+              : peers.get(id))
+          }));
+          clearInterval(queueTimer);
+          queueTimer = null;
+          makeLargeOnlineGame(roster, true);
+          return;
+        }
         if (!connected || opponentId || overlayState !== "waiting") return;
         const candidate = [...peers.keys()].filter(id => id < peerId).sort()[0];
         if (!candidate) return;
@@ -2416,7 +2910,7 @@
       function publishDirect(to, data) {
         if (!connected || !goeasy || !to) return;
         goeasy.pubsub.publish({
-          channel: `${INBOX}${to}`,
+          channel: `${activeInbox}${to}`,
           message: JSON.stringify({ from: peerId, to, data }),
           onSuccess: () => {}, onFailed: error => console.error("GoEasy 对战消息发送失败：", error)
         });
@@ -2427,7 +2921,32 @@
         catch (error) { console.warn("忽略无法解析的联机消息：", error); return; }
         if (!envelope || envelope.to !== peerId || typeof envelope.from !== "string" || !envelope.data) return;
         const { from, data } = envelope;
-        if (data.type === "offer" && overlayState === "waiting" && !opponentId) {
+        if (data.type === "bigStart" && bigOnline && !state && typeof data.hostId === "string" &&
+            from === data.hostId && Array.isArray(data.roster) && data.state &&
+            data.state.bigOnline && Array.isArray(data.state.players)) {
+          const roster = data.roster.filter(profile => profile && typeof profile.peerId === "string");
+          if (!roster.some(profile => profile.peerId === peerId) || !roster.some(profile => profile.peerId === from)) return;
+          onlineRoster = roster;
+          opponentId = from;
+          clearInterval(queueTimer);
+          queueTimer = null;
+          configureArena(8, false);
+          state = { ...data.state, host: false };
+          const localPlayer = state.players.find(player => player.peerId === peerId);
+          if (!localPlayer) { state = null; return; }
+          state.localPlayerId = localPlayer.id;
+          terrain = (state.arenaTerrain || []).map(rect => ({ ...rect }));
+          largeConfig = { type: "online", onlineCount: roster.length };
+          camera = {
+            x: state.players.find(player => player.id === state.localPlayerId).x,
+            y: state.players.find(player => player.id === state.localPlayerId).y
+          };
+          mode = "online";
+          $("gameStatus").textContent = `大战场联机 · ${roster.length} 名玩家`;
+          $("shopButton").disabled = true;
+          $("overlay").hidden = true;
+          updateNames();
+        } else if (data.type === "offer" && overlayState === "waiting" && !opponentId) {
           if (!Number.isSafeInteger(data.stake) || data.stake < 0 ||
               data.stake > 1000000 || !data.loadout || typeof data.loadout !== "object") return;
           opponentId = from;
@@ -2469,6 +2988,17 @@
             hostProfession: profile.profession, opponentProfession: validProfession(data.guestProfession),
             opponentStake, hostLoadout: sanitizeLoadout(data.hostLoadout), gameId: data.gameId
           });
+        } else if (data.type === "input" && bigOnline && state && state.bigOnline && state.host && state.running &&
+                   onlineRoster.some(profile => profile.peerId === from) &&
+                   data.input && typeof data.input === "object") {
+          const remote = state.players.find(player => player.peerId === from);
+          if (remote) {
+            remote.remoteInput = {
+              x: clamp(Number(data.input.x) || 0, -1, 1), y: clamp(Number(data.input.y) || 0, -1, 1),
+              aim: Number.isFinite(data.input.aim) ? data.input.aim : remote.aim,
+              fire: Boolean(data.input.fire), pulse: Boolean(data.input.pulse)
+            };
+          }
         } else if (data.type === "input" && from === opponentId && state && state.host && state.running &&
                    data.input && typeof data.input === "object") {
           const remote = state.players[1];
@@ -2477,25 +3007,35 @@
             aim: Number.isFinite(data.input.aim) ? data.input.aim : remote.aim,
             fire: Boolean(data.input.fire), pulse: Boolean(data.input.pulse)
           };
-        } else if (data.type === "action" && from === opponentId && state && state.host && state.running &&
-                   data.playerId === "p2") {
-          if (data.ability === "profession") activateProfessionSkill("p2");
-          else if (["pearl", "drone"].includes(data.ability)) activateAbility("p2", data.ability);
+        } else if (data.type === "action" && state && state.host && state.running &&
+                   (bigOnline ? onlineRoster.some(profile => profile.peerId === from) : from === opponentId)) {
+          const remotePlayer = bigOnline ? state.players.find(player => player.peerId === from) : null;
+          const playerId = bigOnline ? remotePlayer && remotePlayer.id : data.playerId;
+          if (!bigOnline && playerId !== "p2") return;
+          if (data.ability === "profession" && playerId) activateProfessionSkill(playerId);
+          else if (["pearl", "drone"].includes(data.ability) && playerId) activateAbility(playerId, data.ability);
         } else if (data.type === "petRoster" && from === opponentId && state && !state.host &&
                    state.running && (data.playerId === "p1" || data.playerId === "p2") &&
                    Array.isArray(data.pets)) {
           const owner = state.players.find(player => player.id === data.playerId);
           if (owner) owner.pets = data.pets.map(pet => ({ ...pet }));
         } else if (data.type === "state" && from === opponentId && state && !state.host && data.state && data.state.id === state.id) {
-          state = { ...data.state, host: false };
+          const localPlayerId = state.localPlayerId;
+          state = { ...data.state, host: false, localPlayerId };
           updateNames();
         } else if (data.type === "finish" && from === opponentId && state && !state.host) {
           const winner = state.players.find(player => player.id === data.winner) || null;
           if (winner) winner.name = String(data.winnerName || winner.name).slice(0, 16);
           showResult(winner, winner ? `${winner.name} 获胜！` : "平局。");
-        } else if (data.type === "quit" && from === opponentId) {
+        } else if (data.type === "quit" && (from === opponentId ||
+                   bigOnline && state && state.host && onlineRoster.some(profile => profile.peerId === from))) {
+          if (bigOnline && state && state.host) {
+            const departed = state.players.find(player => player.peerId === from);
+            if (departed) departed.hp = 0;
+            return;
+          }
           if (state && state.running) {
-            const localSide = state.host ? "p1" : "p2";
+            const localSide = state.localPlayerId || (state.host ? "p1" : "p2");
             showResult(state.players.find(player => player.id === localSide), "对手离开对战，本局判你获胜。");
             closeOnline(false);
           } else if (!state && stakeReserved) {
@@ -2512,33 +3052,41 @@
         const now = performance.now();
         if (!pulse && now - lastInputSend < 45) return;
         lastInputSend = now;
-        const player = state.players[1];
+        const player = controlledPlayer();
         const x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
         const y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
         publishDirect(opponentId, {
-          type: "input", seq: ++inputSeq,
+          type: "input", seq: ++inputSeq, playerId: player.id,
           input: { x, y, aim: player.aim, fire: keys.has("Space") || touchInput.fire, pulse }
         });
       }
       function broadcast(data) {
-        if (opponentId) publishDirect(opponentId, data);
+        if (bigOnline && state && state.bigOnline) {
+          onlineRoster.filter(profile => profile.peerId !== peerId)
+            .forEach(profile => publishDirect(profile.peerId, data));
+        } else if (opponentId) publishDirect(opponentId, data);
       }
       function closeOnline(notifyOpponent = true) {
         onlineAttemptId++;
         clearInterval(queueTimer);
         queueTimer = null;
-        if (notifyOpponent && opponentId && connected) publishDirect(opponentId, { type: "quit" });
+        if (notifyOpponent && connected) {
+          if (bigOnline) onlineRoster.filter(profile => profile.peerId !== peerId)
+            .forEach(profile => publishDirect(profile.peerId, { type: "quit" }));
+          else if (opponentId) publishDirect(opponentId, { type: "quit" });
+        }
         if (goeasy) {
           try { goeasy.disconnect({}); }
           catch (error) { console.error("关闭 GoEasy 连接失败：", error); }
         }
         goeasy = null; connected = false; peerId = ""; opponentId = "";
-        opponentProfile = null; peers.clear();
+        opponentProfile = null; peers.clear(); onlineRoster = [];
+        activeLobby = LOBBY; activeInbox = INBOX;
       }
       function returnToMenu() {
         if (mode === "online") {
           if (state && state.running) {
-            const localSide = state.host ? "p1" : "p2";
+            const localSide = state.localPlayerId || (state.host ? "p1" : "p2");
             settleMatch(state.players.find(player => player.id !== localSide), false);
           } else if (!state && stakeReserved) {
             refundStake();
@@ -2547,13 +3095,14 @@
         } else if (state && state.running) {
           settleMatch(null, false);
         }
-        state = null; mode = ""; keys.clear();
+        state = null; mode = ""; largeConfig = null; bigOnline = false; keys.clear();
         showMenu();
       }
 
       document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => {
         if (button.dataset.mode === "ai") showDifficulty();
         else if (button.dataset.mode === "local") { makeGame("local", null, emptyLoadout()); spawnItem(); spawnItem(); }
+        else if (button.dataset.mode === "large") showLargeSetup();
         else showSetup("online", true);
       }));
       document.querySelectorAll("[data-difficulty]").forEach(button => button.addEventListener("click", () => {
@@ -2561,6 +3110,52 @@
         showSetup("ai", true);
       }));
       $("difficultyCancel").addEventListener("click", () => showMenu());
+      for (let count = 5; count <= 20; count++) {
+        $("largeEnemyCount").add(new Option(String(count), String(count)));
+      }
+      for (let count = 2; count <= 20; count++) {
+        $("largeOnlineCount").add(new Option(String(count), String(count)));
+      }
+      $("largeType").addEventListener("change", updateLargeSetupFields);
+      $("largeCancel").addEventListener("click", () => { largeConfig = null; showMenu(); });
+      $("largeStart").addEventListener("click", () => {
+        const type = $("largeType").value;
+        largeConfig = {
+          type, teamSize: Number($("largeTeamSize").value), enemyCount: Number($("largeEnemyCount").value),
+          onlineCount: Number($("largeOnlineCount").value), difficulty: Number($("largeDifficulty").value),
+          profession: $("largeProfession").value
+        };
+        if (type === "online") {
+          $("largeStatus").textContent = "正在准备大战场联机…";
+          bigOnline = true;
+          startOnline();
+        } else {
+          makeLargeGame(largeConfig);
+        }
+      });
+      for (let count = 5; count <= 20; count++) {
+        $("largeEnemyCount").add(new Option(String(count), String(count)));
+      }
+      for (let count = 2; count <= 20; count++) {
+        $("largeOnlineCount").add(new Option(String(count), String(count)));
+      }
+      $("largeType").addEventListener("change", updateLargeSetupFields);
+      $("largeCancel").addEventListener("click", () => { largeConfig = null; showMenu(); });
+      $("largeStart").addEventListener("click", () => {
+        const type = $("largeType").value;
+        largeConfig = {
+          type, teamSize: Number($("largeTeamSize").value), enemyCount: Number($("largeEnemyCount").value),
+          onlineCount: Number($("largeOnlineCount").value), difficulty: Number($("largeDifficulty").value),
+          profession: $("largeProfession").value
+        };
+        if (type === "online") {
+          $("largeStatus").textContent = "正在准备大战场联机…";
+          largeOnline = true;
+          startOnline();
+        } else {
+          makeLargeGame(largeConfig);
+        }
+      });
       $("setupStart").addEventListener("click", () => {
         const gameMode = setupMode;
         const loadout = selectedLoadoutData();
