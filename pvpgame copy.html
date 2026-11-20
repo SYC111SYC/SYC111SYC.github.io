@@ -1,0 +1,3457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7fa">
+  <title>猫球对决 · Catball Arena</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10172b;
+      --panel: rgba(26, 36, 61, .92);
+      --line: rgba(177, 196, 255, .16);
+      --muted: #9aa8c8;
+      --mint: #7af3d1;
+      --pink: #ff83a8;
+      --gold: #ffd675;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: #f3f5ff;
+      background:
+        radial-gradient(ellipse at 50% -18%, rgba(86, 122, 207, .28), transparent 55%),
+        radial-gradient(ellipse at 100% 80%, rgba(200, 89, 143, .12), transparent 35%),
+        var(--bg);
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    button { font: inherit; }
+    .page { width: min(1120px, calc(100% - 28px)); margin: 0 auto; padding: 18px 0 24px; }
+    .topbar, .heading, .hud, .hud-side, .actions, .footer { display: flex; align-items: center; }
+    .topbar, .heading { justify-content: space-between; gap: 16px; }
+    .topbar { margin-bottom: 22px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 900; letter-spacing: .15em; }
+    .brand-mark {
+      display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid rgba(122,243,209,.5);
+      border-radius: 12px; color: var(--mint); background: rgba(122,243,209,.09); font-size: 19px;
+      box-shadow: 0 0 24px rgba(122,243,209,.1);
+    }
+    .actions { gap: 8px; }
+    .quiet, .mode-button, .primary, .touch-controls button {
+      border: 1px solid var(--line); border-radius: 11px; color: #e8edff; background: rgba(255,255,255,.045);
+      cursor: pointer; transition: transform .15s, border-color .15s, background .15s;
+    }
+    .quiet { min-height: 38px; padding: 0 12px; font-size: 12px; }
+    .quiet:hover, .mode-button:hover { border-color: rgba(122,243,209,.45); background: rgba(122,243,209,.08); }
+    .heading { align-items: end; margin-bottom: 17px; }
+    .eyebrow { margin: 0 0 7px; color: var(--mint); font-size: 10px; font-weight: 900; letter-spacing: .2em; }
+    h1 { margin: 0; font-size: clamp(29px, 4vw, 43px); letter-spacing: -.04em; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+    .points { flex: 0 0 auto; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.035); text-align: right; }
+    .points small { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; }
+    .points strong { color: var(--gold); font-size: 19px; }
+    .game-card { overflow: hidden; border: 1px solid rgba(170,190,255,.19); border-radius: 18px; background: var(--panel); box-shadow: 0 24px 80px rgba(0,0,0,.32); }
+    .hud { justify-content: space-between; gap: 16px; min-height: 77px; padding: 12px 19px; border-bottom: 1px solid var(--line); }
+    .hud-side { gap: 13px; min-width: 0; }
+    .hud-side.right { justify-content: flex-end; text-align: right; }
+    .cat-icon { width: 40px; height: 40px; object-fit: contain; }
+    .player-name { max-width: 145px; overflow: hidden; color: #fff; font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .health { display: flex; width: 145px; height: 8px; overflow: hidden; margin-top: 7px; border-radius: 9px; background: #39435f; }
+    .health span { width: 100%; border-radius: inherit; background: linear-gradient(90deg, #73ebc2, #b5f17e); transition: width .18s; }
+    .right .health span { margin-left: auto; background: linear-gradient(90deg, #ffca7b, #ff799f); }
+    .vs { color: #8997b8; font-size: 11px; font-weight: 900; letter-spacing: .1em; }
+    .arena { position: relative; overflow: hidden; background: #182b36; }
+    canvas { display: block; width: 100%; aspect-ratio: 16 / 9; touch-action: none; }
+    .overlay {
+      position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 18px;
+      background: rgba(9, 14, 29, .72); backdrop-filter: blur(5px);
+    }
+    .overlay-card {
+      width: min(510px, 100%); max-height: 100%; overflow: auto; padding: 25px;
+      border: 1px solid rgba(178,197,255,.22); border-radius: 17px; background: rgba(23,31,54,.96);
+      box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center;
+    }
+    .overlay-icon {
+      display: grid; width: 48px; height: 48px; margin: 0 auto 13px; place-items: center;
+      border: 1px solid rgba(122,243,209,.34); border-radius: 15px; color: var(--mint);
+      background: rgba(122,243,209,.08); font-size: 23px;
+    }
+    .overlay-card h2 { margin: 0 0 8px; font-size: 23px; }
+    .overlay-card p { margin: 0 auto 17px; color: #a7b2ce; font-size: 12px; line-height: 1.75; }
+    .mode-list { display: grid; gap: 9px; }
+    .mode-button { min-height: 48px; padding: 9px 13px; text-align: left; }
+    .mode-button strong { display: block; margin-bottom: 3px; font-size: 13px; }
+    .mode-button span { color: var(--muted); font-size: 10px; }
+    .primary { min-height: 43px; padding: 0 22px; border: 0; color: #11242d; background: linear-gradient(135deg,#82f5d4,#7fc7ff); font-size: 13px; font-weight: 900; }
+    .primary:hover { transform: translateY(-2px); }
+    .overlay-status { min-height: 18px; margin-top: 13px; color: var(--mint); font-size: 11px; }
+    .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-top: 12px; }
+    .info { min-height: 66px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.028); }
+    .info strong { display: block; margin-bottom: 5px; font-size: 11px; }
+    .info span { color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .touch-controls { display: none; grid-template-columns: repeat(5, 1fr); gap: 7px; padding: 10px; border-top: 1px solid var(--line); }
+    .touch-controls button { min-height: 46px; padding: 4px; font-size: 11px; font-weight: 800; touch-action: none; user-select: none; }
+    .touch-controls button:active, .touch-controls button.active { border-color: rgba(122,243,209,.6); color: var(--mint); background: rgba(122,243,209,.12); }
+    .footer { justify-content: space-between; gap: 12px; margin-top: 14px; color: #74809f; font-size: 10px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 700px) {
+      .page { width: min(100% - 18px, 620px); padding-top: 12px; }
+      .topbar { margin-bottom: 17px; }
+      .heading { align-items: start; }
+      .subtitle { max-width: 90%; font-size: 11px; }
+      .points { padding: 8px 10px; }
+      .points strong { font-size: 16px; }
+      .hud { min-height: 64px; gap: 5px; padding: 8px 10px; }
+      .hud-side { gap: 7px; }
+      .cat-icon { width: 32px; height: 32px; }
+      .player-name { max-width: 105px; font-size: 10px; }
+      .health { width: min(25vw, 115px); height: 7px; }
+      .shield-bar { width: min(25vw, 115px); }
+      .touch-controls { display: grid; }
+      .bottom { grid-template-columns: 1fr; gap: 7px; margin-top: 8px; }
+      .info { min-height: auto; padding: 9px 11px; }
+      .overlay-card { padding: 18px; }
+      .footer { font-size: 9px; }
+    }
+    @media (max-width: 390px) {
+      .brand { font-size: 10px; }
+      .quiet { min-height: 34px; padding: 0 8px; font-size: 10px; }
+      .hud { padding-right: 7px; padding-left: 7px; }
+      .player-name { max-width: 82px; font-size: 9px; }
+      .health { width: 22vw; }
+      .shield-bar { width: 22vw; }
+      .touch-controls { gap: 4px; padding: 7px; }
+      .touch-controls button { min-height: 42px; font-size: 9px; }
+    }
+    :root {
+      color-scheme: light;
+      --bg: #fff;
+      --panel: #fff;
+      --line: #ccc;
+      --muted: #657184;
+      --mint: #557a6c;
+      --pink: #c65b74;
+      --gold: #8a641c;
+    }
+    body { color: #303545; background: #fff; font-family: system-ui, "Microsoft YaHei", sans-serif; }
+    .page { width: min(900px, calc(100% - 24px)); padding: 0 0 18px; }
+    .topbar { margin-bottom: 12px; }
+    .brand-mark { border-color: #b7c8bc; border-radius: 8px; color: #557a6c; background: #f3f7f4; box-shadow: none; }
+    .quiet, .mode-button, .primary, .touch-controls button { border-color: #cbd1dc; border-radius: 6px; color: #303545; background: #f3f4f6; }
+    .quiet { min-height: 34px; }
+    .quiet:hover, .mode-button:hover { border-color: #8fb0ff; background: #eef3ff; }
+    .heading { align-items: center; margin-bottom: 10px; }
+    .eyebrow { color: #648574; }
+    .points, .info { border-color: #ccc; border-radius: 8px; background: #fff; }
+    .points strong { color: #765a19; }
+    .game-card { border: 1px solid #ccc; border-radius: 8px; background: #fff; box-shadow: none; }
+    .arena { background: #e2ecdf; }
+    .hud { min-height: 62px; padding: 8px 12px; border-bottom-color: #ddd; }
+    .player-name { color: #303545; }
+    .health { background: #e5e8ed; }
+    .shield-bar { width: 145px; height: 4px; overflow: hidden; margin-top: 3px; border-radius: 4px; background: #e5e8ed; }
+    .shield-bar span { display: block; width: 100%; height: 100%; background: #63bce9; transition: width .18s; }
+    .right .shield-bar span { margin-left: auto; }
+    .vs { color: #707a8b; }
+    .overlay { background: rgba(245,247,250,.84); backdrop-filter: blur(2px); }
+    .overlay-card { border-color: #cbd1dc; border-radius: 8px; background: #fff; box-shadow: 0 5px 20px #00000012; }
+    .overlay-icon { border-color: #b7c8bc; border-radius: 8px; color: #557a6c; background: #f3f7f4; }
+    .overlay-card p { color: #657184; }
+    .mode-button span { color: #657184; }
+    .primary { border: 0; color: #fff; background: #8fb0ff; }
+    .primary:hover { background: #769cf3; }
+    .overlay-status { color: #557a6c; }
+    #setupPanel, #shopPanel { text-align: left; }
+    .setup-note, .loadout-heading { margin: 8px 0 10px; color: #596578; font-size: 11px; }
+    #onlineBounty { display: grid; grid-template-columns: 1fr 100px; align-items: center; gap: 8px; margin: 9px 0; }
+    #onlineBounty label { color: #404b5d; font-size: 11px; line-height: 1.5; }
+    #bountyInput { width: 100%; min-height: 35px; padding: 5px 8px; border: 1px solid #cbd1dc; border-radius: 6px; font: inherit; }
+    .loadout-heading { display: flex; align-items: center; justify-content: space-between; font-weight: 700; }
+    .loadout-list, .shop-products, .bag-list { display: grid; gap: 6px; max-height: 190px; overflow: auto; }
+    .loadout-row, .shop-product, .bag-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid #d5d9e0; border-radius: 6px; background: #fff; font-size: 11px; }
+    .loadout-row label { display: flex; flex: 1; align-items: center; gap: 8px; cursor: pointer; }
+    .loadout-row input { accent-color: #709878; }
+    .shop-product-copy, .bag-copy { flex: 1; min-width: 0; }
+    .shop-product-copy strong, .bag-copy strong { display: block; margin-bottom: 3px; }
+    .shop-product-copy small, .bag-copy small { color: #657184; line-height: 1.45; }
+    .shop-product button, .bag-row button { flex: 0 0 auto; padding: 6px 9px; border: 0; border-radius: 5px; color: #fff; background: #8fb0ff; cursor: pointer; }
+    .shop-product button:disabled, .bag-row button:disabled { opacity: .5; cursor: not-allowed; }
+    .shop-balance { margin: 0 0 8px; color: #596578; font-size: 12px; }
+    .shop-balance strong { color: #765a19; }
+    .bag-title { margin: 12px 0 6px; font-size: 13px; }
+    .setup-actions { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+    .large-setting { display: grid; grid-template-columns: 1fr minmax(150px, 42%); align-items: center; gap: 8px; margin: 8px 0; color: #404b5d; font-size: 11px; }
+    .large-setting select { width: 100%; min-height: 34px; padding: 5px 8px; border: 1px solid #cbd1dc; border-radius: 6px; background: #fff; color: #303545; font: inherit; }
+    .large-profession-tools { margin-top: 8px; text-align: left; }
+    .large-profession-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 8px; max-height: 180px; overflow: auto; margin-top: 7px; padding: 7px; border: 1px solid #d5d9e0; border-radius: 6px; }
+    .large-profession-row { display: grid; grid-template-columns: minmax(65px, 1fr) minmax(85px, 1.2fr); align-items: center; gap: 5px; font-size: 10px; }
+    .large-profession-row select { width: 100%; min-height: 30px; border: 1px solid #cbd1dc; border-radius: 5px; background: #fff; color: #303545; font: inherit; }
+    .large-reward-note { margin: 7px 0 0 !important; color: #596578 !important; font-size: 10px !important; text-align: left; }
+    .battle-overview { padding: 6px 10px; border-bottom: 1px solid #ddd; background: #f7f9f7; }
+    .battle-overview[hidden] { display: none; }
+    .battle-overview-scroll { max-height: 104px; overflow: auto; }
+    .battle-overview table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; }
+    .battle-overview th, .battle-overview td { padding: 3px 7px; border-bottom: 1px solid #e6e9e6; white-space: nowrap; }
+    .battle-overview th { position: sticky; top: 0; color: #596578; background: #f7f9f7; }
+    .team-health-track { display: inline-block; width: min(120px, 24vw); height: 6px; margin-left: 5px; overflow: hidden; border-radius: 4px; background: #e2e7e2; vertical-align: middle; }
+    .team-health-track span { display: block; height: 100%; background: #6cae78; }
+    .minimap-panel { position: absolute; z-index: 2; top: 8px; right: 8px; width: min(180px, 25%); min-width: 120px; padding: 5px; border: 1px solid #aeb9ad; border-radius: 6px; background: rgba(255,255,255,.92); pointer-events: none; }
+    .minimap-panel[hidden] { display: none; }
+    .minimap-title { margin-bottom: 3px; color: #303545; font-size: 9px; font-weight: 800; }
+    .minimap-canvas { display: block; width: 100%; height: auto; border: 1px solid #d5ddd3; background: #eef4ea; }
+    .minimap-legend { display: flex; justify-content: space-between; gap: 3px; margin-top: 4px; color: #4b5663; font-size: 8px; }
+    .minimap-legend span { display: inline-flex; align-items: center; gap: 3px; }
+    .minimap-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .info { min-height: 58px; }
+    .info span { color: #657184; }
+    .touch-controls { grid-template-columns: minmax(150px, 1fr) minmax(118px, .75fr); align-items: center; gap: 12px; padding: 10px; }
+    @media (pointer: coarse), (any-pointer: coarse) {
+      .touch-controls { display: grid; }
+    }
+    .dpad { display: grid; width: 144px; grid-template: repeat(3, 42px) / repeat(3, 42px); justify-self: center; gap: 3px; }
+    .touch-actions { display: grid; min-width: 0; gap: 6px; }
+    .dpad button { min-height: 42px; padding: 0; font-size: 17px; }
+    .dpad .up { grid-area: 1 / 2; }
+    .dpad .left { grid-area: 2 / 1; }
+    .dpad .center { grid-area: 2 / 2; display: grid; place-items: center; color: #9aa2af; font-size: 14px; }
+    .dpad .right { grid-area: 2 / 3; }
+    .dpad .down { grid-area: 3 / 2; }
+    .touch-controls button { min-height: 43px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .touch-controls button:active, .touch-controls button.active { border-color: #8fb0ff; color: #3357a4; background: #e8efff; }
+    .footer { color: #657184; }
+    @media (max-width: 700px) {
+      .page { width: min(100% - 20px, 620px); padding-top: 8px; }
+      .topbar { margin-bottom: 10px; }
+      .touch-controls { grid-template-columns: minmax(140px, 1fr) minmax(105px, .75fr); }
+      .large-profession-list { grid-template-columns: 1fr; }
+      .battle-overview { padding: 4px; }
+      .battle-overview th, .battle-overview td { padding: 3px 4px; }
+      .minimap-panel { width: 31%; min-width: 105px; top: 5px; right: 5px; }
+      .minimap-legend { font-size: 7px; }
+    }
+    @media (max-width: 390px) {
+      .touch-controls { gap: 6px; padding: 7px; }
+      .dpad { width: 132px; grid-template: repeat(3, 39px) / repeat(3, 39px); }
+      .dpad button { min-height: 39px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><span>CATBALL&nbsp; / &nbsp;ARENA</span></div>
+      <div class="actions">
+        <button class="quiet" id="shopButton" type="button">小商店 / 背包</button>
+        <button class="quiet" id="menuButton" type="button">模式菜单</button>
+        <a class="quiet" href="index.html" style="display:inline-flex;align-items:center;text-decoration:none">返回首页</a>
+      </div>
+    </header>
+    <section class="heading">
+      <div>
+        <p class="eyebrow">猫球擂台 · 拾取装备 · 灵活走位</p>
+        <h1>猫球对决</h1>
+        <p class="subtitle">拾取装备、部署宠物并赢下对决。战斗奖励、背包和猫球装扮与首页积分同步。</p>
+      </div>
+      <div class="points"><small>猫球积分</small><strong id="pointsValue">0</strong></div>
+    </section>
+    <section class="game-card" aria-label="猫球对决游戏">
+      <div class="hud">
+        <div class="hud-side">
+          <img class="cat-icon" src="images/catball.png" alt="">
+          <div><div class="player-name" id="p1Name">玩家 1</div><div class="health"><span id="p1Health"></span></div><div class="shield-bar" id="p1ShieldWrap" hidden><span id="p1Shield"></span></div></div>
+        </div>
+        <div class="vs">VS</div>
+        <div class="hud-side right">
+          <div><div class="player-name" id="p2Name">玩家 2</div><div class="health"><span id="p2Health"></span></div><div class="shield-bar" id="p2ShieldWrap" hidden><span id="p2Shield"></span></div></div>
+          <img class="cat-icon" src="images/catball.png" alt="">
+        </div>
+      </div>
+      <div class="battle-overview" id="teamOverview" hidden>
+        <div class="battle-overview-scroll">
+          <table aria-label="大战场队伍总览">
+            <thead><tr><th>队伍</th><th>剩余人数</th><th>剩余总生命</th></tr></thead>
+            <tbody id="teamOverviewBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="arena">
+        <canvas id="arenaCanvas" width="960" height="540" aria-label="猫球战斗场地"></canvas>
+        <div class="minimap-panel" id="minimapPanel" hidden>
+          <div class="minimap-title">战场小地图</div>
+          <canvas class="minimap-canvas" id="minimapCanvas" width="180" height="102" aria-label="敌人、队友和道具位置"></canvas>
+          <div class="minimap-legend">
+            <span><i class="minimap-dot" style="background:#268fc1"></i>玩家</span>
+            <span><i class="minimap-dot" style="background:#47a56e"></i>队友</span>
+            <span><i class="minimap-dot" style="background:#d54f55"></i>敌人</span>
+            <span><i class="minimap-dot" style="background:#dd9a30"></i>道具</span>
+          </div>
+        </div>
+        <div class="overlay" id="overlay">
+          <div class="overlay-card">
+            <div class="overlay-icon" id="overlayIcon">🐾</div>
+            <h2 id="overlayTitle">准备好开战了吗？</h2>
+            <p id="overlayCopy">收集场地道具并击败对手。生命值归零时战斗结束。</p>
+            <div class="mode-list" id="modeList">
+              <button class="mode-button" type="button" data-mode="ai"><strong>🤖 人机对战</strong><span>WASD 移动 · 鼠标瞄准 · 空格使用/攻击</span></button>
+              <button class="mode-button" type="button" data-mode="local"><strong>⚔️ 本地 2 人</strong><span>P1：WASD + 空格　·　P2：方向键 + M</span></button>
+              <button class="mode-button" type="button" data-mode="large"><strong>🗺️ 大战场</strong><span>组队对战 · 大混战 · 生存赛 · 多人联机</span></button>
+              <button class="mode-button" type="button" data-mode="online"><strong>🌐 联机双人</strong><span>GoEasy 自动匹配在线玩家</span></button>
+            </div>
+            <section id="difficultyPanel" hidden>
+              <p class="setup-note">选择训练对手的难度。</p>
+              <div class="mode-list">
+                <button class="mode-button" type="button" data-difficulty="1"><strong>1. 菜鸟</strong><span>只会冲上来肉搏</span></button>
+                <button class="mode-button" type="button" data-difficulty="2"><strong>2. 普通</strong><span>标准训练对手</span></button>
+                <button class="mode-button" type="button" data-difficulty="3"><strong>3. 高手</strong><span>会使用掩体与地形</span></button>
+                <button class="mode-button" type="button" data-difficulty="4"><strong>4. 困难</strong><span>有概率携带宠物或装备</span></button>
+                <button class="mode-button" type="button" data-difficulty="5"><strong>5. 噩梦</strong><span>双倍生命，必带宠物与装备</span></button>
+              </div>
+              <div class="setup-actions">
+                <button class="quiet" id="difficultyCancel" type="button">返回</button>
+              </div>
+            </section>
+            <section id="largePanel" hidden>
+              <p class="setup-note">大战场为普通战场的 4 倍尺寸，障碍物更多、道具刷新更快；小地图显示队伍和道具位置。</p>
+              <label class="large-setting">玩法
+                <select id="largeType">
+                  <option value="teams">人机组队对抗</option>
+                  <option value="brawl">大混战</option>
+                  <option value="survival">生存赛</option>
+                  <option value="online">GoEasy 多人联机</option>
+                </select>
+              </label>
+              <label class="large-setting" id="largeTeamSetting">每队人数
+                <select id="largeTeamSize"><option>3</option><option>5</option><option>10</option></select>
+              </label>
+              <label class="large-setting" id="largeEnemySetting" hidden>敌人数量
+                <select id="largeEnemyCount"></select>
+              </label>
+              <label class="large-setting" id="largeOnlineSetting" hidden>联机人数（含自己）
+                <select id="largeOnlineCount"></select>
+              </label>
+              <label class="large-setting" id="largeDifficultySetting">人机难度
+                <select id="largeDifficulty"><option value="1">菜鸟</option><option value="2" selected>普通</option><option value="3">高手</option><option value="4">困难</option><option value="5">噩梦</option></select>
+              </label>
+              <label class="large-setting">职业
+                <select id="largeProfession"></select>
+              </label>
+              <div class="large-profession-tools" id="largeProfessionTools">
+                <button class="quiet" id="largeProfessionToggle" type="button" aria-expanded="false" aria-controls="largeProfessionPanel">自定义队友与对手职业</button>
+                <div id="largeProfessionPanel" hidden>
+                  <p class="setup-note">逐个设置 AI 队友和对手；随机职业会从全部职业中抽取。</p>
+                  <div class="large-profession-list" id="largeProfessionAssignments"></div>
+                  <button class="quiet" id="largeProfessionReset" type="button">AI 角色恢复随机职业</button>
+                </div>
+              </div>
+              <p class="large-reward-note" id="largeRewardNote"></p>
+              <div class="overlay-status" id="largeStatus" role="status" aria-live="polite"></div>
+              <div class="setup-actions">
+                <button class="primary" id="largeStart" type="button">开始大战场</button>
+                <button class="quiet" id="largeCancel" type="button">返回</button>
+              </div>
+            </section>
+            <section id="setupPanel" hidden>
+              <p class="setup-note">每局可装备最多 2 个宠物和 2 件装备；本地双人模式不使用背包。</p>
+              <div id="onlineBounty" hidden>
+                <label for="bountyInput">本局战利品（对方获胜时得到；你获胜时夺得对方战利品）</label>
+                <input id="bountyInput" type="number" min="0" step="1" value="0" inputmode="numeric">
+              </div>
+              <div class="loadout-heading">选择背包物品　<button class="quiet" id="loadoutShopButton" type="button">打开商店</button></div>
+              <div id="loadoutList" class="loadout-list"></div>
+              <div id="professionSetup" hidden>
+                <div class="loadout-heading">选择职业（人机与联机）</div>
+                <div id="professionList" class="loadout-list"></div>
+              </div>
+              <div class="overlay-status" id="setupStatus" role="status" aria-live="polite"></div>
+              <div class="setup-actions">
+                <button class="primary" id="setupStart" type="button">开始对战</button>
+                <button class="quiet" id="setupCancel" type="button">返回</button>
+              </div>
+            </section>
+            <section id="shopPanel" hidden>
+              <div class="shop-balance">积分 <strong id="shopPoints">0</strong>　·　背包 <strong id="bagCount">0 / 8</strong></div>
+              <div class="shop-products" id="shopProducts"></div>
+              <h3 class="bag-title">我的背包</h3>
+              <div class="bag-list" id="bagList"></div>
+              <div class="overlay-status" id="shopStatus" role="status" aria-live="polite"></div>
+              <button class="quiet" id="shopClose" type="button">关闭</button>
+            </section>
+            <div class="overlay-status" id="overlayStatus" role="status" aria-live="polite"></div>
+            <button class="primary" id="overlayAction" type="button" hidden>再来一局</button>
+          </div>
+        </div>
+      </div>
+      <div class="touch-controls" aria-label="触屏操作">
+        <div class="dpad" aria-label="移动">
+          <button class="up" type="button" data-control="up" aria-label="上移">▲</button>
+          <button class="left" type="button" data-control="left" aria-label="左移">◀</button>
+          <span class="center" aria-hidden="true">●</span>
+          <button class="right" type="button" data-control="right" aria-label="右移">▶</button>
+          <button class="down" type="button" data-control="down" aria-label="下移">▼</button>
+        </div>
+        <div class="touch-actions">
+          <button type="button" data-control="fire">使用 / 攻击</button>
+          <button type="button" data-ability="profession">职业技能</button>
+          <button type="button" data-ability="drone">无人机投粮</button>
+          <button type="button" data-ability="pearl">末影珍珠</button>
+        </div>
+      </div>
+    </section>
+    <section class="bottom">
+      <div class="info"><strong id="itemStatus">道具：空手</strong><span id="gameStatus">移动探索，靠近道具即可拾取；空手时靠近敌人按出击键肉搏。</span></div>
+      <div class="info"><strong>战场规则</strong><span>手雷延迟爆炸 · 子弹可被掩体挡住 · 猫粮会引开对手 · 药包持续回血</span></div>
+    </section>
+    <footer class="footer"><span>人机胜利 +20 积分 · 联机可设置战利品</span><span>触屏：十字移动，点场地瞄准，可使用攻击、投粮和珍珠按钮</span></footer>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/goeasy-lite@2.13.24/goeasy-lite.min.js"></script>
+  <script>
+    (() => {
+      "use strict";
+      const VIEW_W = 960, VIEW_H = 540, ECONOMY_KEY = "catball_economy_v1";
+      let W = VIEW_W, H = VIEW_H;
+      const NAME_KEY = "catball_pet_name_v1", GOEASY_KEY = "BC-6c13f16b458f45548f069666edacbd91";
+      const BIG_GO_EASY_KEY = "BC-cca123fa205040bdb2ec3d9c18682250";
+      const GOEASY_HOST = "hangzhou.goeasy.io", LOBBY = "catball-pvp-lobby-syc111syc-v1";
+      const INBOX = "catball-pvp-inbox-";
+      const BIG_LOBBY = "catball-pvp-big-lobby-syc111syc-v1";
+      const BIG_INBOX = "catball-pvp-big-inbox-";
+      const canvas = document.getElementById("arenaCanvas");
+      const ctx = canvas.getContext("2d");
+      const minimapCanvas = document.getElementById("minimapCanvas");
+      const minimapContext = minimapCanvas.getContext("2d");
+      const $ = id => document.getElementById(id);
+      const keys = new Set(), touchInput = { up: false, down: false, left: false, right: false, fire: false };
+      const activeTouchPointers = new Map();
+      let pointerTarget = null;
+      const catImage = new Image();
+      catImage.src = "images/catball.png";
+      const elephantImage = new Image();
+      elephantImage.src = "images/elephantball.png";
+      const dogImage = new Image();
+      dogImage.src = "images/dogball.png";
+      let cosmetic = "", catName = "猫球", points = 0, mode = "", state = null, lastFrame = 0;
+      let arenaScale = 1, largeConfig = null, bigOnline = false, camera = { x: VIEW_W / 2, y: VIEW_H / 2 };
+      let goeasy = null, connected = false, peerId = "", opponentId = "", opponentProfile = null, onlineAttemptId = 0;
+      let activeLobby = LOBBY, activeInbox = INBOX, onlineRoster = [];
+      let peers = new Map(), queueTimer = null, snapshotTimer = 0, lastInputSend = 0, inputSeq = 0;
+      let overlayState = "menu", resultMessage = "", rewardedGameIds = new Set();
+      let overviewTimer = 0;
+      let aiDifficulty = 2;
+      let arenaBag = [], selectedLoadout = { pets: [], equipment: [] }, setupMode = "";
+      let unlockedProfessions = new Set(), selectedProfession = "";
+      const professionSpecs = {
+        doctor: { name: "医生", price: 25, description: "125 HP · 药包治疗效果 +10%" },
+        soldier: { name: "士兵", price: 25, description: "枪械与手雷伤害 +10% · R 无中生有：随机手雷或霰弹，冷却 20 秒" },
+        giant: { name: "巨人", price: 25, description: "130 HP · 移速 -15% · 肉搏伤害 +10%" },
+        gremlin: { name: "给我怪", price: 25, description: "蓝色眼镜 · 生命低于 30% 时狂怒：移速 +15%、肉搏伤害 +5% · 捡枪多 1 发" },
+        wizard: { name: "巫师", price: 25, description: "90 HP · 空手时每 4 秒发射昏迷咒 · 低血量时恢复生命" },
+        hunter: { name: "猎人", price: 25, description: "枪械伤害 +5% · 移速 -5% · R 召唤猎狗，冷却 15 秒" },
+        kungfu: { name: "功夫大师", price: 28, description: "血量 +15% · 每命中 4 次肉搏，使对手眩晕 2 秒" },
+        zombie: { name: "丧尸", price: 35, description: "可复活 2 次，每次最大生命 +10% · 移速 -10% · 肉搏施加 3 秒中毒" },
+        zookeeper: { name: "动物园管理员", price: 225, description: "猎人属性 · R 召唤持手枪小猫球和狗球，冷却 20 秒" },
+        commander: { name: "雇佣兵指挥官", price: 175, description: "R 召唤 3 只小猫球，冷却 25 秒" },
+        chef: { name: "厨师", price: 28, description: "R 发射 2 个猫粮无人机，冷却 20 秒" },
+        cardmaster: { name: "卡牌大师", price: 30, description: "R 洗 4 张牌并按牌型发射攻击，冷却 15 秒" },
+        lightning: { name: "闪电侠", price: 50, description: "移速 +50% · R 朝瞄准方向冲刺 5 秒，撞击造成伤害并眩晕 2 秒，冷却 20 秒" },
+        miner: { name: "矿工", price: 55, description: "障碍物肉搏 10 次可击碎 · R 钻地至多 12 秒，再按 R 出土，冷却 25 秒" },
+        cyborg: { name: "生化人", price: 80, description: "生命 ×2 · 肉搏距离 ×2 并吸血 · 移速 -30%" }
+      };
+      let lockedStake = 0, opponentStake = 0, stakeReserved = false, shopReturnSetup = false;
+      const BAG_CAPACITY = 8, PET_LIMIT = 2, EQUIPMENT_LIMIT = 2;
+      const petSpecs = {
+        elephant: { name: "象球", maxHp: 400, speed: 36, price: 45, description: "400 HP · 移速 0.2 倍 · 靠近后每秒踩踏 12 伤害", image: elephantImage },
+        drone: { name: "猫粮自动无人机", maxHp: 40, speed: 190, price: 30, description: "40 HP · 敌人附近盘旋 · F/L 空投一次 2 秒猫粮" },
+        dog: { name: "狗球", maxHp: 80, speed: 216, price: 22, description: "80 HP · 移速 1.2 倍 · 冲向敌人啃咬" , image: dogImage },
+        turret: { name: "枪塔", maxHp: 150, speed: 0, price: 23, description: "150 HP · 固定不动 · 每秒发射步枪子弹" }
+      };
+      const equipmentSpecs = {
+        shield: { name: "护盾", price: 25, description: "吸收伤害；3 秒未受击后每秒恢复 15 点" },
+        pearl: { name: "末影珍珠", price: 13, description: "P1 按 E / P2 按 K 投掷并传送到落点" },
+        phase: { name: "穿墙术", price: 17, description: "本局可穿过墙体与掩体" }
+      };
+      const shopItems = { ...petSpecs, ...equipmentSpecs };
+      let terrain = [
+        { x: 276, y: 167, w: 60, h: 44 }, { x: 614, y: 328, w: 65, h: 48 },
+        { x: 457, y: 95, w: 47, h: 34 }, { x: 442, y: 405, w: 55, h: 38 }
+      ];
+      const itemInfo = {
+        grenade: { label: "手雷", color: "#ffc767", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M12 8h8v4h4v11a8 8 0 0 1-16 0V12h4z" fill="#ffc767" stroke="#573d20" stroke-width="2"/><path d="M14 8V5h5l3 3" fill="none" stroke="#573d20" stroke-width="2.5" stroke-linecap="round"/><path d="m23 4 2-2m1 5 3-1" stroke="#ff745e" stroke-width="2" stroke-linecap="round"/></svg>' },
+        pistol: { label: "手枪", color: "#83d7ff", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M4 10h23v7h-8l-1 4h-5l-1-4H4z" fill="#83d7ff" stroke="#24485b" stroke-width="2" stroke-linejoin="round"/><path d="M18 17v4h-5l-1-4m11-7V7h4v3" fill="#b9edff" stroke="#24485b" stroke-width="1.5" stroke-linejoin="round"/></svg>' },
+        shotgun: { label: "霰弹枪", color: "#ff9dbe", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M3 11h20v5H12v5H8l-1-5H3z" fill="#ff9dbe" stroke="#573342" stroke-width="2" stroke-linejoin="round"/><path d="M23 12h6v3h-6m-11 1v6h-4" fill="none" stroke="#573342" stroke-width="2" stroke-linecap="round"/></svg>' },
+        rifle: { label: "步枪", color: "#8df0c0", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M2 12h19v4H12v5H8l-1-5H2z" fill="#8df0c0" stroke="#294d40" stroke-width="2" stroke-linejoin="round"/><path d="M21 13h8v2h-8m-8 0v-3h4m-9 10 2-3" fill="none" stroke="#294d40" stroke-width="2" stroke-linecap="round"/></svg>' },
+        cover: { label: "掩体", color: "#c5a5ff", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M5 8h22v18H5z" fill="#c5a5ff" stroke="#493a62" stroke-width="2"/><path d="M5 14h22M13 8v6m8 0v6m-8 0v6" stroke="#493a62" stroke-width="2"/></svg>' },
+        food: { label: "猫粮", color: "#ffbf80", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M8 11 5 8m19 3 3-3M7 17a9 9 0 1 1 18 0v7H7z" fill="#ffbf80" stroke="#67472f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 18h.1m8 0h.1M13 22q3 3 6 0" fill="none" stroke="#67472f" stroke-width="2" stroke-linecap="round"/></svg>' },
+        medkit: { label: "药包", color: "#ff879c", svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect x="5" y="9" width="22" height="18" rx="3" fill="#ff879c" stroke="#623640" stroke-width="2"/><path d="M12 9V6h8v3m-4 4v10m-5-5h10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>' }
+      };
+      const itemIcons = {};
+      Object.entries(itemInfo).forEach(([type, info]) => {
+        const image = new Image();
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(info.svg)}`;
+        itemIcons[type] = image;
+      });
+
+      function readProfile() {
+        try {
+          catName = (localStorage.getItem(NAME_KEY) || "").trim().slice(0, 16) || "猫球";
+          const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
+          const inventory = data.inventory || {};
+          points = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
+          unlockedProfessions = new Set((Array.isArray(inventory.pvpProfessions) ? inventory.pvpProfessions : [])
+            .filter(id => Object.prototype.hasOwnProperty.call(professionSpecs, id)));
+          if (selectedProfession && !unlockedProfessions.has(selectedProfession)) selectedProfession = "";
+          const seen = new Set();
+          arenaBag = (Array.isArray(inventory.pvpBag) ? inventory.pvpBag : [])
+            .filter(item => item && typeof item.id === "string" && !seen.has(item.id) &&
+              Object.prototype.hasOwnProperty.call(shopItems, item.type) &&
+              (seen.add(item.id), true))
+            .map(item => {
+              const entry = { id: item.id, type: item.type };
+              if (petSpecs[item.type]) {
+                const maxHp = petSpecs[item.type].maxHp;
+                entry.hp = Number.isFinite(item.hp) ? clamp(item.hp, 0, maxHp) : maxHp;
+              }
+              return entry;
+            }).slice(0, BAG_CAPACITY);
+          const equipped = inventory.equipped;
+          cosmetic = ["sign", "scooter", "ingot", "glasses"].includes(equipped) &&
+            Number.isFinite(inventory[`${equipped}Until`]) && inventory[`${equipped}Until`] > Date.now() ? equipped : "";
+        } catch (error) {
+          console.error("无法读取猫球积分或装扮：", error);
+          catName = "猫球";
+          cosmetic = "";
+          points = 0;
+        }
+        $("pointsValue").textContent = points;
+        if ($("shopPoints")) renderShop();
+      }
+
+      function renderProfessions() {
+        const list = $("professionList");
+        if (!list) return;
+        list.replaceChildren();
+        const none = document.createElement("button");
+        none.type = "button";
+        none.className = "quiet";
+        none.dataset.professionSelect = "";
+        none.textContent = `${selectedProfession ? "选择无职业" : "✓ 无职业"}`;
+        list.appendChild(none);
+        Object.entries(professionSpecs).forEach(([id, profession]) => {
+          const row = document.createElement("div");
+          row.className = "loadout-row";
+          const copy = document.createElement("span");
+          copy.className = "shop-product-copy";
+          const title = document.createElement("strong");
+          title.textContent = `${profession.name}${selectedProfession === id ? " · 已选择" : ""}`;
+          const description = document.createElement("small");
+          description.textContent = profession.description;
+          copy.append(title, description);
+          const action = document.createElement("button");
+          action.type = "button";
+          action.className = "quiet";
+          action.dataset.professionSelect = id;
+          if (unlockedProfessions.has(id)) {
+            action.textContent = selectedProfession === id ? "已选择" : "选择";
+          } else {
+            action.textContent = `解锁 · ${profession.price} 积分`;
+            action.disabled = points < profession.price;
+            action.dataset.professionUnlock = id;
+          }
+          row.append(copy, action);
+          list.appendChild(row);
+        });
+      }
+
+      function unlockProfession(id) {
+        if (!Object.prototype.hasOwnProperty.call(professionSpecs, id) || unlockedProfessions.has(id)) return;
+        const price = professionSpecs[id].price;
+        if (points < price) {
+          $("setupStatus").textContent = `需要 ${price} 积分才能解锁该职业。`;
+          return;
+        }
+        try {
+          const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
+          if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("积分数据格式无效");
+          const current = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
+          if (current < price) {
+            readProfile();
+            $("setupStatus").textContent = "积分不足，无法解锁该职业。";
+            return;
+          }
+          if (!data.inventory || typeof data.inventory !== "object" || Array.isArray(data.inventory)) data.inventory = {};
+          const professions = new Set(Array.isArray(data.inventory.pvpProfessions) ? data.inventory.pvpProfessions : []);
+          professions.add(id);
+          data.points = current - price;
+          data.inventory.pvpProfessions = [...professions].filter(value =>
+            Object.prototype.hasOwnProperty.call(professionSpecs, value));
+          localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
+          readProfile();
+          selectedProfession = id;
+          $("setupStatus").textContent = `已解锁并选择${professionSpecs[id].name}。`;
+          renderProfessions();
+        } catch (error) {
+          console.error("无法解锁 PVP 职业：", error);
+          $("setupStatus").textContent = "职业解锁失败，请检查积分数据或浏览器存储。";
+        }
+      }
+
+      function persistArenaChanges(pointsDelta, nextBag) {
+        try {
+          const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
+          if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("积分数据格式无效");
+          const current = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
+          if (!data.inventory || typeof data.inventory !== "object" || Array.isArray(data.inventory)) data.inventory = {};
+          if (!Number.isSafeInteger(current + pointsDelta) || current + pointsDelta < 0) return false;
+          data.points = current + pointsDelta;
+          data.inventory.pvpBag = nextBag.map(item => ({ ...item }));
+          localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
+          readProfile();
+          return true;
+        } catch (error) {
+          console.error("无法保存猫球商店或积分数据：", error);
+          return false;
+        }
+      }
+
+      function settleMatch(winner, localWinner) {
+        if (!state || state.matchSettled) return "";
+        const rewardId = state.id;
+        if (rewardId && rewardedGameIds.has(rewardId)) return "本局奖励已领取。";
+        const localSide = mode === "online" ? state.localPlayerId || (state.host ? "p1" : "p2") : "p1";
+        const localPlayer = state.players.find(player => player.id === localSide);
+        const selected = state.loadouts && state.loadouts[localSide];
+        let nextBag = arenaBag.map(item => ({ ...item }));
+        if (selected && localPlayer) {
+          for (const petItem of selected.pets) {
+            const pet = localPlayer.pets.find(item => item.itemId === petItem.id);
+            if (!pet || !pet.alive || pet.hp <= 0) {
+              nextBag = nextBag.filter(item => item.id !== petItem.id);
+            } else {
+              nextBag = nextBag.map(item => item.id === petItem.id ? { ...item, hp: pet.hp } : item);
+            }
+          }
+          for (const gear of selected.equipment) {
+            if (gear.type === "pearl" && localPlayer.equipment.pearlUsed) {
+              nextBag = nextBag.filter(item => item.id !== gear.id);
+            }
+          }
+        }
+        let reward = 0, rewardLabel = "";
+        if (mode === "large" && state.gameType === "survival") {
+          reward = Math.min(40, Math.floor(state.elapsed / 15) + Math.floor(state.survivalKills / 3));
+          if (reward) rewardLabel = `生存奖励 +${reward} 积分（单局上限 40）。`;
+        } else if (mode === "large" && state.gameType === "teams" && localWinner && winner) {
+          const teamSize = Number(largeConfig && largeConfig.teamSize) || 3;
+          reward = teamSize === 3 ? 15 : teamSize === 5 ? 25 : 40;
+          rewardLabel = `${teamSize}v${teamSize} 胜利奖励 +${reward} 积分。`;
+        } else if (mode === "large" && state.gameType === "brawl" && localWinner && winner) {
+          reward = 12 + Math.floor(Math.max(0, state.players.length - 1) / 2);
+          rewardLabel = `大混战冠军奖励 +${reward} 积分。`;
+        } else if (mode === "online" && state.bigOnline && localWinner && winner) {
+          reward = 15;
+          rewardLabel = `大战场联机胜利奖励 +${reward} 积分。`;
+        } else if (mode === "online" && !winner) {
+          reward = state.stakes[localSide] || 0;
+          rewardLabel = `平局，返还战利品 ${reward} 积分。`;
+        } else if (localWinner && winner) {
+          if (mode === "ai") {
+            reward = 20;
+            rewardLabel = "人机胜利奖励 +20 积分。";
+          } else if (mode === "online") {
+            const otherSide = localSide === "p1" ? "p2" : "p1";
+            reward = (state.stakes[localSide] || 0) + (state.stakes[otherSide] || 0);
+            rewardLabel = `夺得本局战利品 ${state.stakes[otherSide] || 0} 积分。`;
+          } else {
+            reward = 12;
+            rewardLabel = "获胜奖励 +12 积分。";
+          }
+        }
+        const bagChanged = JSON.stringify(nextBag) !== JSON.stringify(arenaBag);
+        const saved = !reward && !bagChanged || persistArenaChanges(reward, nextBag);
+        state.matchSettled = true;
+        if (mode === "online" && saved) stakeReserved = false;
+        if (!saved) return reward ? "积分或背包保存失败，请检查浏览器存储空间。" : "宠物或装备保存失败，请检查浏览器存储空间。";
+        if (rewardId && reward) rewardedGameIds.add(rewardId);
+        return rewardLabel;
+      }
+
+      function itemName(type) {
+        return petSpecs[type] ? petSpecs[type].name : equipmentSpecs[type] ? equipmentSpecs[type].name : type;
+      }
+      function renderLoadout() {
+        const list = $("loadoutList");
+        list.replaceChildren();
+        const selectedPets = new Set(selectedLoadout.pets);
+        const selectedEquipment = new Set(selectedLoadout.equipment);
+        if (!arenaBag.length) {
+          list.textContent = "背包是空的，可先去小商店购买宠物或装备。";
+          return;
+        }
+        arenaBag.forEach(item => {
+          const isPet = Boolean(petSpecs[item.type]);
+          const selected = isPet ? selectedPets.has(item.id) : selectedEquipment.has(item.id);
+          const row = document.createElement("div");
+          row.className = "loadout-row";
+          const label = document.createElement("label");
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = selected;
+          checkbox.addEventListener("change", () => {
+            const bucket = isPet ? selectedLoadout.pets : selectedLoadout.equipment;
+            const limit = isPet ? PET_LIMIT : EQUIPMENT_LIMIT;
+            if (checkbox.checked && bucket.length >= limit) {
+              checkbox.checked = false;
+              $("setupStatus").textContent = `每局最多装备 ${limit} 个${isPet ? "宠物" : "装备"}。`;
+              return;
+            }
+            if (checkbox.checked) bucket.push(item.id);
+            else selectedLoadout[isPet ? "pets" : "equipment"] = bucket.filter(id => id !== item.id);
+            $("setupStatus").textContent = "";
+          });
+          const copy = document.createElement("span");
+          copy.textContent = `${itemName(item.type)}${isPet ? ` · HP ${Math.floor(item.hp)} / ${petSpecs[item.type].maxHp}` : ""}`;
+          label.append(checkbox, copy);
+          const kind = document.createElement("small");
+          kind.textContent = isPet ? "宠物" : "装备";
+          row.append(label, kind);
+          list.appendChild(row);
+        });
+      }
+
+      function renderShop() {
+        if (!$("shopProducts")) return;
+        $("shopPoints").textContent = points;
+        $("bagCount").textContent = `${arenaBag.length} / ${BAG_CAPACITY}`;
+        const products = $("shopProducts");
+        products.replaceChildren();
+        Object.entries(shopItems).forEach(([type, product]) => {
+          const row = document.createElement("div");
+          row.className = "shop-product";
+          const copy = document.createElement("div");
+          copy.className = "shop-product-copy";
+          const title = document.createElement("strong");
+          title.textContent = `${product.name} · ${product.price} 积分`;
+          const desc = document.createElement("small");
+          desc.textContent = product.description;
+          copy.append(title, desc);
+          const buy = document.createElement("button");
+          buy.type = "button";
+          buy.dataset.buy = type;
+          buy.textContent = "购买";
+          buy.disabled = arenaBag.length >= BAG_CAPACITY || points < product.price;
+          row.append(copy, buy);
+          products.appendChild(row);
+        });
+        const bagList = $("bagList");
+        bagList.replaceChildren();
+        if (!arenaBag.length) {
+          bagList.textContent = "背包空空如也。";
+        } else {
+          arenaBag.forEach(item => {
+            const row = document.createElement("div");
+            row.className = "bag-row";
+            const copy = document.createElement("div");
+            copy.className = "bag-copy";
+            const title = document.createElement("strong");
+            title.textContent = itemName(item.type);
+            copy.appendChild(title);
+            if (petSpecs[item.type]) {
+              const status = document.createElement("small");
+              status.textContent = `HP ${Math.floor(item.hp)} / ${petSpecs[item.type].maxHp}`;
+              copy.appendChild(status);
+            } else {
+              const status = document.createElement("small");
+              status.textContent = "可在每局开始前装备";
+              copy.appendChild(status);
+            }
+            row.appendChild(copy);
+            if (petSpecs[item.type] && item.hp < petSpecs[item.type].maxHp) {
+              const heal = document.createElement("button");
+              heal.type = "button";
+              heal.dataset.heal = item.id;
+              heal.textContent = "+25 HP · 7分";
+              heal.disabled = points < 7;
+              row.appendChild(heal);
+            }
+            bagList.appendChild(row);
+          });
+        }
+      }
+
+      function showSetup(gameMode, reset = false) {
+        setupMode = gameMode;
+        if (reset) selectedLoadout = emptyLoadout();
+        readProfile();
+        $("overlayTitle").textContent = gameMode === "online" ? "联机战前准备" : `选择本局装备 · ${["", "菜鸟", "普通", "高手", "困难", "噩梦"][aiDifficulty]}`;
+        $("overlayCopy").textContent = gameMode === "online"
+          ? "设置对手获胜时得到的战利品，并选择本局出战宠物和装备。"
+          : `挑选背包里的宠物和装备；未选择的物品仍留在背包。训练对手难度：${["", "菜鸟", "普通", "高手", "困难", "噩梦"][aiDifficulty]}。`;
+        $("overlayIcon").textContent = gameMode === "online" ? "🌐" : "🎒";
+        $("modeList").hidden = true;
+        $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
+        $("setupPanel").hidden = false;
+        $("professionSetup").hidden = gameMode === "local";
+        $("shopPanel").hidden = true;
+        $("onlineBounty").hidden = gameMode !== "online";
+        $("setupStatus").textContent = "";
+        $("overlayAction").hidden = true;
+        $("overlay").hidden = false;
+        $("shopButton").disabled = false;
+        if (reset && gameMode === "online") $("bountyInput").value = "0";
+        renderLoadout();
+        renderProfessions();
+      }
+
+      function openShop() {
+        if (state && state.running || overlayState === "waiting") return;
+        shopReturnSetup = Boolean(setupMode);
+        $("overlayTitle").textContent = "猫球小商店";
+        $("overlayCopy").textContent = "购买的物品会存入 8 格背包；宠物存活归队后可用积分修复。";
+        $("overlayIcon").textContent = "🛍️";
+        $("modeList").hidden = true;
+        $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
+        $("setupPanel").hidden = true;
+        $("shopPanel").hidden = false;
+        $("overlayAction").hidden = true;
+        $("overlay").hidden = false;
+        $("shopStatus").textContent = "";
+        readProfile();
+      }
+
+      function closeShop() {
+        if (shopReturnSetup && setupMode) showSetup(setupMode);
+        else showMenu();
+      }
+
+      function buyItem(type) {
+        const product = shopItems[type];
+        if (!product) return;
+        readProfile();
+        if (arenaBag.length >= BAG_CAPACITY) {
+          $("shopStatus").textContent = "背包已满（8 格），请先整理后再购买。";
+          return;
+        }
+        if (points < product.price) {
+          $("shopStatus").textContent = "积分不足，无法购买。";
+          return;
+        }
+        const item = { id: `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, type };
+        if (petSpecs[type]) item.hp = petSpecs[type].maxHp;
+        if (!persistArenaChanges(-product.price, [...arenaBag, item])) {
+          $("shopStatus").textContent = "购买未完成，积分或背包保存失败。";
+          return;
+        }
+        $("shopStatus").textContent = `已购买${product.name}，存入背包。`;
+        renderLoadout();
+      }
+
+      function healBagPet(id) {
+        readProfile();
+        const item = arenaBag.find(entry => entry.id === id);
+        if (!item || !petSpecs[item.type] || item.hp >= petSpecs[item.type].maxHp) return;
+        if (points < 7) {
+          $("shopStatus").textContent = "需要 7 积分才能修复 25 HP。";
+          return;
+        }
+        const nextBag = arenaBag.map(entry => entry.id === id
+          ? { ...entry, hp: Math.min(petSpecs[entry.type].maxHp, entry.hp + 25) } : entry);
+        if (!persistArenaChanges(-7, nextBag)) {
+          $("shopStatus").textContent = "宠物修复失败，积分或背包保存失败。";
+          return;
+        }
+        $("shopStatus").textContent = `${itemName(item.type)}已恢复 25 HP。`;
+        renderLoadout();
+      }
+
+      function refundStake() {
+        if (!stakeReserved) return true;
+        if (!persistArenaChanges(lockedStake, arenaBag)) {
+          $("setupStatus").textContent = "战利品退还失败，请检查浏览器存储空间。";
+          return false;
+        }
+        stakeReserved = false;
+        lockedStake = 0;
+        return true;
+      }
+      function makePlayer(id, name, x, color, kind, look) {
+        return {
+          id, name, x, y: H / 2, vx: 0, vy: 0, aim: id === "p1" ? 0 : Math.PI,
+          hp: 100, maxHp: 100, held: "", ammo: 0, attackCooldown: 0, meleeCooldown: 0,
+          profession: "", professionCooldown: 0, professionRegenTimer: 0, professionRegenActive: false,
+          glassesBroken: false, skillWeapon: "", stunned: 0, meleeHits: 0, revivesLeft: 0,
+          spawnX: x, spawnY: H / 2, poisonTimer: 0, poisonTick: 0, lastHand: [], lastHandTimer: 0,
+          underground: false, undergroundTimer: 0, lightningDash: 0, lightningDirection: 0, lightningHits: [],
+          pets: [], equipment: { shield: 0, maxShield: 0, shieldHitAt: -Infinity, pearlAvailable: false, pearlUsed: false, phase: false },
+          invulnerable: 0, medTimer: 0, fireWasDown: false, input: { x: 0, y: 0, fire: false, pulse: false, aim: 0 },
+          color, kind, cosmetic: look || "", recoil: 0, walked: 0,
+          navPath: [], navIndex: 0, navKey: "", navTimer: 0, stuckFor: 0, lastX: x, lastY: H / 2
+        };
+      }
+
+      function emptyLoadout() { return { pets: [], equipment: [] }; }
+      function sanitizeLoadout(loadout) {
+        const result = emptyLoadout();
+        if (!loadout || typeof loadout !== "object") return result;
+        const usedIds = new Set();
+        (Array.isArray(loadout.pets) ? loadout.pets : []).slice(0, PET_LIMIT).forEach(item => {
+          if (!item || !petSpecs[item.type] || typeof item.id !== "string" || usedIds.has(item.id)) return;
+          usedIds.add(item.id);
+          result.pets.push({ id: item.id.slice(0, 100), type: item.type, hp: clamp(Number(item.hp) || petSpecs[item.type].maxHp, 1, petSpecs[item.type].maxHp) });
+        });
+        (Array.isArray(loadout.equipment) ? loadout.equipment : []).slice(0, EQUIPMENT_LIMIT).forEach(item => {
+          if (!item || !equipmentSpecs[item.type] || typeof item.id !== "string" || usedIds.has(item.id)) return;
+          usedIds.add(item.id);
+          result.equipment.push({ id: item.id.slice(0, 100), type: item.type });
+        });
+        return result;
+      }
+      function selectedLoadoutData() {
+        return sanitizeLoadout({
+          pets: selectedLoadout.pets.map(id => arenaBag.find(item => item.id === id)).filter(Boolean),
+          equipment: selectedLoadout.equipment.map(id => arenaBag.find(item => item.id === id)).filter(Boolean)
+        });
+      }
+      function makeAiLoadout(difficulty) {
+        const loadout = emptyLoadout();
+        const petTypes = ["dog", "drone", "elephant", "turret"];
+        const equipmentTypes = ["shield", "pearl", "phase"];
+        if (difficulty >= 5 || difficulty === 4 && Math.random() < .5) {
+          const type = petTypes[Math.floor(Math.random() * petTypes.length)];
+          loadout.pets.push({ id: `ai-${type}`, type, hp: petSpecs[type].maxHp });
+        }
+        if (difficulty >= 5 || difficulty === 4 && Math.random() < .5) {
+          const type = equipmentTypes[Math.floor(Math.random() * equipmentTypes.length)];
+          loadout.equipment.push({ id: `ai-${type}`, type });
+        }
+        return loadout;
+      }
+      function validProfession(value) {
+        return typeof value === "string" && Object.prototype.hasOwnProperty.call(professionSpecs, value) ? value : "";
+      }
+      function randomProfession() {
+        const professions = Object.keys(professionSpecs);
+        return professions[Math.floor(Math.random() * professions.length)];
+      }
+      function professionHealthMultiplier(profession) {
+        return profession === "doctor" ? 1.25 :
+          profession === "giant" ? 1.3 : profession === "wizard" ? .9 :
+            profession === "kungfu" ? 1.15 : profession === "cyborg" ? 2 : 1;
+      }
+      function applyProfessionHealth(player) {
+        player.maxHp = 100 * professionHealthMultiplier(player.profession);
+        player.hp = player.maxHp;
+      }
+      function equipPlayer(player, loadout) {
+        const selected = sanitizeLoadout(loadout);
+        player.pets = selected.pets.map((entry, index) => {
+          const spec = petSpecs[entry.type];
+          const side = player.id === "p1" ? 1 : -1;
+          const x = player.x + side * (34 + index * 30), y = player.y + (index % 2 ? 48 : -48);
+          return {
+            id: `${player.id}-${entry.id}`, itemId: entry.id, owner: player.id, type: entry.type, isPet: true,
+            x, y, hp: clamp(entry.hp, 1, spec.maxHp), maxHp: spec.maxHp, alive: true,
+            speed: spec.speed, color: player.color, damage: entry.type === "elephant" ? 12 : entry.type === "dog" ? 14.4 : 0,
+            cooldown: 0, phase: rand(0, Math.PI * 2), age: 0, navPath: [], navIndex: 0,
+            navKey: "", navTimer: 0, navPoint: null, stuckFor: 0,
+            input: { x: 0, y: 0 }, foodAvailable: entry.type === "drone", selfDestruct: false
+          };
+        });
+        player.equipment = {
+          shield: selected.equipment.some(item => item.type === "shield") ? 75 : 0,
+          maxShield: selected.equipment.some(item => item.type === "shield") ? 75 : 0,
+          shieldHitAt: -Infinity,
+          pearlAvailable: selected.equipment.some(item => item.type === "pearl"),
+          pearlUsed: false,
+          phase: selected.equipment.some(item => item.type === "phase"),
+          items: selected.equipment
+        };
+        return selected;
+      }
+
+      function makeGame(gameMode, remote = null, loadout = null) {
+        mode = gameMode;
+        pointerTarget = null;
+        configureArena(largeConfig ? 8 : 2, Boolean(largeConfig));
+        const onlineGuest = gameMode === "online" && remote && !remote.host;
+        const localLoadout = gameMode === "local" ? emptyLoadout() : sanitizeLoadout(loadout || selectedLoadoutData());
+        const hostLoadout = onlineGuest ? sanitizeLoadout(remote.hostLoadout) : localLoadout;
+        const guestLoadout = gameMode === "online" && !onlineGuest
+          ? sanitizeLoadout(remote && remote.opponentLoadout) : onlineGuest ? localLoadout : emptyLoadout();
+        const p1 = makePlayer(
+          "p1",
+          onlineGuest ? (remote.opponentName || "联机玩家") : catName,
+          W * .15,
+          "#78f0cf",
+          "human",
+          onlineGuest ? (remote.opponentCosmetic || "") : cosmetic
+        );
+        const p2Kind = gameMode === "ai" ? "ai" : "human";
+        const p2Name = gameMode === "ai" ? `训练对手 · ${["", "菜鸟", "普通", "高手", "困难", "噩梦"][aiDifficulty]}` :
+          gameMode === "online" ? (onlineGuest ? catName : (remote && remote.opponentName || "联机玩家")) : "玩家 2";
+        const p2Cosmetic = gameMode === "online" ? (onlineGuest ? cosmetic : (remote && remote.opponentCosmetic || "")) :
+          (opponentProfile && opponentProfile.cosmetic || "");
+        const p2 = makePlayer("p2", p2Name, W * .85, "#ff88ad", p2Kind, p2Cosmetic);
+        p1.profession = gameMode === "local" ? "" :
+          validProfession(gameMode === "online" && onlineGuest ? remote.hostProfession : selectedProfession);
+        p2.profession = gameMode === "local" ? "" :
+          gameMode === "ai" ? randomProfession() :
+            validProfession(onlineGuest ? selectedProfession : remote && remote.opponentProfession);
+        [p1, p2].forEach(player => {
+          if (player.profession === "zombie") player.revivesLeft = 2;
+        });
+        const p1Loadout = gameMode === "online" && onlineGuest ? hostLoadout : localLoadout;
+        const p2Selected = gameMode === "online" ? guestLoadout :
+          gameMode === "ai" && aiDifficulty >= 4 ? makeAiLoadout(aiDifficulty) : emptyLoadout();
+        equipPlayer(p1, p1Loadout);
+        equipPlayer(p2, p2Selected);
+        if (gameMode === "ai") {
+          p2.maxHp = 140 * (aiDifficulty >= 5 ? 2 : 1) * professionHealthMultiplier(p2.profession);
+          p2.hp = p2.maxHp;
+        }
+        applyProfessionHealth(p1);
+        if (gameMode === "online") applyProfessionHealth(p2);
+        if (gameMode === "ai") p2.name += ` · ${professionSpecs[p2.profession].name}`;
+        if (p1.profession) p1.name += ` · ${professionSpecs[p1.profession].name}`;
+        const localStake = gameMode === "online" ? lockedStake : 0;
+        const otherStake = gameMode === "online" ? Number(remote && remote.opponentStake) || 0 : 0;
+        state = {
+          id: remote && remote.gameId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+          mode: gameMode, running: true, elapsed: 0, spawnTimer: 1.6, itemSpawnTimer: 1.6, nextObjectId: 1,
+          players: [p1, p2], items: [], projectiles: [], covers: [], lures: [], particles: [],
+          arenaTerrain: terrain.map(rect => ({ ...rect })),
+          winner: "", shake: 0,
+          loadouts: { p1: p1Loadout, p2: p2Selected },
+          stakes: gameMode === "online" ? (onlineGuest ? { p1: otherStake, p2: localStake } : { p1: localStake, p2: otherStake }) : { p1: 0, p2: 0 }
+        };
+        if (gameMode === "online") {
+          if (remote && remote.host) state.host = true;
+          else state.host = false;
+        }
+        updateNames();
+        $("gameStatus").textContent = gameMode === "ai"
+          ? `训练对手难度：${["", "菜鸟", "普通", "高手", "困难", "噩梦"][aiDifficulty]} · 胜利奖励 +20 积分。` :
+          gameMode === "local" ? "双人同屏对战，率先击败对手的一方获胜。" : "联机已接通，正在战斗。";
+        $("shopButton").disabled = true;
+        updateNames();
+        $("overlay").hidden = true;
+      }
+
+      function makeLargeGame(config) {
+        largeConfig = config;
+        selectedProfession = validProfession(config.profession);
+        configureArena(8, true);
+        mode = "large";
+        const players = [];
+        let nextPlayerNumber = 2;
+        const add = (id, name, kind, team, color, startX, startY, profession = "", assignmentKey = "") => {
+          const player = makePlayer(id, name, startX, color, kind, "");
+          player.y = startY;
+          player.spawnY = startY;
+          player.team = team;
+          player.profession = kind === "ai" ? configuredAIProfession(config, assignmentKey) : validProfession(profession);
+          if (player.profession === "zombie") player.revivesLeft = 2;
+          applyProfessionHealth(player);
+          if (kind === "ai") {
+            player.maxHp *= 1.4 * (config.difficulty >= 5 ? 2 : 1);
+            player.hp = player.maxHp;
+          }
+          players.push(player);
+          return player;
+        };
+        const firstPlayer = add("p1", catName, "human", 0, "#78f0cf", W * .12, H / 2, config.profession);
+        const opponentCount = config.type === "teams" ? config.teamSize :
+          config.type === "brawl" ? config.enemyCount : 5;
+        if (config.type === "teams") {
+          for (let index = 1; index < config.teamSize; index++) {
+            add(`p${nextPlayerNumber++}`, `队友 ${index + 1}`, "ai", 0, "#76b7e8",
+              W * .12 + rand(-120, 120), H / 2 + rand(-180, 180), "", `ally-${index}`);
+          }
+        }
+        for (let index = 0; index < opponentCount; index++) {
+          const team = config.type === "teams" ? 1 : index + 1;
+          add(`p${nextPlayerNumber++}`, config.type === "teams" ? `敌方 ${index + 1}` : `对手 ${index + 1}`,
+            "ai", team, ["#ff88ad", "#f0a15e", "#c79cff", "#e7d36b"][index % 4],
+            W * .88 + rand(-110, 110), H / 2 + rand(-240, 240), "", `enemy-${index}`);
+        }
+        if (config.type === "survival") {
+          for (let index = 0; index < players.length; index++) {
+            players[index].team = index === 0 ? 0 : 1;
+          }
+        }
+        firstPlayer.name = catName + (config.profession ? ` · ${professionSpecs[config.profession].name}` : "");
+        const enemyIndex = config.type === "teams" ? config.teamSize : 1;
+        if (players[enemyIndex] && players[enemyIndex].profession) {
+          const enemy = players[enemyIndex];
+          enemy.name += ` · ${professionSpecs[enemy.profession].name}`;
+        }
+        state = {
+          id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+          mode: "large", gameType: config.type, running: true, elapsed: 0,
+          spawnTimer: config.type === "survival" ? 4 : .7, itemSpawnTimer: .7, nextObjectId: 1,
+          players, items: [], projectiles: [], covers: [], lures: [], particles: [],
+          winner: "", shake: 0, survivalKills: 0, nextSurvivalProfessionId: 5,
+          loadouts: { p1: emptyLoadout() }, stakes: {}
+        };
+        camera = { x: firstPlayer.x, y: firstPlayer.y };
+        if (config.type === "teams") {
+          $("gameStatus").textContent = `${config.teamSize}v${config.teamSize} · ${["", "菜鸟", "普通", "高手", "困难", "噩梦"][config.difficulty]} · 大战场`;
+        } else if (config.type === "brawl") {
+          $("gameStatus").textContent = `大混战 · ${config.enemyCount} 名敌人 · 大战场`;
+        } else {
+          $("gameStatus").textContent = "生存赛 · 敌人将持续刷新";
+        }
+        $("shopButton").disabled = true;
+        $("overlay").hidden = true;
+        updateNames();
+        for (let index = 0; index < 22; index++) spawnItem();
+      }
+
+      function makeLargeOnlineGame(roster, host) {
+        configureArena(8, true);
+        mode = "online";
+        const players = roster.map((profile, index) => {
+          const angle = Math.PI * 2 * index / roster.length;
+          const player = makePlayer(
+            `p${index + 1}`, profile.name || "联机玩家",
+            W / 2 + Math.cos(angle) * W * .28,
+            ["#78f0cf", "#ff88ad", "#f0a15e", "#c79cff", "#e7d36b"][index % 5],
+            "human", profile.cosmetic || ""
+          );
+          player.y = clamp(H / 2 + Math.sin(angle) * H * .28, 90, H - 90);
+          player.spawnX = player.x;
+          player.spawnY = player.y;
+          player.team = index % 2;
+          player.peerId = profile.peerId;
+          player.profession = validProfession(profile.profession);
+          if (player.profession === "zombie") player.revivesLeft = 2;
+          applyProfessionHealth(player);
+          return player;
+        });
+        state = {
+          id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+          mode: "online", gameType: "largeOnline", bigOnline: true,
+          running: true, elapsed: 0, spawnTimer: .7, itemSpawnTimer: .7, nextObjectId: 1,
+          players, items: [], projectiles: [], covers: [], lures: [], particles: [],
+          arenaTerrain: terrain.map(rect => ({ ...rect })),
+          winner: "", shake: 0, loadouts: {}, stakes: {}, host, localPlayerId: host ? "p1" : ""
+        };
+        if (host) {
+          state.localPlayerId = players[0].id;
+          onlineRoster = roster;
+          opponentId = roster.find(profile => profile.peerId !== peerId).peerId;
+          const snapshot = serializableState();
+          roster.slice(1).forEach(profile => publishDirect(profile.peerId, {
+            type: "bigStart", hostId: peerId, roster, state: snapshot
+          }));
+        } else {
+          state.localPlayerId = players.find(player => player.peerId === peerId).id;
+        }
+        camera = { x: players.find(player => player.id === state.localPlayerId).x,
+          y: players.find(player => player.id === state.localPlayerId).y };
+        $("gameStatus").textContent = `大战场联机 · ${roster.length} 名玩家`;
+        $("shopButton").disabled = true;
+        $("overlay").hidden = true;
+        updateNames();
+        for (let index = 0; index < 22; index++) spawnItem();
+      }
+
+      function updateNames() {
+        if (!state) return;
+        const [first, second] = hudPlayers();
+        $("p1Name").textContent = first.name;
+        $("p2Name").textContent = second.name;
+        $("p1Health").style.width = `${Math.max(0, first.hp / first.maxHp * 100)}%`;
+        $("p2Health").style.width = `${Math.max(0, second.hp / second.maxHp * 100)}%`;
+      }
+      function hudPlayers() {
+        if ((mode === "large" || state.bigOnline) && state.players.length > 1) {
+          const local = mode === "online" ? controlledPlayer() : state.players[0];
+          const opponent = state.players.find(player => isEnemy(local, player)) ||
+            state.players.find(player => player !== local);
+          return [local, opponent];
+        }
+        return [state.players[0], state.players[1]];
+        [0, 1].forEach(index => {
+          const player = state.players[index], prefix = index === 0 ? "p1" : "p2";
+          $(`${prefix}ShieldWrap`).hidden = player.equipment.maxShield <= 0;
+          $(`${prefix}Shield`).style.width = `${player.equipment.maxShield ? player.equipment.shield / player.equipment.maxShield * 100 : 0}%`;
+        });
+      }
+
+      function configureArena(scale, randomObstacles) {
+        arenaScale = scale;
+        W = VIEW_W * scale;
+        H = VIEW_H * scale;
+        pointerTarget = null;
+        const baseTerrain = [
+          { x: 276, y: 167, w: 60, h: 44 }, { x: 614, y: 328, w: 65, h: 48 },
+          { x: 457, y: 95, w: 47, h: 34 }, { x: 442, y: 405, w: 55, h: 38 }
+        ];
+        terrain = randomObstacles ? [] : baseTerrain.map(rect => ({
+          x: rect.x * scale, y: rect.y * scale, w: rect.w * scale, h: rect.h * scale
+        }));
+        if (randomObstacles) {
+          for (let index = 0; index < 240; index++) {
+            const rect = { x: rand(100, W - 280), y: rand(100, H - 200), w: rand(78, 230), h: rand(46, 145) };
+            const startClearance = Math.min(
+              Math.hypot(rect.x + rect.w / 2 - W * .12, rect.y + rect.h / 2 - H / 2),
+              Math.hypot(rect.x + rect.w / 2 - W * .88, rect.y + rect.h / 2 - H / 2)
+            );
+            if (startClearance > 440) terrain.push(rect);
+          }
+        }
+        terrain.forEach(rect => { rect.hitsLeft = 10; });
+        navGrid.step = scale >= 8 ? 72 : 40;
+        navGrid.cols = Math.floor((W - 136) / navGrid.step) + 1;
+        navGrid.rows = Math.floor((H - 136) / navGrid.step) + 1;
+        camera = { x: W / 2, y: H / 2 };
+      }
+
+      function renderLargeProfessionOptions() {
+        const select = $("largeProfession");
+        select.replaceChildren();
+        const none = document.createElement("option");
+        none.value = "";
+        none.textContent = "无职业";
+        select.appendChild(none);
+        Object.entries(professionSpecs).forEach(([id, profession]) => {
+          if (!unlockedProfessions.has(id)) return;
+          const option = document.createElement("option");
+          option.value = id;
+          option.textContent = profession.name;
+          select.appendChild(option);
+        });
+        if (unlockedProfessions.has(selectedProfession)) select.value = selectedProfession;
+      }
+
+      function configuredAIProfession(config, key) {
+        const selected = config.aiProfessions && config.aiProfessions[key];
+        if (selected === "none") return "";
+        if (selected && selected !== "random") return validProfession(selected);
+        return randomProfession();
+      }
+
+      function largeAIAssignmentSlots() {
+        const type = $("largeType").value;
+        if (type === "teams") {
+          const teamSize = Number($("largeTeamSize").value);
+          return [
+            ...Array.from({ length: Math.max(0, teamSize - 1) }, (_, index) => ({
+              key: `ally-${index + 1}`, label: `队友 ${index + 2}`
+            })),
+            ...Array.from({ length: teamSize }, (_, index) => ({
+              key: `enemy-${index}`, label: `敌方 ${index + 1}`
+            }))
+          ];
+        }
+        const count = type === "brawl" ? Number($("largeEnemyCount").value) : type === "survival" ? 5 : 0;
+        return Array.from({ length: count }, (_, index) => ({
+          key: `enemy-${index}`, label: type === "survival" ? `初始敌人 ${index + 1}` : `对手 ${index + 1}`
+        }));
+      }
+
+      function renderLargeProfessionAssignments() {
+        const list = $("largeProfessionAssignments");
+        list.replaceChildren();
+        if (!largeConfig) return;
+        largeConfig.aiProfessions = largeConfig.aiProfessions || {};
+        largeAIAssignmentSlots().forEach(slot => {
+          const row = document.createElement("label");
+          row.className = "large-profession-row";
+          const title = document.createElement("span");
+          title.textContent = slot.label;
+          const select = document.createElement("select");
+          select.dataset.professionSlot = slot.key;
+          [["random", "随机"], ["none", "无职业"], ...Object.entries(professionSpecs)]
+            .forEach(([value, entry]) => {
+              const option = document.createElement("option");
+              option.value = value;
+              option.textContent = typeof entry === "string" ? entry : entry.name;
+              select.appendChild(option);
+            });
+          select.value = largeConfig.aiProfessions[slot.key] || "random";
+          select.addEventListener("change", () => { largeConfig.aiProfessions[slot.key] = select.value; });
+          row.append(title, select);
+          list.appendChild(row);
+        });
+      }
+
+      function showLargeSetup() {
+        readProfile();
+        largeConfig = { type: "teams", teamSize: 3, enemyCount: 5, difficulty: 2, onlineCount: 2, aiProfessions: {} };
+        $("overlayTitle").textContent = "大战场设置";
+        $("overlayCopy").textContent = "地图为普通战场的 4 倍，障碍物随机生成。选择玩法和人数。";
+        $("overlayIcon").textContent = "🗺️";
+        $("modeList").hidden = true;
+        $("difficultyPanel").hidden = true;
+        $("setupPanel").hidden = true;
+        $("largePanel").hidden = false;
+        $("shopPanel").hidden = true;
+        $("overlayAction").hidden = true;
+        $("largeType").value = "teams";
+        $("largeStatus").textContent = "";
+        $("largeProfessionPanel").hidden = true;
+        $("largeProfessionToggle").setAttribute("aria-expanded", "false");
+        renderLargeProfessionOptions();
+        updateLargeSetupFields();
+        renderLargeProfessionAssignments();
+        updateLargeRewardNote();
+        $("overlay").hidden = false;
+      }
+
+      function updateLargeSetupFields() {
+        const type = $("largeType").value;
+        $("largeTeamSetting").hidden = type !== "teams";
+        $("largeEnemySetting").hidden = type !== "brawl";
+        $("largeOnlineSetting").hidden = type !== "online";
+        $("largeDifficultySetting").hidden = type === "online";
+        $("largeProfessionTools").hidden = type === "online";
+        if (type === "online") {
+          $("largeProfessionPanel").hidden = true;
+          $("largeProfessionToggle").setAttribute("aria-expanded", "false");
+        }
+      }
+
+      function updateLargeRewardNote() {
+        const type = $("largeType").value;
+        const teamSize = Number($("largeTeamSize").value);
+        const enemyCount = Number($("largeEnemyCount").value);
+        const note = type === "teams"
+          ? `积分奖励：获胜队伍每人 +${teamSize === 3 ? 15 : teamSize === 5 ? 25 : 40} 分。`
+          : type === "brawl" ? `积分奖励：大混战冠军 +${12 + Math.floor(enemyCount / 2)} 分。`
+            : type === "survival" ? "积分奖励：每生存 15 秒 +1 分、每击败 3 名敌人 +1 分，单局上限 40 分。"
+              : "积分奖励：联机大战场胜方每人 +15 分。";
+        $("largeRewardNote").textContent = note;
+      }
+
+      function refreshLargeSetup() {
+        updateLargeSetupFields();
+        renderLargeProfessionAssignments();
+        updateLargeRewardNote();
+      }
+
+      function controlledPlayer() {
+        if (!state) return null;
+        const id = mode === "online" ? state.localPlayerId || (state.host ? "p1" : "p2") : "p1";
+        return state.players.find(player => player.id === id) || state.players[0];
+      }
+
+      function showMenu(title = "准备好开战了吗？", copy = "收集场地道具并击败对手。生命值归零时战斗结束。") {
+        overlayState = "menu";
+        setupMode = "";
+        $("overlayTitle").textContent = title;
+        $("overlayCopy").textContent = copy;
+        $("overlayIcon").textContent = "🐾";
+        $("modeList").hidden = false;
+        $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
+        $("setupPanel").hidden = true;
+        $("shopPanel").hidden = true;
+        $("overlayAction").hidden = true;
+        $("overlayStatus").textContent = "";
+        $("overlay").hidden = false;
+        $("shopButton").disabled = false;
+      }
+
+      function showDifficulty() {
+        $("overlayTitle").textContent = "选择训练难度";
+        $("overlayCopy").textContent = "不同难度会改变训练对手的战术、装备和生命值。";
+        $("overlayIcon").textContent = "🤖";
+        $("modeList").hidden = true;
+        $("difficultyPanel").hidden = false;
+        $("largePanel").hidden = true;
+        $("setupPanel").hidden = true;
+        $("shopPanel").hidden = true;
+        $("overlayAction").hidden = true;
+        $("overlayStatus").textContent = "";
+        $("overlay").hidden = false;
+      }
+
+      function showWaiting(message) {
+        overlayState = "waiting";
+        $("overlayTitle").textContent = "正在寻找对手…";
+        $("overlayCopy").textContent = "保持页面打开。匹配到另一位玩家后会自动开始。";
+        $("overlayIcon").textContent = "🌐";
+        $("modeList").hidden = true;
+        $("difficultyPanel").hidden = true;
+        $("largePanel").hidden = true;
+        $("setupPanel").hidden = true;
+        $("shopPanel").hidden = true;
+        $("overlayAction").hidden = false;
+        $("overlayAction").textContent = "取消匹配";
+        $("overlayStatus").textContent = message;
+        $("overlay").hidden = false;
+        $("shopButton").disabled = true;
+      }
+
+      function showResult(winner, message = "") {
+        if (!state || !state.running) return;
+        state.running = false;
+        state.winner = winner ? winner.id : "";
+        overlayState = "result";
+        const localSide = mode === "online" ? state.localPlayerId || (state.host ? "p1" : "p2") : "p1";
+        const localWinner = winner && (mode === "ai" ? winner.id === "p1" :
+          mode === "large" ? winner.team === 0 :
+          mode === "online" ? state.bigOnline
+            ? winner.team === (state.players.find(player => player.id === localSide) || {}).team
+            : winner.id === localSide : true);
+        const rewardText = settleMatch(winner, Boolean(localWinner));
+        const heading = winner ? `${winner.name} 获胜！` : "平局";
+        resultMessage = `${message || heading}${rewardText ? ` ${rewardText}` : ""}`;
+        $("overlayIcon").textContent = winner ? "🏆" : "🤝";
+        $("overlayTitle").textContent = heading;
+        $("overlayCopy").textContent = resultMessage;
+        $("modeList").hidden = true;
+        $("difficultyPanel").hidden = true;
+        $("overlayAction").hidden = false;
+        $("overlayAction").textContent = "返回模式菜单";
+        $("overlayStatus").textContent = "";
+        $("overlay").hidden = false;
+        $("shopButton").disabled = false;
+        $("gameStatus").textContent = resultMessage;
+        if (mode === "online" && state.host) broadcast({ type: "finish", winner: state.winner, winnerName: winner ? winner.name : "" });
+      }
+
+      function rand(min, max) { return min + Math.random() * (max - min); }
+      function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+      function distance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+      function itemAt(x, y) {
+        return state.items.find(item => Math.hypot(item.x - x, item.y - y) < 27);
+      }
+      function isEnemy(first, second) {
+        const teamsEnabled = mode === "large" || Boolean(state && state.bigOnline);
+        return first !== second && (!teamsEnabled || first.team !== second.team);
+      }
+      function enemiesFor(player) {
+        return state.players.filter(other => other.hp > 0 && isEnemy(player, other));
+      }
+      function deployDroneFood(player) {
+        const drone = player.pets.find(pet => pet.type === "drone" && pet.alive && pet.foodAvailable);
+        if (!drone) return false;
+        drone.foodAvailable = false;
+        drone.foodDropped = true;
+        state.lures.push({
+          id: state.nextObjectId++, owner: player.id, drone: true, droneId: drone.id,
+          x: drone.x, y: drone.y, life: 2, phase: 0
+        });
+        addParticles(drone.x, drone.y, "#ffbf80", 10);
+        return true;
+      }
+      function throwPearl(player) {
+        if (!player.equipment.pearlAvailable) return false;
+        const dx = Math.cos(player.aim), dy = Math.sin(player.aim);
+        state.projectiles.push({
+          id: state.nextObjectId++, kind: "pearl", owner: player.id,
+          x: player.x + dx * 22, y: player.y + dy * 22,
+          vx: dx * 340, vy: dy * 340, age: 0
+        });
+        player.equipment.pearlAvailable = false;
+        player.equipment.pearlUsed = true;
+        return true;
+      }
+      function landPearl(projectile) {
+        const owner = state.players.find(player => player.id === projectile.owner);
+        if (!owner) return;
+        let landing = null;
+        for (let radius = 0; radius <= 112 && !landing; radius += 14) {
+          for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+            const x = projectile.x + Math.cos(angle) * radius;
+            const y = projectile.y + Math.sin(angle) * radius;
+            if (safePosition(x, y, 22)) { landing = { x, y }; break; }
+          }
+        }
+        if (landing) {
+          owner.x = landing.x;
+          owner.y = landing.y;
+          owner.invulnerable = .2;
+        }
+        addParticles(projectile.x, projectile.y, "#8bd5ff", 18);
+        state.projectiles = state.projectiles.filter(item => item !== projectile);
+      }
+      function activateAbility(playerId, ability) {
+        if (!state || !state.running) return;
+        if (mode === "online" && !state.host && state.bigOnline) {
+          publishDirect(opponentId, { type: "action", playerId, ability });
+          return;
+        }
+        if (mode === "online" && !state.host && playerId === "p2") {
+          publishDirect(opponentId, { type: "action", playerId, ability });
+          return;
+        }
+        const player = state.players.find(item => item.id === playerId);
+        if (!player) return;
+        if (ability === "drone") deployDroneFood(player);
+        else if (ability === "pearl") throwPearl(player);
+      }
+      function safePosition(x, y, radius = 23) {
+        return x > 45 + radius && x < W - 45 - radius && y > 48 + radius && y < H - 48 - radius &&
+          !terrain.some(rect => x + radius > rect.x && x - radius < rect.x + rect.w && y + radius > rect.y && y - radius < rect.y + rect.h) &&
+          !state.covers.some(rect => x + radius > rect.x && x - radius < rect.x + rect.w && y + radius > rect.y && y - radius < rect.y + rect.h);
+      }
+      function spawnItem() {
+        if (state.items.length >= (largeConfig ? 80 : 8)) return;
+        const types = Object.keys(itemInfo);
+        const nearbyPlayers = largeConfig ? state.players.filter(player => player.hp > 0) : [];
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const nearby = nearbyPlayers.length
+            ? nearbyPlayers[Math.floor(Math.random() * nearbyPlayers.length)]
+            : null;
+          const x = nearby
+            ? clamp(nearby.x + rand(-VIEW_W, VIEW_W), 100, W - 100)
+            : rand(100, W - 100);
+          const y = nearby
+            ? clamp(nearby.y + rand(-VIEW_H, VIEW_H), 100, H - 100)
+            : rand(100, H - 100);
+          if (safePosition(x, y, 34) && !state.items.some(item => Math.hypot(item.x - x, item.y - y) < 75)) {
+            const type = types[Math.floor(Math.random() * types.length)];
+            state.items.push({ id: state.nextObjectId++, type, x, y, phase: rand(0, 6), born: state.elapsed });
+            addParticles(x, y, itemInfo[type].color, 12);
+            return;
+          }
+        }
+      }
+      function itemAmmo(type) { return ({ grenade: 1, pistol: 3, shotgun: 3, rifle: 5, cover: 1, food: 1, medkit: 1 })[type] || 1; }
+      function isFirearm(type) { return ["pistol", "shotgun", "rifle"].includes(type); }
+      function damageMultiplier(player, type) {
+        if (type === "melee") {
+          return 1 + (player.profession === "giant" ? .1 : 0) +
+            (player.profession === "gremlin" && player.glassesBroken ? .05 : 0);
+        }
+        if (type === "grenade" && player.profession === "soldier") return 1.1;
+        if (isFirearm(type)) {
+          return 1 + (player.profession === "soldier" ? .1 : 0) +
+            (["hunter", "zookeeper"].includes(player.profession) ? .05 : 0);
+        }
+        return 1;
+      }
+      function summonPet(player, type, options = {}) {
+        const stats = type === "kitten"
+          ? { maxHp: 50, speed: 180, damage: 8 }
+          : { maxHp: petSpecs[type].maxHp, speed: petSpecs[type].speed, damage: type === "dog" ? 14.4 : 0 };
+        const side = player.id === "p1" ? 1 : -1;
+        player.pets.push({
+          id: `${player.id}-summon-${state.nextObjectId++}`, owner: player.id, type,
+          isPet: true, summoned: true, x: player.x + side * (34 + (options.index || 0) * 28),
+          y: player.y + 38 + (options.index || 0) * 22,
+          hp: stats.maxHp, maxHp: stats.maxHp, alive: true,
+          speed: stats.speed, color: player.color, damage: stats.damage, cooldown: 0,
+          phase: rand(0, Math.PI * 2), age: 0, lifetime: options.lifetime || 0,
+          navPath: [], navIndex: 0, navKey: "", navTimer: 0, navPoint: null, stuckFor: 0,
+          input: { x: 0, y: 0 }, foodAvailable: type === "drone", selfDestruct: false,
+          ammo: type === "kitten" && options.armed ? 15 : 0, poisonTimer: 0, poisonTick: 0
+        });
+      }
+      function summonHunterDog(player) {
+        if (player.pets.some(pet => pet.summoned && pet.alive)) return false;
+        summonPet(player, "dog", { lifetime: 10 });
+        return true;
+      }
+      function syncPetRoster(player) {
+        if (mode === "online" && state.host) {
+          broadcast({ type: "petRoster", playerId: player.id, pets: player.pets });
+        }
+      }
+      function displayCard(value) {
+        return value === 1 ? "A" : value === 11 ? "J" : value === 12 ? "Q" :
+          value === 13 ? "K" : value === 14 ? "JOKER" : String(value);
+      }
+      function fireCard(player, value, damage, angleOffset = 0) {
+        const angle = player.aim + angleOffset;
+        state.projectiles.push({
+          id: state.nextObjectId++, kind: "card", owner: player.id,
+          x: player.x + Math.cos(angle) * 25, y: player.y + Math.sin(angle) * 25,
+          vx: Math.cos(angle) * 600, vy: Math.sin(angle) * 600,
+          life: 1.25, damage, value
+        });
+      }
+      function useCardSkill(player) {
+        const deck = [];
+        for (let value = 1; value <= 13; value++) {
+          for (let suit = 0; suit < 4; suit++) deck.push(value);
+        }
+        deck.push(14, 14);
+        for (let index = deck.length - 1; index > 0; index--) {
+          const swap = Math.floor(Math.random() * (index + 1));
+          [deck[index], deck[swap]] = [deck[swap], deck[index]];
+        }
+        const hand = deck.slice(0, 4);
+        const sorted = [...hand].sort((a, b) => a - b);
+        const counts = new Map();
+        hand.forEach(value => counts.set(value, (counts.get(value) || 0) + 1));
+        const jokerBonus = hand.includes(1) && hand.includes(14) ? 10 : 1;
+        const uniqueCounts = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+        const fourKind = uniqueCounts.find(([, count]) => count === 4);
+        const threeKind = uniqueCounts.find(([, count]) => count === 3);
+        const runValues = [];
+        let currentRun = [];
+        [...new Set(sorted)].forEach(value => {
+          currentRun = currentRun.length && value === currentRun[currentRun.length - 1] + 1
+            ? [...currentRun, value] : [value];
+          if (currentRun.length >= 3 &&
+              (currentRun.length > runValues.length ||
+               currentRun.length === runValues.length && currentRun.reduce((sum, card) => sum + card, 0) >
+                 runValues.reduce((sum, card) => sum + card, 0))) {
+            runValues.splice(0, runValues.length, ...currentRun);
+          }
+        });
+        const run = runValues.length ? runValues : null;
+        const maxCard = sorted[sorted.length - 1];
+        const pair = uniqueCounts.find(([value, count]) => count === 2 && value * 2 > maxCard);
+        if (fourKind) {
+          fireCard(player, fourKind[0], fourKind[0] * 4 * 8 * jokerBonus);
+        } else if (threeKind) {
+          fireCard(player, threeKind[0], threeKind[0] * 3 * 3 * jokerBonus);
+        } else if (run) {
+          fireCard(player, run[2], run.reduce((sum, value) => sum + value, 0) * 5 * jokerBonus);
+        } else if (pair) {
+          fireCard(player, pair[0], pair[0] * jokerBonus, -.04);
+          fireCard(player, pair[0], pair[0] * jokerBonus, .04);
+        } else {
+          fireCard(player, maxCard, maxCard * jokerBonus);
+        }
+        player.lastHand = hand.map(displayCard);
+        player.lastHandTimer = 4;
+        addParticles(player.x, player.y, "#e5c25e", 12);
+      }
+      function activateProfessionSkill(playerId) {
+        if (!state || !state.running || !["ai", "online", "large"].includes(mode)) return;
+        if (mode === "online" && !state.host && state.bigOnline) {
+          publishDirect(opponentId, { type: "action", playerId, ability: "profession" });
+          return;
+        }
+        if (mode === "online" && !state.host && playerId === "p2") {
+          publishDirect(opponentId, { type: "action", playerId, ability: "profession" });
+          return;
+        }
+        const player = state.players.find(item => item.id === playerId);
+        if (!player || player.professionCooldown > 0) return;
+        const petCount = player.pets.length;
+        if (player.profession === "miner") {
+          if (player.underground) {
+            player.underground = false;
+            player.undergroundTimer = 0;
+            player.professionCooldown = 25;
+            player.invulnerable = .35;
+          } else if (player.professionCooldown <= 0) {
+            player.underground = true;
+            player.undergroundTimer = 12;
+            player.lightningHits = [];
+          }
+        } else if (player.profession === "lightning") {
+          player.lightningDash = 5;
+          player.lightningDirection = player.aim;
+          player.lightningHits = [];
+          player.professionCooldown = 20;
+        } else if (player.profession === "soldier") {
+          player.skillWeapon = Math.random() < .5 ? "grenade" : "shotgun";
+          player.professionCooldown = 20;
+        } else if (player.profession === "hunter" && summonHunterDog(player)) {
+          player.professionCooldown = 15;
+        } else if (player.profession === "zookeeper") {
+          summonPet(player, "kitten", { armed: true });
+          summonPet(player, "dog", { index: 1 });
+          player.professionCooldown = 20;
+        } else if (player.profession === "commander") {
+          for (let index = 0; index < 3; index++) summonPet(player, "kitten", { index });
+          player.professionCooldown = 25;
+        } else if (player.profession === "chef") {
+          summonPet(player, "drone");
+          summonPet(player, "drone", { index: 1 });
+          player.professionCooldown = 20;
+        } else if (player.profession === "cardmaster") {
+          useCardSkill(player);
+          player.professionCooldown = 15;
+        }
+        if (player.pets.length > petCount) syncPetRoster(player);
+      }
+      function applyPoison(target) {
+        if (!(target.poisonTimer > 0)) addParticles(target.x, target.y, "#80b85d", 8);
+        target.poisonTimer = 3;
+        target.poisonTick = 0;
+      }
+      function updatePoison(target, dt) {
+        if (!(target.poisonTimer > 0)) return;
+        const activeTime = Math.min(dt, target.poisonTimer);
+        target.poisonTimer = Math.max(0, target.poisonTimer - dt);
+        target.poisonTick += activeTime;
+        while (target.poisonTick >= 1) {
+          target.poisonTick -= 1;
+          applyDamage(target, 2);
+        }
+        if (target.poisonTimer <= 0) target.poisonTick = 0;
+      }
+      function updateProfession(player, dt) {
+        player.professionCooldown = Math.max(0, player.professionCooldown - dt);
+        player.stunned = Math.max(0, player.stunned - dt);
+        player.lastHandTimer = Math.max(0, player.lastHandTimer - dt);
+        updatePoison(player, dt);
+        if (player.underground) {
+          player.undergroundTimer -= dt;
+          if (player.undergroundTimer <= 0) {
+            player.underground = false;
+            player.professionCooldown = 25;
+            player.invulnerable = .35;
+          }
+        }
+        player.lightningDash = Math.max(0, player.lightningDash - dt);
+        if (player.profession === "gremlin" && player.hp / player.maxHp < .3) player.glassesBroken = true;
+        if (player.profession === "wizard" && player.hp < player.maxHp * .2) player.professionRegenActive = true;
+        if (player.professionRegenActive && player.hp < player.maxHp * .5) {
+          player.professionRegenTimer += dt;
+          if (player.professionRegenTimer >= 1) {
+            player.hp = Math.min(player.maxHp * .5, player.hp + player.maxHp * .02);
+            player.professionRegenTimer -= 1;
+          }
+          if (player.hp >= player.maxHp * .5) player.professionRegenActive = false;
+        } else {
+          player.professionRegenTimer = 0;
+          player.professionRegenActive = false;
+        }
+        const enemy = enemiesFor(player).sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const hasGun = isFirearm(player.held) || player.held === "grenade";
+        if (player.profession === "wizard" && !hasGun && player.professionCooldown <= 0 &&
+            player.stunned <= 0 && enemy) {
+          const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+          state.projectiles.push({
+            id: state.nextObjectId++, kind: "spell", owner: player.id,
+            x: player.x + Math.cos(angle) * 24, y: player.y + Math.sin(angle) * 24,
+            vx: Math.cos(angle) * 520, vy: Math.sin(angle) * 520,
+            life: 1.05, damage: 6, stun: .5
+          });
+          player.professionCooldown = 4;
+        }
+        if (player.kind === "ai" && enemy && player.professionCooldown <= 0) {
+          const range = distance(player, enemy);
+          if (player.profession === "soldier" && !player.skillWeapon && range < 390) activateProfessionSkill(player.id);
+          else if (player.profession === "hunter" && !player.pets.some(pet => pet.summoned && pet.alive)) activateProfessionSkill(player.id);
+          else if (player.profession === "zookeeper" && range < 420) activateProfessionSkill(player.id);
+          else if (player.profession === "commander" && range < 500) activateProfessionSkill(player.id);
+          else if (player.profession === "chef" && range < 420) activateProfessionSkill(player.id);
+          else if (["cardmaster", "lightning"].includes(player.profession) && range < 560) activateProfessionSkill(player.id);
+          else if (player.profession === "miner" && range < 280 && !player.underground) activateProfessionSkill(player.id);
+        }
+      }
+      function useItem(player) {
+        if (!state || !state.running) return;
+        if (player.underground && player.held !== "grenade") return;
+        if (player.skillWeapon && player.input.pulse && player.attackCooldown <= 0) {
+          const held = player.held, ammo = player.ammo, skillWeapon = player.skillWeapon;
+          player.skillWeapon = "";
+          player.held = skillWeapon;
+          player.ammo = 1;
+          useItem(player);
+          player.held = held;
+          player.ammo = ammo;
+          return;
+        }
+        const target = enemiesFor(player).sort((a, b) => distance(player, a) - distance(player, b))[0];
+        if (!player.held || player.ammo <= 0) {
+          if (player.profession === "wizard") return;
+          const targets = player.kind === "ai"
+            ? enemiesFor(player).flatMap(enemy => [enemy, ...enemy.pets.filter(pet => pet.alive && pet.type !== "elephant")])
+            : target ? [target] : [];
+          const meleeTarget = targets
+            .filter(candidate => {
+              const d = distance(player, candidate);
+              const meleeRange = player.profession === "cyborg" ? 144 : 72;
+              return d < meleeRange &&
+                Math.cos(player.aim) * (candidate.x - player.x) / Math.max(1, d) +
+                Math.sin(player.aim) * (candidate.y - player.y) / Math.max(1, d) > .15;
+            })
+            .sort((a, b) => distance(player, a) - distance(player, b))[0];
+          if (player.meleeCooldown <= 0 && meleeTarget) {
+            const previousHp = meleeTarget.hp;
+            applyDamage(meleeTarget, 11 * damageMultiplier(player, "melee"));
+            const dealt = Math.max(0, previousHp - meleeTarget.hp);
+            if (player.profession === "cyborg") player.hp = Math.min(player.maxHp, player.hp + dealt * .35);
+            if (player.profession === "zombie") applyPoison(meleeTarget);
+            if (player.profession === "kungfu") {
+              player.meleeHits++;
+              if (player.meleeHits >= 4) {
+                player.meleeHits = 0;
+                const opponent = meleeTarget.isPet ? enemiesFor(player)
+                  .sort((a, b) => distance(player, a) - distance(player, b))[0] : meleeTarget;
+                if (opponent) opponent.stunned = Math.max(opponent.stunned, 2);
+              }
+            }
+            player.meleeCooldown = .52;
+            player.recoil = .22;
+            addParticles(meleeTarget.x, meleeTarget.y, player.color, 9);
+            if (!meleeTarget.isPet && meleeTarget.hp <= 0 && mode !== "large" &&
+                !(meleeTarget.profession === "zombie" && meleeTarget.revivesLeft > 0)) showResult(player);
+          } else if (player.profession === "miner" && player.meleeCooldown <= 0) {
+            const facingX = Math.cos(player.aim), facingY = Math.sin(player.aim);
+            const obstacle = terrain.map(rect => {
+              const nearestX = clamp(player.x, rect.x, rect.x + rect.w);
+              const nearestY = clamp(player.y, rect.y, rect.y + rect.h);
+              const dx = nearestX - player.x, dy = nearestY - player.y;
+              return { rect, distance: Math.hypot(dx, dy), direction: dx * facingX + dy * facingY };
+            }).filter(entry => entry.rect.hitsLeft > 0 && entry.distance < 64 && entry.direction >= -5)
+              .sort((a, b) => a.distance - b.distance)[0];
+            if (obstacle) {
+              obstacle.rect.hitsLeft--;
+              player.meleeCooldown = .52;
+              addParticles(player.x + facingX * 28, player.y + facingY * 28,
+                obstacle.rect.hitsLeft ? "#aab6a2" : "#c59668", obstacle.rect.hitsLeft ? 4 : 16);
+              if (!obstacle.rect.hitsLeft) terrain = terrain.filter(rect => rect !== obstacle.rect);
+            }
+          }
+          return;
+        }
+        const type = player.held;
+        if (type === "medkit") return;
+        if (type === "rifle" && player.attackCooldown > 0) return;
+        if (type !== "rifle" && player.attackCooldown > 0) return;
+        const dx = Math.cos(player.aim), dy = Math.sin(player.aim);
+        if (type === "grenade") {
+          state.projectiles.push({ id: state.nextObjectId++, kind: "grenade", owner: player.id, x: player.x + dx * 23, y: player.y + dy * 23, vx: dx * 280, vy: dy * 280, fuse: -1, age: 0 });
+          player.ammo = 0;
+        } else if (type === "cover") {
+          const x = player.x + dx * 67, y = player.y + dy * 67;
+          const cover = { id: state.nextObjectId++, x: x - (Math.abs(dx) > Math.abs(dy) ? 11 : 32), y: y - (Math.abs(dx) > Math.abs(dy) ? 32 : 11), w: Math.abs(dx) > Math.abs(dy) ? 22 : 64, h: Math.abs(dx) > Math.abs(dy) ? 64 : 22, life: 12 };
+          if (safePosition(x, y, 12)) state.covers.push(cover);
+          player.ammo = 0;
+          addParticles(x, y, "#c5a5ff", 14);
+        } else if (type === "food") {
+          state.lures.push({ id: state.nextObjectId++, owner: player.id, x: player.x + dx * 52, y: player.y + dy * 52, life: 6, phase: 0 });
+          player.ammo = 0;
+          addParticles(player.x + dx * 52, player.y + dy * 52, "#ffbf80", 10);
+        } else {
+          const count = type === "shotgun" ? 5 : 1;
+          const spread = type === "shotgun" ? .26 : type === "rifle" ? .025 : 0;
+          for (let i = 0; i < count; i++) {
+            const angle = player.aim + (count === 1 ? rand(-spread, spread) : (i - 2) * spread);
+            const speed = type === "shotgun" ? 550 : type === "rifle" ? 720 : 640;
+            state.projectiles.push({
+              id: state.nextObjectId++, kind: "bullet", owner: player.id, x: player.x + dx * 24, y: player.y + dy * 24,
+              vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: type === "shotgun" ? .68 : 1.1,
+              damage: (type === "shotgun" ? 8 : type === "rifle" ? 15 : type === "pistol" ? 22 : 16) *
+                damageMultiplier(player, type)
+            });
+          }
+          player.ammo--;
+        }
+        player.attackCooldown = type === "rifle" ? .16 : type === "shotgun" ? .44 : type === "pistol" ? .32 : .28;
+        player.recoil = .18;
+        if (player.ammo <= 0 && player.held !== "medkit") player.held = "";
+        addParticles(player.x + dx * 24, player.y + dy * 24, player.color, 4);
+      }
+
+      function addParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+          const angle = Math.random() * Math.PI * 2, speed = rand(30, 180);
+          state.particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: rand(.22, .65), max: .65, color, size: rand(2, 5) });
+        }
+      }
+      function applyDamage(target, amount) {
+        if (!target || amount <= 0) return;
+        if (target.underground) return;
+        if (target.isPet) {
+          if (!target.alive) return;
+          target.hp = Math.max(0, target.hp - amount);
+          if (target.hp <= 0) {
+            target.alive = false;
+            addParticles(target.x, target.y, target.color || "#d4d8dc", 18);
+          }
+          return;
+        }
+        const equipment = target.equipment;
+        if (equipment && equipment.maxShield > 0) {
+          equipment.shieldHitAt = state.elapsed;
+          const absorbed = Math.min(equipment.shield, amount);
+          equipment.shield -= absorbed;
+          amount -= absorbed;
+        }
+        if (amount > 0) target.hp = Math.max(0, target.hp - amount);
+        target.invulnerable = .12;
+      }
+      function hitCover(x, y) {
+        return terrain.some(rect => x > rect.x && x < rect.x + rect.w && y > rect.y && y < rect.y + rect.h) ||
+          state.covers.some(rect => x > rect.x && x < rect.x + rect.w && y > rect.y && y < rect.y + rect.h);
+      }
+      function explode(projectile) {
+        const owner = state.players.find(player => player.id === projectile.owner);
+        const damageScale = damageMultiplier(owner || {}, "grenade");
+        addParticles(projectile.x, projectile.y, "#ffbd68", 30);
+        state.shake = .24;
+        state.players.forEach(player => {
+          if (owner && (mode === "large" || state.bigOnline) && !isEnemy(owner, player)) return;
+          const d = Math.hypot(projectile.x - player.x, projectile.y - player.y);
+          if (d < 118 && !hitCover((projectile.x + player.x) / 2, (projectile.y + player.y) / 2)) {
+            applyDamage(player, Math.round(44 * (1 - d / 150) * damageScale));
+          }
+          player.pets.forEach(pet => {
+            const petDistance = distance(projectile, pet);
+            if (pet.alive && petDistance < 118 &&
+                !hitCover((projectile.x + pet.x) / 2, (projectile.y + pet.y) / 2)) {
+              applyDamage(pet, Math.round(36 * (1 - petDistance / 150) * damageScale));
+            }
+          });
+        });
+        state.projectiles = state.projectiles.filter(item => item !== projectile);
+      }
+      function collisionMove(player, dx, dy) {
+        const radius = 22;
+        if (!(player.equipment && player.equipment.phase)) resolveBlockedPosition(player, radius);
+        const nextX = clamp(player.x + dx, 48 + radius, W - 48 - radius);
+        if (player.equipment && player.equipment.phase || safePosition(nextX, player.y, radius)) player.x = nextX;
+        const nextY = clamp(player.y + dy, 48 + radius, H - 48 - radius);
+        if (player.equipment && player.equipment.phase || safePosition(player.x, nextY, radius)) player.y = nextY;
+        if (!(player.equipment && player.equipment.phase)) resolveBlockedPosition(player, radius);
+      }
+      function resolveBlockedPosition(player, radius) {
+        const bounds = { minX: 48 + radius, maxX: W - 48 - radius, minY: 48 + radius, maxY: H - 48 - radius };
+        for (let attempt = 0; attempt < 8 && !safePosition(player.x, player.y, radius); attempt++) {
+          const candidates = [];
+          for (const rect of [...terrain, ...state.covers]) {
+            if (player.x + radius <= rect.x || player.x - radius >= rect.x + rect.w ||
+                player.y + radius <= rect.y || player.y - radius >= rect.y + rect.h) continue;
+            candidates.push(
+              { x: rect.x - radius - 1, y: player.y },
+              { x: rect.x + rect.w + radius + 1, y: player.y },
+              { x: player.x, y: rect.y - radius - 1 },
+              { x: player.x, y: rect.y + rect.h + radius + 1 }
+            );
+          }
+          const safeCandidates = candidates.map(point => ({
+            x: clamp(point.x, bounds.minX, bounds.maxX),
+            y: clamp(point.y, bounds.minY, bounds.maxY)
+          })).filter(point => safePosition(point.x, point.y, radius));
+          if (!safeCandidates.length) break;
+          safeCandidates.sort((a, b) =>
+            Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y));
+          player.x = safeCandidates[0].x;
+          player.y = safeCandidates[0].y;
+        }
+      }
+      const navGrid = { x: 68, y: 68, step: 40, cols: 45, rows: 25 };
+      function gridPosition(index) {
+        return {
+          x: navGrid.x + index % navGrid.cols * navGrid.step,
+          y: navGrid.y + Math.floor(index / navGrid.cols) * navGrid.step
+        };
+      }
+      function navigationPath(player, target, arriveRadius) {
+        const total = navGrid.cols * navGrid.rows;
+        const walkable = new Uint8Array(total);
+        for (let index = 0; index < total; index++) {
+          const point = gridPosition(index);
+          walkable[index] = safePosition(point.x, point.y, 22) ? 1 : 0;
+        }
+        let start = -1, startDistance = Infinity;
+        for (let index = 0; index < total; index++) {
+          if (!walkable[index]) continue;
+          const point = gridPosition(index), d = Math.hypot(point.x - player.x, point.y - player.y);
+          if (d < startDistance) { start = index; startDistance = d; }
+        }
+        if (start < 0 || startDistance > 50) return [];
+        const goals = new Set();
+        for (let index = 0; index < total; index++) {
+          if (!walkable[index]) continue;
+          const point = gridPosition(index);
+          if (Math.hypot(point.x - target.x, point.y - target.y) <= arriveRadius) goals.add(index);
+        }
+        if (!goals.size) return [];
+        const cost = new Float32Array(total);
+        cost.fill(Infinity);
+        const previous = new Int32Array(total);
+        previous.fill(-1);
+        const open = [start], closed = new Uint8Array(total);
+        cost[start] = 0;
+        let goal = -1;
+        const heuristic = index => {
+          const point = gridPosition(index);
+          return Math.max(0, Math.hypot(point.x - target.x, point.y - target.y) - arriveRadius);
+        };
+        while (open.length) {
+          let bestPosition = 0;
+          for (let i = 1; i < open.length; i++) {
+            const a = open[i], b = open[bestPosition];
+            if (cost[a] + heuristic(a) < cost[b] + heuristic(b)) bestPosition = i;
+          }
+          const current = open.splice(bestPosition, 1)[0];
+          if (closed[current]) continue;
+          if (goals.has(current)) { goal = current; break; }
+          closed[current] = 1;
+          const column = current % navGrid.cols, row = Math.floor(current / navGrid.cols);
+          const neighbors = [];
+          if (column > 0) neighbors.push(current - 1);
+          if (column < navGrid.cols - 1) neighbors.push(current + 1);
+          if (row > 0) neighbors.push(current - navGrid.cols);
+          if (row < navGrid.rows - 1) neighbors.push(current + navGrid.cols);
+          for (const next of neighbors) {
+            if (!walkable[next] || closed[next]) continue;
+            const a = gridPosition(current), b = gridPosition(next);
+            if (!safePosition((a.x + b.x) / 2, (a.y + b.y) / 2, 22)) continue;
+            const nextCost = cost[current] + navGrid.step;
+            if (nextCost >= cost[next]) continue;
+            cost[next] = nextCost;
+            previous[next] = current;
+            open.push(next);
+          }
+        }
+        if (goal < 0) return [];
+        const path = [];
+        for (let index = goal; index !== -1; index = previous[index]) {
+          path.push(gridPosition(index));
+          if (index === start) break;
+        }
+        return path.reverse();
+      }
+      function navigate(player, target, key, arriveRadius, dt) {
+        player.navTimer -= dt;
+        const targetMoved = player.navPoint &&
+          Math.hypot(player.navPoint.x - target.x, player.navPoint.y - target.y) > 42;
+        if (player.navKey !== key || player.navTimer <= 0 || targetMoved) {
+          player.navPath = navigationPath(player, target, arriveRadius);
+          player.navIndex = player.navPath.length > 1 ? 1 : 0;
+          player.navKey = key;
+          player.navPoint = { x: target.x, y: target.y };
+          player.navTimer = .42;
+        }
+        if (distance(player, target) <= arriveRadius) {
+          player.input.x = 0; player.input.y = 0;
+          return;
+        }
+        while (player.navIndex < player.navPath.length - 1 &&
+               Math.hypot(player.navPath[player.navIndex].x - player.x, player.navPath[player.navIndex].y - player.y) < 10) {
+          player.navIndex++;
+        }
+        const waypoint = player.navPath[player.navIndex] || target;
+        const dx = waypoint.x - player.x, dy = waypoint.y - player.y;
+        const length = Math.max(1, Math.hypot(dx, dy));
+        player.input.x = dx / length;
+        player.input.y = dy / length;
+      }
+      function hasLineOfSight(from, to) {
+        const length = distance(from, to);
+        const steps = Math.ceil(length / 10);
+        for (let i = 1; i < steps; i++) {
+          const t = i / steps;
+          if (hitCover(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t)) return false;
+        }
+        return true;
+      }
+      function aiInput(player, dt) {
+        const enemies = enemiesFor(player);
+        const foe = enemies.sort((a, b) => distance(player, a) - distance(player, b))[0];
+        if (!foe) {
+          player.input.x = 0; player.input.y = 0; player.input.fire = false; player.input.pulse = false;
+          return;
+        }
+        const enemyPet = enemies.flatMap(enemy => enemy.pets.filter(pet =>
+          pet.alive && pet.type !== "elephant").map(pet => ({ ...pet, enemyOwner: enemy })))
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const target = enemyPet && distance(player, enemyPet) < distance(player, foe) + 52 ? enemyPet : foe;
+        const lure = state.lures.filter(item => item.owner !== player.id)
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const enemyDrone = enemies.flatMap(enemy => enemy.pets.filter(pet => pet.alive && pet.type === "drone"))
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const droneAttraction = !lure && enemyDrone && distance(player, enemyDrone) < 190 ? enemyDrone : null;
+        const healItem = aiDifficulty > 1 && state.items.filter(item => item.type === "medkit")
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        const weapon = aiDifficulty > 1 && state.items.filter(item => item.type !== "medkit")
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        let destination = target, destinationKey = `foe-${target.id}`, arriveRadius = 48;
+        if (lure) {
+          destination = lure; destinationKey = `lure-${lure.id}`; arriveRadius = 18;
+        } else if (droneAttraction) {
+          destination = droneAttraction; destinationKey = `drone-${droneAttraction.id}`; arriveRadius = 30;
+        } else if (aiDifficulty > 1 && player.hp < 82 && healItem && (!player.held || player.held === "medkit")) {
+          destination = healItem; destinationKey = `item-${healItem.id}`; arriveRadius = 22;
+        } else if (aiDifficulty > 1 && (!player.held || player.ammo <= 0) && weapon) {
+          destination = weapon; destinationKey = `item-${weapon.id}`; arriveRadius = 22;
+        } else if (player.held && ["pistol", "shotgun", "rifle", "grenade"].includes(player.held)) {
+          const dx = player.x - target.x, dy = player.y - target.y, length = Math.max(1, Math.hypot(dx, dy));
+          const desiredRange = player.held === "grenade" ? 205 : 245;
+          destination = { x: clamp(target.x + dx / length * desiredRange, 70, W - 70), y: clamp(target.y + dy / length * desiredRange, 70, H - 70) };
+          destinationKey = `combat-${target.id}`;
+          arriveRadius = 26;
+        }
+        const aimTarget = player.held ? target : destination;
+        player.input.aim = Math.atan2(aimTarget.y - player.y, aimTarget.x - player.x);
+        player.aim = player.input.aim;
+        if (player.equipment.pearlAvailable && player.hp < player.maxHp * .48 && distance(player, foe) < 280) {
+          activateAbility(player.id, "pearl");
+        }
+        if (player.pets.some(pet => pet.type === "drone" && pet.alive && pet.foodAvailable) &&
+            distance(player, foe) < 340) {
+          deployDroneFood(player);
+        }
+        if (destination === target && (player.held === "cover" || player.held === "food")) {
+          arriveRadius = player.held === "food" ? 140 : 120;
+        }
+        navigate(player, destination, destinationKey, arriveRadius, dt);
+        const foeDistance = distance(player, target);
+        const canAttack = !lure && !droneAttraction && hasLineOfSight(player, target);
+        if (aiDifficulty >= 3 && player.held === "cover" && player.ammo > 0 &&
+            foeDistance > 105 && foeDistance < 320 && canAttack && player.attackCooldown <= 0) {
+          player.input.fire = false;
+          player.input.pulse = true;
+          return;
+        }
+        if (player.held && player.ammo > 0 && player.held !== "medkit" && canAttack && foeDistance < 420) {
+          player.input.fire = player.held === "rifle";
+          player.input.pulse = player.held !== "rifle" && player.attackCooldown <= 0;
+        } else if (player.skillWeapon && canAttack && foeDistance < 390) {
+          player.input.fire = false;
+          player.input.pulse = player.attackCooldown <= 0;
+        } else if (!player.held && !lure && foeDistance < 64) {
+          player.input.pulse = player.meleeCooldown <= 0;
+        } else {
+          player.input.fire = false;
+          player.input.pulse = false;
+        }
+      }
+
+      function updatePlayer(player, dt) {
+        player.attackCooldown = Math.max(0, player.attackCooldown - dt);
+        player.meleeCooldown = Math.max(0, player.meleeCooldown - dt);
+        player.invulnerable = Math.max(0, player.invulnerable - dt);
+        player.recoil = Math.max(0, player.recoil - dt);
+        updateProfession(player, dt);
+        if (player.equipment.maxShield && state.elapsed - player.equipment.shieldHitAt >= 3) {
+          player.equipment.shield = Math.min(player.equipment.maxShield, player.equipment.shield + 15 * dt);
+        }
+        if (player.kind === "ai") aiInput(player, dt);
+        else {
+          const isP1 = player.id === "p1";
+          const controls = isP1
+            ? { up: keys.has("KeyW"), down: keys.has("KeyS"), left: keys.has("KeyA"), right: keys.has("KeyD") }
+            : { up: keys.has("ArrowUp"), down: keys.has("ArrowDown"), left: keys.has("ArrowLeft"), right: keys.has("ArrowRight") };
+          if (mode === "online" && state.bigOnline && state.host && player.peerId !== peerId) {
+            player.input.x = player.remoteInput ? player.remoteInput.x : 0;
+            player.input.y = player.remoteInput ? player.remoteInput.y : 0;
+            player.input.aim = player.remoteInput ? player.remoteInput.aim : player.aim;
+            player.input.fire = player.remoteInput ? player.remoteInput.fire : false;
+            player.input.pulse = Boolean(player.remoteInput && player.remoteInput.pulse);
+            if (player.remoteInput) player.remoteInput.pulse = false;
+          } else if (mode === "online" && state.bigOnline && state.host && player.peerId === peerId) {
+            player.input.x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+            player.input.y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("Space") || touchInput.fire;
+          } else if (mode === "online" && state.bigOnline && !state.host && player.peerId === peerId) {
+            player.input.x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+            player.input.y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("Space") || touchInput.fire;
+          } else if (mode === "online" && state.host && player.id === "p2") {
+            player.input.x = player.remoteInput ? player.remoteInput.x : 0;
+            player.input.y = player.remoteInput ? player.remoteInput.y : 0;
+            player.input.aim = player.remoteInput ? player.remoteInput.aim : player.aim;
+            player.input.fire = player.remoteInput ? player.remoteInput.fire : false;
+            player.input.pulse = Boolean(player.remoteInput && player.remoteInput.pulse);
+            if (player.remoteInput) player.remoteInput.pulse = false;
+          } else if (mode === "online" && (state.host && player.id === "p1" || !state.host && player.id === "p2")) {
+            player.input.x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+            player.input.y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("Space") || touchInput.fire;
+          } else if (mode === "online" && !state.host && player.id === "p1") {
+            player.input.x = player.remoteInput ? player.remoteInput.x : 0;
+            player.input.y = player.remoteInput ? player.remoteInput.y : 0;
+            player.input.aim = player.remoteInput ? player.remoteInput.aim : player.aim;
+            player.input.fire = player.remoteInput ? player.remoteInput.fire : false;
+            player.input.pulse = Boolean(player.remoteInput && player.remoteInput.pulse);
+            if (player.remoteInput) player.remoteInput.pulse = false;
+          } else if (mode === "local" && !isP1) {
+            player.input.x = (controls.right ? 1 : 0) - (controls.left ? 1 : 0);
+            player.input.y = (controls.down ? 1 : 0) - (controls.up ? 1 : 0);
+            const opponent = state.players.find(other => other !== player);
+            if (opponent) player.aim = Math.atan2(opponent.y - player.y, opponent.x - player.x);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has("KeyM");
+          } else {
+            player.input.x = (controls.right || touchInput.right ? 1 : 0) - (controls.left || touchInput.left ? 1 : 0);
+            player.input.y = (controls.down || touchInput.down ? 1 : 0) - (controls.up || touchInput.up ? 1 : 0);
+            player.input.aim = player.aim;
+            player.input.fire = keys.has(isP1 ? "Space" : "KeyM") || (isP1 && touchInput.fire);
+          }
+        }
+        const lure = state.lures.filter(item => item.owner !== player.id && !item.drone)
+            .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        if (lure && player.kind !== "ai") {
+            const dx = lure.x - player.x, dy = lure.y - player.y;
+            const length = Math.max(1, Math.hypot(dx, dy));
+            player.input.x = dx / length;
+            player.input.y = dy / length;
+            player.input.fire = false;
+            player.input.pulse = false;
+        }
+        const droneLure = player.kind !== "ai" && state.lures.filter(item => item.owner !== player.id && item.drone)
+          .sort((a, b) => distance(player, a) - distance(player, b))[0];
+        if (droneLure) {
+          const dx = droneLure.x - player.x, dy = droneLure.y - player.y;
+          const length = Math.max(1, Math.hypot(dx, dy));
+          player.input.x = clamp(player.input.x + dx / length * .22, -1, 1);
+          player.input.y = clamp(player.input.y + dy / length * .22, -1, 1);
+        }
+        if (player.underground && player.held !== "grenade") {
+          player.input.fire = false;
+          player.input.pulse = false;
+        }
+        if (player.stunned > 0) {
+          player.input.x = 0;
+          player.input.y = 0;
+          player.input.fire = false;
+          player.input.pulse = false;
+        }
+        if (player.lightningDash > 0 || player.input.x || player.input.y) {
+          if (player.lightningDash > 0 && player.stunned <= 0) {
+            player.input.x = Math.cos(player.lightningDirection);
+            player.input.y = Math.sin(player.lightningDirection);
+          }
+          const magnitude = Math.hypot(player.input.x, player.input.y) || 1;
+          let speed = player.held === "scooter" ? 205 : 180;
+          if (player.profession === "giant") speed *= .85;
+          if (["hunter", "zookeeper"].includes(player.profession)) speed *= .95;
+          if (player.profession === "zombie") speed *= .9;
+          if (player.profession === "lightning") speed *= 1.5;
+          if (player.profession === "cyborg") speed *= .7;
+          if (player.underground) speed *= 1.2;
+          if (player.lightningDash > 0) speed *= 3;
+          if (player.profession === "gremlin" && player.glassesBroken) speed *= 1.15;
+          const dx = player.input.x / magnitude * speed * dt, dy = player.input.y / magnitude * speed * dt;
+          const beforeX = player.x, beforeY = player.y;
+          collisionMove(player, dx, dy);
+          const moved = Math.hypot(player.x - beforeX, player.y - beforeY);
+          player.walked += moved;
+          if (player.lightningDash > 0 && player.stunned <= 0) {
+            enemiesFor(player).forEach(enemy => {
+              if (distance(player, enemy) < 38 && !player.lightningHits.includes(enemy.id)) {
+                player.lightningHits.push(enemy.id);
+                applyDamage(enemy, 22);
+                enemy.stunned = Math.max(enemy.stunned, 2);
+                addParticles(enemy.x, enemy.y, "#ffe65f", 18);
+              }
+            });
+          }
+          if (player.kind === "ai" && moved < .2) {
+            player.stuckFor += dt;
+            if (player.stuckFor > .32) {
+              player.navTimer = 0;
+              player.navPath = [];
+              player.stuckFor = 0;
+            }
+          } else {
+            player.stuckFor = 0;
+          }
+        }
+        if (Number.isFinite(player.input.aim)) player.aim = player.input.aim;
+        if (player.held === "medkit") {
+          player.medTimer += dt;
+          if (player.medTimer >= 1 && player.hp < player.maxHp) {
+            player.hp = Math.min(player.maxHp, player.hp + (player.profession === "doctor" ? 1.1 : 1));
+            player.medTimer -= 1;
+          }
+          if (player.hp >= player.maxHp) { player.held = ""; player.ammo = 0; }
+        }
+        if (player.input.pulse || (player.held === "rifle" && player.input.fire)) useItem(player);
+        player.input.pulse = false;
+        player.fireWasDown = player.input.fire;
+        const pickup = player.kind === "ai" && aiDifficulty === 1 ? null : itemAt(player.x, player.y);
+        if (pickup) {
+          player.held = pickup.type;
+          player.ammo = itemAmmo(pickup.type);
+          if (player.profession === "gremlin" && isFirearm(pickup.type)) player.ammo++;
+          player.medTimer = 0;
+          state.items = state.items.filter(item => item !== pickup);
+          addParticles(pickup.x, pickup.y, itemInfo[pickup.type].color, 18);
+        }
+      }
+
+      function updateObjects(dt) {
+        state.itemSpawnTimer -= dt;
+        if (state.itemSpawnTimer <= 0) {
+          spawnItem();
+          state.itemSpawnTimer = largeConfig ? rand(.45, .8) : rand(3, 5);
+        }
+        state.items = state.items.filter(item => state.elapsed - item.born < 20);
+        state.covers.forEach(cover => cover.life -= dt);
+        state.covers = state.covers.filter(cover => cover.life > 0);
+        state.lures.forEach(lure => { lure.life -= dt; lure.phase += dt; });
+        state.lures.filter(lure => lure.drone && lure.life <= 0).forEach(lure => {
+          const drone = state.players.flatMap(player => player.pets).find(pet => pet.id === lure.droneId);
+          if (drone && drone.alive) { drone.selfDestruct = true; drone.age = 0; }
+        });
+        state.lures = state.lures.filter(lure => lure.life > 0);
+        for (const shot of [...state.projectiles]) {
+          if (shot.kind === "pearl") {
+            shot.age += dt;
+            shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+            shot.vx *= Math.pow(.982, dt * 60); shot.vy *= Math.pow(.982, dt * 60);
+            if (hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 ||
+                shot.y < 52 || shot.y > H - 52 || shot.age > .9) landPearl(shot);
+            continue;
+          }
+          if (shot.kind === "grenade") {
+            shot.age += dt;
+            if (shot.fuse >= 0) {
+              shot.fuse -= dt;
+              if (shot.fuse <= 0) explode(shot);
+              continue;
+            }
+            shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+            shot.vx *= Math.pow(.982, dt * 60); shot.vy *= Math.pow(.982, dt * 60);
+            const owner = state.players.find(player => player.id === shot.owner);
+            const hitTarget = state.players.filter(player => owner ? isEnemy(owner, player) : player.id !== shot.owner)
+              .some(player => distance(player, shot) < 25 ||
+                player.pets.some(pet => pet.alive && distance(pet, shot) < 23));
+            if (hitTarget || hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 || shot.y < 52 || shot.y > H - 52 || shot.age > .9) {
+              shot.fuse = 1.5;
+            }
+          } else if (shot.kind === "spell") {
+            shot.life -= dt;
+            shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+            const owner = state.players.find(player => player.id === shot.owner);
+            const target = state.players.find(player => (owner ? isEnemy(owner, player) : player.id !== shot.owner) &&
+              distance(player, shot) < 23 && !hitCover((player.x + shot.x) / 2, (player.y + shot.y) / 2));
+            if (target) {
+              applyDamage(target, shot.damage);
+              target.stunned = Math.max(target.stunned, shot.stun);
+              addParticles(shot.x, shot.y, "#a58bff", 9);
+              state.projectiles = state.projectiles.filter(item => item !== shot);
+            } else if (hitCover(shot.x, shot.y) || shot.x < 46 || shot.x > W - 46 ||
+                shot.y < 46 || shot.y > H - 46 || shot.life <= 0) {
+              addParticles(shot.x, shot.y, "#a58bff", 3);
+              state.projectiles = state.projectiles.filter(item => item !== shot);
+            }
+          } else {
+            shot.life -= dt;
+            shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+            let hitTarget = null, hitDistance = Infinity;
+            const owner = state.players.find(player => player.id === shot.owner);
+            state.players.filter(player => owner ? isEnemy(owner, player) : player.id !== shot.owner).forEach(player => {
+              const playerDistance = distance(player, shot);
+              if (playerDistance < 23 && playerDistance < hitDistance) { hitTarget = player; hitDistance = playerDistance; }
+              player.pets.filter(pet => pet.alive).forEach(pet => {
+                const petDistance = distance(pet, shot);
+                if (petDistance < 20 && petDistance < hitDistance) { hitTarget = pet; hitDistance = petDistance; }
+              });
+            });
+            if (hitTarget) {
+              applyDamage(hitTarget, shot.damage);
+              addParticles(shot.x, shot.y, hitTarget.color || "#dce8f4", 7);
+              state.projectiles = state.projectiles.filter(item => item !== shot);
+            } else if (hitCover(shot.x, shot.y) || shot.x < 46 || shot.x > W - 46 || shot.y < 46 || shot.y > H - 46 || shot.life <= 0) {
+              addParticles(shot.x, shot.y, "#dce8f4", 3);
+              state.projectiles = state.projectiles.filter(item => item !== shot);
+            }
+          }
+        }
+        state.particles.forEach(p => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .96; p.vy *= .96; });
+        state.particles = state.particles.filter(p => p.life > 0);
+        state.shake = Math.max(0, state.shake - dt);
+      }
+
+      function updatePets(dt) {
+        state.players.forEach(owner => owner.pets.forEach(pet => {
+          if (!pet.alive) return;
+          updatePoison(pet, dt);
+          if (!pet.alive) return;
+          if (pet.summoned && pet.lifetime > 0) {
+            pet.age += dt;
+            if (pet.age >= pet.lifetime) { pet.alive = false; return; }
+          }
+          pet.cooldown = Math.max(0, pet.cooldown - dt);
+          const enemyPlayer = enemiesFor(owner).sort((a, b) => distance(pet, a) - distance(pet, b))[0];
+          if (!enemyPlayer) return;
+          const enemyPet = enemiesFor(owner).flatMap(player => player.pets).filter(target =>
+            target.alive && (owner.kind !== "ai" || target.type !== "elephant"))
+            .sort((a, b) => distance(pet, a) - distance(pet, b))[0];
+          const enemy = enemyPet && distance(pet, enemyPet) < distance(pet, enemyPlayer) + 30
+            ? enemyPet : enemyPlayer;
+          if (pet.type === "turret") {
+            pet.x = owner.x + (owner.id === "p1" ? 48 : -48);
+            pet.y = owner.y + 48;
+            if (pet.cooldown <= 0 && hasLineOfSight(pet, enemy)) {
+              const angle = Math.atan2(enemy.y - pet.y, enemy.x - pet.x);
+              state.projectiles.push({
+                id: state.nextObjectId++, kind: "bullet", owner: owner.id,
+                x: pet.x + Math.cos(angle) * 18, y: pet.y + Math.sin(angle) * 18,
+                vx: Math.cos(angle) * 620, vy: Math.sin(angle) * 620,
+                life: 1.1, damage: 14
+              });
+              pet.cooldown = 1;
+            }
+            return;
+          }
+          if (pet.type === "drone") {
+            pet.phase += dt * 1.7;
+            if (pet.selfDestruct) {
+              pet.age += dt;
+              const dx = enemy.x - pet.x, dy = enemy.y - pet.y, length = Math.max(1, Math.hypot(dx, dy));
+              const travel = Math.min(length, 260 * dt);
+              pet.x += dx / length * travel;
+              pet.y += dy / length * travel;
+              if (length < 25 || pet.age > 5) {
+                if (length < 25) applyDamage(enemy, 18);
+                pet.alive = false;
+                addParticles(pet.x, pet.y, "#ffbf80", 18);
+              }
+            } else {
+              const orbitX = clamp(enemy.x + Math.cos(pet.phase) * 92, 56, W - 56);
+              const orbitY = clamp(enemy.y + Math.sin(pet.phase) * 62, 56, H - 56);
+              const dx = orbitX - pet.x, dy = orbitY - pet.y, length = Math.max(1, Math.hypot(dx, dy));
+              pet.x += dx / length * Math.min(length, pet.speed * dt);
+              pet.y += dy / length * Math.min(length, pet.speed * dt);
+            }
+            return;
+          }
+          if (pet.type === "kitten" && pet.ammo > 0) {
+            const dx = pet.x - enemy.x, dy = pet.y - enemy.y;
+            const length = Math.max(1, Math.hypot(dx, dy));
+            const firingPoint = {
+              x: clamp(enemy.x + dx / length * 145, 70, W - 70),
+              y: clamp(enemy.y + dy / length * 145, 70, H - 70)
+            };
+            navigate(pet, firingPoint, `kitten-${pet.id}-${enemy.id}`, 14, dt);
+          } else {
+            navigate(pet, enemy, `pet-${pet.id}-${enemy.id}`, 39, dt);
+          }
+          if (pet.input.x || pet.input.y) {
+            const magnitude = Math.max(1, Math.hypot(pet.input.x, pet.input.y));
+            const speed = pet.speed;
+            collisionMove(pet, pet.input.x / magnitude * speed * dt, pet.input.y / magnitude * speed * dt);
+          }
+          const d = distance(pet, enemy);
+          if (pet.type === "kitten" && pet.ammo > 0 && d < 390 &&
+              pet.cooldown <= 0 && hasLineOfSight(pet, enemy)) {
+            const angle = Math.atan2(enemy.y - pet.y, enemy.x - pet.x);
+            state.projectiles.push({
+              id: state.nextObjectId++, kind: "bullet", owner: owner.id,
+              x: pet.x + Math.cos(angle) * 22, y: pet.y + Math.sin(angle) * 22,
+              vx: Math.cos(angle) * 640, vy: Math.sin(angle) * 640,
+              life: 1.1, damage: 12 * damageMultiplier(owner, "pistol")
+            });
+            pet.ammo--;
+            pet.cooldown = .42;
+          } else if (pet.type === "kitten" && pet.ammo <= 0 && d < 46 && pet.cooldown <= 0) {
+            applyDamage(enemy, pet.damage);
+            pet.cooldown = .8;
+            addParticles(enemy.x, enemy.y, "#e8a878", 6);
+          }
+          if (pet.type === "elephant" && d < 50) applyDamage(enemy, pet.damage * dt);
+          if (pet.type === "dog" && d < 46 && pet.cooldown <= 0) {
+            applyDamage(enemy, pet.damage);
+            pet.cooldown = .8;
+            addParticles(enemy.x, enemy.y, "#e8a878", 6);
+          }
+        }));
+      }
+
+      function updateGame(dt) {
+        if (!state || !state.running || (mode === "online" && !state.host)) return;
+        state.elapsed += dt;
+        state.players.forEach(player => updatePlayer(player, dt));
+        updatePets(dt);
+        updateObjects(dt);
+        if ((mode === "large" || state.bigOnline) && state.gameType === "survival") {
+          const enemies = state.players.filter(player => player.team !== 0 && player.hp > 0);
+          state.spawnTimer -= dt;
+          if (state.spawnTimer <= 0 && enemies.length < 8) {
+            const id = `p${state.nextObjectId++}`;
+            const enemy = makePlayer(id, `来袭 ${state.survivalKills + enemies.length + 1}`,
+              rand(100, W - 100), "#ff88ad", "ai", "");
+            enemy.y = rand(100, H - 100);
+            enemy.spawnX = enemy.x;
+            enemy.spawnY = enemy.y;
+            enemy.team = 1;
+            enemy.profession = configuredAIProfession(largeConfig, `enemy-${state.nextSurvivalProfessionId++}`);
+            if (enemy.profession === "zombie") enemy.revivesLeft = 2;
+            applyProfessionHealth(enemy);
+            enemy.maxHp *= 1.4;
+            enemy.hp = enemy.maxHp;
+            state.players.push(enemy);
+            state.spawnTimer = Math.max(1.2, 4 - state.elapsed / 90);
+          }
+          state.players.forEach(player => {
+            if (player.team !== 0 && player.hp <= 0 && !player.killCounted) {
+              player.killCounted = true;
+              state.survivalKills++;
+            }
+          });
+          $("gameStatus").textContent =
+            `生存 ${Math.floor(state.elapsed)} 秒 · 击败 ${state.survivalKills} 名敌人 · 场上 ${enemies.length} 个`;
+        }
+        if (state.players[0]) {
+          camera.x += (state.players[0].x - camera.x) * Math.min(1, dt * 7);
+          camera.y += (state.players[0].y - camera.y) * Math.min(1, dt * 7);
+          camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
+          camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
+        }
+        updateNames();
+        state.players.forEach(player => {
+          if (player.hp <= 0 && player.profession === "zombie" && player.revivesLeft > 0) {
+            player.revivesLeft--;
+            player.maxHp = Math.round(player.maxHp * 1.1);
+            player.hp = player.maxHp;
+            player.x = player.spawnX;
+            player.y = player.spawnY;
+            if (!safePosition(player.x, player.y, 22)) {
+              player.x = player.id === "p1" ? 145 : W - 145;
+              player.y = H / 2;
+            }
+            player.poisonTimer = 0;
+            player.poisonTick = 0;
+            player.stunned = 0;
+            player.invulnerable = 1.2;
+            addParticles(player.x, player.y, "#83bc75", 24);
+          }
+        });
+        if ((mode === "large" || state.bigOnline) && state.gameType !== "survival") {
+          const aliveTeams = new Set(state.players.filter(player => player.hp > 0).map(player => player.team));
+          if (aliveTeams.size <= 1) {
+            const survivingTeam = aliveTeams.values().next().value;
+            const winner = state.players.find(player => player.hp > 0 && player.team === survivingTeam) || null;
+            showResult(winner, winner ? `${winner.team === 0 ? "你的队伍" : winner.name} 获胜！` : "无人存活。");
+          }
+        } else {
+          const human = state.players[0];
+          if (human.hp <= 0 && state.running) {
+            showResult(null, mode === "large"
+              ? `生存结束：${Math.floor(state.elapsed)} 秒，击败 ${state.survivalKills} 名敌人。`
+              : "");
+          } else if (mode !== "large" && !state.bigOnline) {
+            const dead = state.players.find(player => player.hp <= 0);
+            if (dead && state.running) showResult(state.players.find(player => player !== dead));
+          }
+        }
+        if (mode === "online" && state.running) {
+          snapshotTimer += dt;
+          if (snapshotTimer >= .05) {
+            snapshotTimer = 0;
+            broadcast({ type: "state", state: serializableState() });
+          }
+        }
+      }
+
+      function serializableState() {
+        const copy = JSON.parse(JSON.stringify(state));
+        delete copy.host;
+        copy.particles = [];
+        copy.players.forEach(player => { delete player.remoteInput; });
+        return copy;
+      }
+
+      function drawCosmetic(player) {
+        if (player.cosmetic === "glasses") {
+          ctx.fillStyle = "rgba(139,224,245,.62)"; ctx.strokeStyle = "#26364f"; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.roundRect(-22, -9, 18, 14, 5); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.roundRect(4, -9, 18, 14, 5); ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(4, -4);
+          ctx.moveTo(-22, -5); ctx.lineTo(-27, -8); ctx.moveTo(22, -5); ctx.lineTo(27, -8); ctx.stroke();
+        } else if (player.cosmetic === "sign") {
+          ctx.fillStyle = "#ffb9d1";
+          ctx.fillRect(-29, -51, 58, 15);
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(-29, -51, 58, 15);
+          ctx.fillStyle = "#57284a"; ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center"; ctx.fillText("最帅猫球", 0, -40);
+        } else if (player.cosmetic === "ingot") {
+          ctx.fillStyle = "#ffd45f"; ctx.strokeStyle = "#a76b13"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(19, 11); ctx.lineTo(28, 15);
+          ctx.lineTo(25, 25); ctx.lineTo(13, 25);
+          ctx.lineTo(10, 15); ctx.closePath(); ctx.fill(); ctx.stroke();
+        } else if (player.cosmetic === "scooter") {
+          ctx.strokeStyle = "#6abce9"; ctx.lineWidth = 3; ctx.beginPath();
+          ctx.moveTo(-20, 24); ctx.lineTo(20, 24);
+          ctx.lineTo(10, 14); ctx.moveTo(20, 24); ctx.lineTo(15, 13);
+          ctx.stroke(); ctx.fillStyle = "#795ca5";
+          [-16, 17].forEach(dx => { ctx.beginPath(); ctx.arc(dx, 25, 4, 0, Math.PI * 2); ctx.fill(); });
+        }
+      }
+
+      function drawPlayer(player) {
+        const bob = Math.sin(player.walked / 12) * (player.input.x || player.input.y ? 2 : 1);
+        ctx.save();
+        ctx.translate(player.x, player.y + bob);
+        ctx.globalAlpha = player.underground ? .24 :
+          player.invulnerable > 0 ? .55 + Math.sin(state.elapsed * 38) * .3 : 1;
+        ctx.fillStyle = player.color + "30";
+        ctx.beginPath(); ctx.ellipse(0, 21, 28, 12, 0, 0, Math.PI * 2); ctx.fill();
+        if (catImage.complete && catImage.naturalWidth) ctx.drawImage(catImage, -28, -29, 56, 56);
+        else {
+          ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#fff"; ctx.font = "bold 24px sans-serif"; ctx.textAlign = "center"; ctx.fillText("●", 0, 8);
+        }
+        ctx.globalAlpha = 1;
+        drawCosmetic(player);
+        if (player.profession === "gremlin" && !player.glassesBroken) {
+          ctx.strokeStyle = "#56b8ff"; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(-7, -5, 6, 0, Math.PI * 2); ctx.arc(7, -5, 6, 0, Math.PI * 2);
+          ctx.moveTo(-1, -5); ctx.lineTo(1, -5); ctx.moveTo(-13, -7); ctx.lineTo(-18, -9);
+          ctx.moveTo(13, -7); ctx.lineTo(18, -9); ctx.stroke();
+        }
+        if (player.underground) {
+          ctx.fillStyle = "rgba(110,125,94,.8)";
+          ctx.beginPath(); ctx.ellipse(0, 13, 29, 11, 0, 0, Math.PI * 2); ctx.fill();
+        }
+        if (player.profession === "wizard" && !isFirearm(player.held) && player.held !== "grenade") {
+          ctx.strokeStyle = "#9277e8"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(20, 15); ctx.lineTo(30, 28); ctx.stroke();
+          ctx.fillStyle = "#c9b8ff"; ctx.beginPath(); ctx.arc(20, 15, 4, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.strokeStyle = player.color; ctx.lineWidth = 3; ctx.globalAlpha = .8;
+        ctx.beginPath(); ctx.moveTo(Math.cos(player.aim) * 22, Math.sin(player.aim) * 22);
+        ctx.lineTo(Math.cos(player.aim) * 35, Math.sin(player.aim) * 35); ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = "rgba(12,18,31,.85)";
+        ctx.beginPath(); ctx.roundRect(player.x - 31, player.y - 43, 62, 16, 7); ctx.fill();
+        ctx.fillStyle = "#f4f6ff"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center"; ctx.fillText(player.name.slice(0, 12), player.x, player.y - 32);
+        if (player.held) {
+          const item = itemInfo[player.held], icon = itemIcons[player.held];
+          if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, player.x - 16, player.y + 30, 18, 18);
+          ctx.fillStyle = item ? item.color : "#fff";
+          ctx.font = "bold 12px sans-serif"; ctx.fillText(String(player.ammo), player.x + 9, player.y + 44);
+        }
+      }
+
+      function drawPet(pet) {
+        if (!pet.alive) return;
+        ctx.save();
+        ctx.translate(pet.x, pet.y + Math.sin(state.elapsed * 7 + pet.phase) * (pet.type === "drone" ? 4 : 1));
+        ctx.globalAlpha = pet.type === "drone" ? .92 : 1;
+        if (pet.type === "elephant" && elephantImage.complete && elephantImage.naturalWidth) {
+          ctx.drawImage(elephantImage, -34, -34, 68, 68);
+        } else if (pet.type === "dog" && dogImage.complete && dogImage.naturalWidth) {
+          ctx.drawImage(dogImage, -27, -27, 54, 54);
+        } else if (pet.type === "kitten" && catImage.complete && catImage.naturalWidth) {
+          ctx.drawImage(catImage, -23, -23, 46, 46);
+        } else if (pet.type === "drone") {
+          ctx.strokeStyle = "#52677b"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(-20, -12); ctx.lineTo(-27, -17);
+          ctx.moveTo(20, -12); ctx.lineTo(27, -17); ctx.moveTo(-19, 12); ctx.lineTo(-27, 17);
+          ctx.moveTo(19, 12); ctx.lineTo(27, 17); ctx.stroke();
+          ctx.fillStyle = pet.color; ctx.beginPath(); ctx.roundRect(-18, -12, 36, 24, 9); ctx.fill();
+          ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#52677b"; ctx.lineWidth = 2;
+          [[-27, -17, -19, -17], [19, -17, 27, -17], [-27, 17, -19, 17], [19, 17, 27, 17]]
+            .forEach(([x1, y1, x2, y2]) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); });
+        } else {
+          ctx.fillStyle = "#66717c"; ctx.strokeStyle = "#333d46"; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.roundRect(-24, -20, 48, 40, 6); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#a9b5bf"; ctx.fillRect(-6, -7, 33, 14);
+          ctx.fillStyle = "#69757f"; ctx.beginPath(); ctx.arc(-5, 0, 12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#d5e0e7"; ctx.beginPath(); ctx.arc(-5, 0, 5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+        const width = pet.type === "elephant" ? 44 : pet.type === "kitten" ? 32 : 34;
+        const y = pet.y - (pet.type === "elephant" ? 41 : pet.type === "kitten" ? 30 : 34);
+        ctx.fillStyle = "#fff"; ctx.fillRect(pet.x - width / 2, y, width, 4);
+        ctx.fillStyle = pet.color;
+        ctx.fillRect(pet.x - width / 2, y, width * clamp(pet.hp / pet.maxHp, 0, 1), 4);
+        if (pet.type === "drone" && pet.foodAvailable) {
+          const icon = itemIcons.food;
+          if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, pet.x + 14, pet.y - 27, 14, 14);
+        }
+        if (pet.type === "kitten" && pet.ammo > 0) {
+          ctx.fillStyle = "#52616e"; ctx.font = "bold 9px sans-serif";
+          ctx.textAlign = "center"; ctx.fillText(String(pet.ammo), pet.x, pet.y + 38);
+        }
+      }
+
+      function draw() {
+        ctx.save();
+        if (state && state.shake > 0) ctx.translate(rand(-5, 5) * state.shake * 4, rand(-4, 4) * state.shake * 4);
+        const sky = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+        sky.addColorStop(0, "#f1f7e9"); sky.addColorStop(.7, "#e5f0df"); sky.addColorStop(1, "#dcebd8");
+        ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+        if (state) ctx.translate(VIEW_W / 2 - camera.x, VIEW_H / 2 - camera.y);
+        ctx.fillStyle = "rgba(89,129,84,.2)";
+        for (let x = 25; x < W; x += 74) for (let y = 33; y < H; y += 68) {
+          ctx.beginPath(); ctx.arc(x + Math.sin(y + x) * 14, y, 1.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.strokeStyle = "rgba(88,121,86,.34)"; ctx.lineWidth = 2; ctx.strokeRect(46, 46, W - 92, H - 92);
+        ctx.fillStyle = "rgba(91,112,91,.2)";
+        ctx.fillRect(0, 0, W, 39); ctx.fillRect(0, H - 39, W, 39); ctx.fillRect(0, 0, 39, H); ctx.fillRect(W - 39, 0, 39, H);
+        terrain.forEach((rect, index) => {
+          ctx.fillStyle = index % 2 ? "#9eac98" : "#aab6a2"; ctx.beginPath(); ctx.roundRect(rect.x, rect.y, rect.w, rect.h, 12); ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.beginPath(); ctx.ellipse(rect.x + rect.w * .35, rect.y + 6, rect.w * .34, 5, 0, 0, Math.PI * 2); ctx.fill();
+        });
+        if (state) {
+          state.covers.forEach(cover => {
+            ctx.globalAlpha = Math.min(1, cover.life / .35);
+            ctx.fillStyle = "#8875a9"; ctx.beginPath(); ctx.roundRect(cover.x, cover.y, cover.w, cover.h, 6); ctx.fill();
+            ctx.fillStyle = "rgba(255,255,255,.22)"; ctx.fillRect(cover.x + 5, cover.y + 4, Math.max(0, cover.w - 10), 3);
+            ctx.globalAlpha = 1;
+          });
+          state.items.forEach(item => {
+            const info = itemInfo[item.type], float = Math.sin(state.elapsed * 3 + item.phase) * 5;
+            ctx.save(); ctx.translate(item.x, item.y + float);
+            ctx.fillStyle = info.color + "33"; ctx.beginPath(); ctx.arc(0, 0, 24 + Math.sin(state.elapsed * 4 + item.phase) * 2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#fff"; ctx.strokeStyle = "#abb7c1"; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            const icon = itemIcons[item.type];
+            if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, -12, -12, 24, 24);
+            ctx.restore();
+          });
+          state.lures.forEach(lure => {
+            ctx.globalAlpha = .7 + Math.sin(lure.phase * 9) * .2;
+            const icon = itemIcons.food;
+            if (icon && icon.complete && icon.naturalWidth) ctx.drawImage(icon, lure.x - 13, lure.y - 13, 26, 26);
+            ctx.globalAlpha = 1;
+          });
+          state.projectiles.forEach(shot => {
+            if (shot.kind === "pearl") {
+              ctx.fillStyle = "#9ce3ff"; ctx.strokeStyle = "#2676a0"; ctx.lineWidth = 2;
+              ctx.beginPath(); ctx.arc(shot.x, shot.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            } else if (shot.kind === "grenade") {
+              ctx.fillStyle = shot.fuse >= 0 ? (Math.sin(state.elapsed * 25) > 0 ? "#fff0a0" : "#ff765f") : "#ffbd5b";
+              ctx.beginPath(); ctx.arc(shot.x, shot.y, 8, 0, Math.PI * 2); ctx.fill();
+            } else if (shot.kind === "card") {
+              ctx.save(); ctx.translate(shot.x, shot.y); ctx.rotate(Math.atan2(shot.vy, shot.vx));
+              ctx.fillStyle = "#fff6d8"; ctx.strokeStyle = "#b48a3b"; ctx.lineWidth = 1.5;
+              ctx.beginPath(); ctx.roundRect(-9, -6, 18, 12, 2); ctx.fill(); ctx.stroke();
+              ctx.fillStyle = "#6b4b1d"; ctx.font = "bold 8px sans-serif"; ctx.textAlign = "center";
+              ctx.fillText(displayCard(shot.value), 0, 3); ctx.restore();
+            } else {
+              ctx.fillStyle = shot.owner === "p1" ? "#b6ffe5" : "#ffd0de";
+              ctx.beginPath(); ctx.ellipse(shot.x, shot.y, 7, 3, Math.atan2(shot.vy, shot.vx), 0, Math.PI * 2); ctx.fill();
+            }
+          });
+          state.particles.forEach(p => {
+            ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+          });
+          ctx.globalAlpha = 1;
+          state.players.forEach(player => player.pets.forEach(drawPet));
+          state.players.forEach(drawPlayer);
+        } else {
+          ctx.fillStyle = "#52616e"; ctx.font = "700 20px sans-serif"; ctx.textAlign = "center";
+          ctx.fillText("选择一种模式，开始猫球对决", VIEW_W / 2, VIEW_H / 2);
+        }
+        ctx.restore();
+      }
+
+      function drawMinimap() {
+        const enabled = Boolean(state && (mode === "large" || state.bigOnline));
+        $("minimapPanel").hidden = !enabled;
+        if (!enabled) return;
+        const width = minimapCanvas.width, height = minimapCanvas.height;
+        const scaleX = width / W, scaleY = height / H;
+        const map = minimapContext;
+        map.clearRect(0, 0, width, height);
+        map.fillStyle = "#edf3e9";
+        map.fillRect(0, 0, width, height);
+        map.fillStyle = "#9eac98";
+        terrain.forEach(rect => map.fillRect(rect.x * scaleX, rect.y * scaleY,
+          Math.max(1, rect.w * scaleX), Math.max(1, rect.h * scaleY)));
+        state.items.forEach(item => {
+          map.fillStyle = "#dd9a30";
+          map.beginPath();
+          map.arc(item.x * scaleX, item.y * scaleY, 2, 0, Math.PI * 2);
+          map.fill();
+        });
+        const local = controlledPlayer();
+        state.players.forEach(player => {
+          if (player.hp <= 0) return;
+          map.fillStyle = player === local ? "#268fc1" : isEnemy(local, player) ? "#d54f55" : "#47a56e";
+          map.beginPath();
+          map.arc(player.x * scaleX, player.y * scaleY, player === local ? 3.2 : 2.4, 0, Math.PI * 2);
+          map.fill();
+        });
+        map.strokeStyle = "#416c9b";
+        map.lineWidth = 1;
+        map.strokeRect(
+          (camera.x - VIEW_W / 2) * scaleX,
+          (camera.y - VIEW_H / 2) * scaleY,
+          VIEW_W * scaleX,
+          VIEW_H * scaleY
+        );
+      }
+
+      function updateTeamOverview() {
+        const enabled = Boolean(state && (mode === "large" || state.bigOnline));
+        const overview = $("teamOverview");
+        overview.hidden = !enabled;
+        if (!enabled || performance.now() < overviewTimer) return;
+        overviewTimer = performance.now() + 300;
+        const teams = new Map();
+        state.players.forEach(player => {
+          if (!teams.has(player.team)) teams.set(player.team, []);
+          teams.get(player.team).push(player);
+        });
+        const local = controlledPlayer();
+        const body = $("teamOverviewBody");
+        body.replaceChildren();
+        [...teams.entries()].sort((a, b) => a[0] - b[0]).forEach(([team, players]) => {
+          const alive = players.filter(player => player.hp > 0);
+          const currentHp = players.reduce((sum, player) => sum + Math.max(0, player.hp), 0);
+          const maxHp = players.reduce((sum, player) => sum + player.maxHp, 0);
+          const label = mode === "large" && state.gameType === "brawl"
+            ? players[0].name
+            : state.gameType === "survival"
+              ? team === 0 ? "玩家" : "敌群"
+              : team === local.team ? "我方" : "敌方";
+          const row = document.createElement("tr");
+          const nameCell = document.createElement("td");
+          nameCell.textContent = label;
+          const countCell = document.createElement("td");
+          countCell.textContent = `${alive.length}/${players.length}`;
+          const healthCell = document.createElement("td");
+          const healthText = document.createElement("span");
+          healthText.textContent = `${Math.ceil(currentHp)}/${Math.ceil(maxHp)}`;
+          const track = document.createElement("span");
+          track.className = "team-health-track";
+          const fill = document.createElement("span");
+          fill.style.width = `${maxHp ? clamp(currentHp / maxHp * 100, 0, 100) : 0}%`;
+          track.appendChild(fill);
+          healthCell.append(healthText, track);
+          row.append(nameCell, countCell, healthCell);
+          body.appendChild(row);
+        });
+      }
+
+      function updateHudInfo() {
+        if (!state) { $("itemStatus").textContent = "道具：空手"; return; }
+        const localPlayer = controlledPlayer();
+        const info = itemInfo[localPlayer.held];
+        $("itemStatus").textContent = info ? `道具：${info.label}　剩余 ${localPlayer.ammo}` : "道具：空手（靠近后按出击键肉搏）";
+        if (localPlayer.profession === "soldier" || localPlayer.profession === "hunter") {
+          const cooldown = Math.ceil(localPlayer.professionCooldown);
+          $("itemStatus").textContent += `　· ${localPlayer.profession === "soldier" ? "R技能" : "R猎狗"}：${cooldown ? `${cooldown}s` : "就绪"}`;
+        } else if (["zookeeper", "commander", "chef", "cardmaster"].includes(localPlayer.profession)) {
+          const cooldown = Math.ceil(localPlayer.professionCooldown);
+          const skillName = {
+            zookeeper: "R动物伙伴", commander: "R小猫球", chef: "R猫粮无人机", cardmaster: "R洗牌"
+          }[localPlayer.profession];
+          $("itemStatus").textContent += `　· ${skillName}：${cooldown ? `${cooldown}s` : "就绪"}`;
+        } else if (localPlayer.profession === "wizard") {
+          $("itemStatus").textContent += `　· 昏迷咒：${Math.ceil(localPlayer.professionCooldown)}s`;
+        } else if (localPlayer.profession === "kungfu") {
+          $("itemStatus").textContent += `　· 肉搏连击 ${localPlayer.meleeHits}/4`;
+        } else if (localPlayer.profession === "zombie") {
+          $("itemStatus").textContent += `　· 复活次数 ${localPlayer.revivesLeft}`;
+        }
+        if (localPlayer.lastHandTimer > 0) {
+          $("itemStatus").textContent += `　· 手牌 ${localPlayer.lastHand.join(" ")}`;
+        }
+        if (localPlayer.stunned > 0) $("itemStatus").textContent += `　· 眩晕 ${localPlayer.stunned.toFixed(1)}s`;
+        if (localPlayer.poisonTimer > 0) $("itemStatus").textContent += `　· 中毒 ${localPlayer.poisonTimer.toFixed(1)}s`;
+        const [first, second] = hudPlayers();
+        $("p1Health").style.width = `${Math.max(0, first.hp / first.maxHp * 100)}%`;
+        $("p2Health").style.width = `${Math.max(0, second.hp / second.maxHp * 100)}%`;
+        [0, 1].forEach(index => {
+          const player = index === 0 ? first : second, prefix = index === 0 ? "p1" : "p2";
+          $(`${prefix}ShieldWrap`).hidden = player.equipment.maxShield <= 0;
+          $(`${prefix}Shield`).style.width = `${player.equipment.maxShield ? player.equipment.shield / player.equipment.maxShield * 100 : 0}%`;
+        });
+        const pets = localPlayer.pets.filter(pet => pet.alive).length;
+        const gear = localPlayer.equipment;
+        const extras = [];
+        if (pets) extras.push(`宠物 ${pets}`);
+        if (gear.shield) extras.push(`盾 ${Math.ceil(gear.shield)}`);
+        if (gear.pearlAvailable) extras.push("珍珠 E/K");
+        if (gear.phase) extras.push("穿墙");
+        if (extras.length) $("itemStatus").textContent += `　· ${extras.join(" · ")}`;
+      }
+
+      function frame(now) {
+        const dt = Math.min(.04, (now - (lastFrame || now)) / 1000);
+        lastFrame = now;
+        if (state && state.running && pointerTarget) {
+          const localPlayer = controlledPlayer();
+          const targetX = camera.x - VIEW_W / 2 + pointerTarget.x;
+          const targetY = camera.y - VIEW_H / 2 + pointerTarget.y;
+          localPlayer.aim = Math.atan2(targetY - localPlayer.y, targetX - localPlayer.x);
+        }
+        updateGame(dt);
+        if (state && mode === "online" && state.bigOnline && !state.host) {
+          const player = controlledPlayer();
+          camera.x += (player.x - camera.x) * Math.min(1, dt * 7);
+          camera.y += (player.y - camera.y) * Math.min(1, dt * 7);
+          camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
+          camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
+        }
+        if (mode === "online" && state && !state.host && state.running) sendInput();
+        draw();
+        drawMinimap();
+        updateTeamOverview();
+        updateHudInfo();
+        requestAnimationFrame(frame);
+      }
+
+      function pointerAim(event) {
+        if (!state || !state.running) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = (event.clientX - rect.left) * VIEW_W / rect.width;
+        const y = (event.clientY - rect.top) * VIEW_H / rect.height;
+        pointerTarget = { x, y };
+        const player = controlledPlayer();
+        const targetX = camera.x - VIEW_W / 2 + x;
+        const targetY = camera.y - VIEW_H / 2 + y;
+        player.aim = Math.atan2(targetY - player.y, targetX - player.x);
+      }
+      canvas.addEventListener("pointerdown", event => { pointerAim(event); canvas.setPointerCapture(event.pointerId); });
+      canvas.addEventListener("pointermove", pointerAim);
+
+      function firePulse(playerId) {
+        if (!state || !state.running) return;
+        if (mode === "online" && !state.host) {
+          sendInput(true);
+          return;
+        }
+        const player = state.players.find(item => item.id === playerId);
+        if (player) player.input.pulse = true;
+      }
+      const keyboardCodes = {
+        " ": "Space", Spacebar: "Space", ArrowUp: "ArrowUp", ArrowDown: "ArrowDown",
+        ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight", w: "KeyW", W: "KeyW",
+        a: "KeyA", A: "KeyA", s: "KeyS", S: "KeyS", d: "KeyD", D: "KeyD",
+        m: "KeyM", M: "KeyM", r: "KeyR", R: "KeyR", e: "KeyE", E: "KeyE",
+        f: "KeyF", F: "KeyF", k: "KeyK", K: "KeyK", l: "KeyL", L: "KeyL"
+      };
+      function normalizedKey(event) { return event.code && event.code !== "Unidentified" ? event.code : keyboardCodes[event.key]; }
+      document.addEventListener("keydown", event => {
+        const code = normalizedKey(event);
+        const keysUsed = ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyR"];
+        if (keysUsed.includes(code)) event.preventDefault();
+        if (code && !keys.has(code)) {
+          if (code === "Space" && (mode !== "online" || state)) firePulse("p1");
+          if (code === "KeyM" && mode === "local") firePulse("p2");
+          const canControlP1 = mode !== "online" || state && state.host;
+          const canControlP2 = mode === "local" || mode === "online" && state && !state.host;
+          const controlledId = mode === "online" && state && state.bigOnline
+            ? state.localPlayerId : mode === "online" && state && !state.host ? "p2" : "p1";
+          if (code === "KeyR" && mode !== "local" &&
+              (canControlP1 || canControlP2) && (mode !== "online" || state)) activateProfessionSkill(controlledId);
+          const canUseP1Abilities = canControlP1 || Boolean(state && state.bigOnline);
+          const canUseP2Abilities = canControlP2 || Boolean(state && state.bigOnline);
+          if (code === "KeyE" && canUseP1Abilities) activateAbility(controlledId, "pearl");
+          if (code === "KeyF" && canUseP1Abilities) activateAbility(controlledId, "drone");
+          if (code === "KeyK" && canUseP2Abilities) activateAbility(controlledId, "pearl");
+          if (code === "KeyL" && canUseP2Abilities) activateAbility(controlledId, "drone");
+          if (code) keys.add(code);
+        }
+      });
+      document.addEventListener("keyup", event => {
+        const code = normalizedKey(event);
+        if (code) keys.delete(code);
+      });
+      function releaseTouchPointer(pointerId) {
+        const control = activeTouchPointers.get(pointerId);
+        if (!control) return;
+        activeTouchPointers.delete(pointerId);
+        const stillPressed = [...activeTouchPointers.values()].includes(control);
+        if (!stillPressed) {
+          touchInput[control] = false;
+          const button = document.querySelector(`[data-control="${control}"]`);
+          if (button) button.classList.remove("active");
+        }
+      }
+      document.querySelectorAll("[data-control]").forEach(button => {
+        const control = button.dataset.control;
+        const down = event => {
+          event.preventDefault();
+          activeTouchPointers.set(event.pointerId, control);
+          if (control === "fire") { touchInput.fire = true; firePulse("p1"); }
+          else touchInput[control] = true;
+          button.classList.add("active");
+          if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+        };
+        button.addEventListener("pointerdown", down);
+        button.addEventListener("lostpointercapture", event => releaseTouchPointer(event.pointerId));
+      });
+      document.querySelectorAll("[data-ability]").forEach(button => {
+        button.addEventListener("click", () => {
+          const playerId = controlledPlayer() ? controlledPlayer().id : "p1";
+          if (button.dataset.ability === "profession") activateProfessionSkill(playerId);
+          else activateAbility(playerId, button.dataset.ability);
+        });
+      });
+      window.addEventListener("pointerup", event => releaseTouchPointer(event.pointerId));
+      window.addEventListener("pointercancel", event => releaseTouchPointer(event.pointerId));
+      function clearInputs() {
+        keys.clear();
+        activeTouchPointers.clear();
+        Object.keys(touchInput).forEach(key => touchInput[key] = false);
+        document.querySelectorAll("[data-control].active").forEach(button => button.classList.remove("active"));
+        if (mode === "online" && state && !state.host) sendInput();
+      }
+      window.addEventListener("blur", clearInputs);
+      document.addEventListener("visibilitychange", () => { if (document.hidden) clearInputs(); });
+
+      function goEasyOperation(start) {
+        return new Promise((resolve, reject) => start({
+          onSuccess: resolve,
+          onFailed: error => reject(new Error(error && (error.content || error.message) || String(error)))
+        }));
+      }
+      function randomId() {
+        return `catball-pvp-${window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+      }
+      async function startOnline() {
+        const attemptId = ++onlineAttemptId;
+        mode = "online";
+        peers.clear();
+        activeLobby = bigOnline ? BIG_LOBBY : LOBBY;
+        activeInbox = bigOnline ? BIG_INBOX : INBOX;
+        showWaiting("正在连接 GoEasy…");
+        if (!window.GoEasy || typeof window.GoEasy.getInstance !== "function") {
+          refundStake();
+          showMenu("联机服务加载失败", "请检查网络后刷新页面，或选择人机/本地双人模式。");
+          $("overlayStatus").textContent = "GoEasy SDK 未能加载。";
+          return;
+        }
+        try {
+          const client = window.GoEasy.getInstance({
+            host: GOEASY_HOST, appkey: bigOnline ? BIG_GO_EASY_KEY : GOEASY_KEY, modules: ["pubsub"]
+          });
+          goeasy = client;
+          const stillWaiting = () => onlineAttemptId === attemptId && mode === "online" && overlayState === "waiting";
+          const stopCancelledAttempt = () => {
+            if (goeasy === client) {
+              try { client.disconnect({}); }
+              catch (error) { console.error("关闭已取消的 GoEasy 连接失败：", error); }
+              goeasy = null;
+              connected = false;
+            }
+          };
+          peerId = randomId();
+          await goEasyOperation(callbacks => client.connect({
+            id: peerId,
+            data: { nickname: catName, catName, cosmetic, profession: selectedProfession },
+            ...callbacks
+          }));
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          connected = true;
+          await goEasyOperation(callbacks => client.pubsub.subscribe({
+            channel: activeLobby, presence: { enable: true }, onMessage: onLobbyMessage, ...callbacks
+          }));
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          await goEasyOperation(callbacks => client.pubsub.subscribe({
+            channel: `${activeInbox}${peerId}`, onMessage: onDirectMessage, ...callbacks
+          }));
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          await goEasyOperation(callbacks => client.pubsub.subscribePresence({
+            channel: activeLobby, onPresence: handlePresence, ...callbacks
+          }));
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          await goEasyOperation(callbacks => client.pubsub.hereNow({
+            channel: activeLobby, limit: 100, onSuccess: response => {
+              const members = response && response.content && response.content.members;
+              if (!Array.isArray(members)) { callbacks.onFailed(new Error("GoEasy 在线成员数据格式异常")); return; }
+              members.forEach(addPeer);
+              callbacks.onSuccess();
+            }, onFailed: callbacks.onFailed
+          }));
+          if (!stillWaiting()) { stopCancelledAttempt(); return; }
+          publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession } });
+          queueTimer = setInterval(() => {
+            if ((!opponentId || bigOnline) && connected && overlayState === "waiting") {
+              publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession } });
+              tryMatch();
+            }
+          }, 2500);
+          tryMatch();
+          $("overlayStatus").textContent = peers.size ? `找到 ${peers.size} 位在线玩家，正在匹配…` : "已连接，正在等待对手加入…";
+        } catch (error) {
+          if (onlineAttemptId !== attemptId) return;
+          console.error("GoEasy 联机失败：", error);
+          refundStake();
+          closeOnline();
+          showMenu("暂时无法联机", "请确认网络连接和 GoEasy 服务状态。");
+          $("overlayStatus").textContent = error.message || "连接失败，请稍后重试。";
+        }
+      }
+      function addPeer(member) {
+        if (!member || typeof member.id !== "string" || member.id === peerId || !member.id.startsWith("catball-pvp-")) return;
+        const profile = member.data || {};
+        peers.set(member.id, {
+          name: String(profile.nickname || profile.catName || "联机玩家").slice(0, 16),
+          cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(profile.cosmetic) ? profile.cosmetic : "",
+          profession: validProfession(profile.profession)
+        });
+      }
+      function handlePresence(event) {
+        if (!event || !event.member) return;
+        if (event.action === "join") {
+          addPeer(event.member);
+          publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession } });
+          tryMatch();
+        } else if (event.action === "leave") {
+          peers.delete(event.member.id);
+          if (bigOnline && state && state.host && state.running && onlineRoster.some(profile => profile.peerId === event.member.id)) {
+            const departed = state.players.find(player => player.peerId === event.member.id);
+            if (departed) departed.hp = 0;
+            if (departed) addParticles(departed.x, departed.y, "#89949c", 14);
+          }
+          if (bigOnline && state && state.host) return;
+          if (event.member.id === opponentId) {
+            if (state && state.running) {
+              const localSide = state.localPlayerId || (state.host ? "p1" : "p2");
+              showResult(state.players.find(player => player.id === localSide), "对手已离线，本局判你获胜。");
+            } else if (!state && stakeReserved) {
+              refundStake();
+              closeOnline(false);
+              showMenu("对手已离线", "本局尚未开始，战利品已退还。请重新匹配。");
+            } else {
+              closeOnline(false);
+            }
+          }
+        }
+      }
+      function publishLobby(data) {
+        if (!connected || !goeasy) return;
+        goeasy.pubsub.publish({
+          channel: activeLobby, message: JSON.stringify(data),
+          onSuccess: () => {}, onFailed: error => console.error("GoEasy 匹配消息发送失败：", error)
+        });
+      }
+      function onLobbyMessage(message) {
+        try {
+          const data = typeof message.content === "string" ? JSON.parse(message.content) : message.content;
+          if (!data || data.type !== "ready" || typeof data.from !== "string" || data.from === peerId) return;
+          peers.set(data.from, {
+            name: String((data.profile && data.profile.name) || "联机玩家").slice(0, 16),
+            cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(data.profile && data.profile.cosmetic) ? data.profile.cosmetic : "",
+            profession: validProfession(data.profile && data.profile.profession)
+          });
+          tryMatch();
+        } catch (error) {
+          console.warn("忽略无法解析的匹配消息：", error);
+        }
+      }
+      function tryMatch() {
+        if (bigOnline) {
+          if (!connected || state || overlayState !== "waiting") return;
+          const ids = [...new Set([peerId, ...peers.keys()])].sort();
+          const targetCount = largeConfig ? largeConfig.onlineCount : 2;
+          if (ids.length < targetCount || ids[0] !== peerId) return;
+          const roster = ids.slice(0, targetCount).map(id => ({
+            peerId: id,
+            ...(id === peerId
+              ? { name: catName, cosmetic, profession: selectedProfession }
+              : peers.get(id))
+          }));
+          clearInterval(queueTimer);
+          queueTimer = null;
+          makeLargeOnlineGame(roster, true);
+          return;
+        }
+        if (!connected || opponentId || overlayState !== "waiting") return;
+        const candidate = [...peers.keys()].filter(id => id < peerId).sort()[0];
+        if (!candidate) return;
+        const profile = peers.get(candidate);
+        opponentId = candidate;
+        opponentProfile = profile;
+        publishDirect(candidate, {
+          type: "offer", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession },
+          stake: lockedStake, loadout: selectedLoadoutData()
+        });
+        $("overlayStatus").textContent = `正在与 ${profile.name} 握手…`;
+      }
+      function publishDirect(to, data) {
+        if (!connected || !goeasy || !to) return;
+        goeasy.pubsub.publish({
+          channel: `${activeInbox}${to}`,
+          message: JSON.stringify({ from: peerId, to, data }),
+          onSuccess: () => {}, onFailed: error => console.error("GoEasy 对战消息发送失败：", error)
+        });
+      }
+      function onDirectMessage(message) {
+        let envelope;
+        try { envelope = typeof message.content === "string" ? JSON.parse(message.content) : message.content; }
+        catch (error) { console.warn("忽略无法解析的联机消息：", error); return; }
+        if (!envelope || envelope.to !== peerId || typeof envelope.from !== "string" || !envelope.data) return;
+        const { from, data } = envelope;
+        if (data.type === "bigStart" && bigOnline && !state && typeof data.hostId === "string" &&
+            from === data.hostId && Array.isArray(data.roster) && data.state &&
+            data.state.bigOnline && Array.isArray(data.state.players)) {
+          const roster = data.roster.filter(profile => profile && typeof profile.peerId === "string");
+          if (!roster.some(profile => profile.peerId === peerId) || !roster.some(profile => profile.peerId === from)) return;
+          onlineRoster = roster;
+          opponentId = from;
+          clearInterval(queueTimer);
+          queueTimer = null;
+          configureArena(8, false);
+          state = { ...data.state, host: false };
+          const localPlayer = state.players.find(player => player.peerId === peerId);
+          if (!localPlayer) { state = null; return; }
+          state.localPlayerId = localPlayer.id;
+          terrain = (state.arenaTerrain || []).map(rect => ({ ...rect }));
+          largeConfig = { type: "online", onlineCount: roster.length };
+          camera = {
+            x: state.players.find(player => player.id === state.localPlayerId).x,
+            y: state.players.find(player => player.id === state.localPlayerId).y
+          };
+          mode = "online";
+          $("gameStatus").textContent = `大战场联机 · ${roster.length} 名玩家`;
+          $("shopButton").disabled = true;
+          $("overlay").hidden = true;
+          updateNames();
+        } else if (data.type === "offer" && overlayState === "waiting" && !opponentId) {
+          if (!Number.isSafeInteger(data.stake) || data.stake < 0 ||
+              data.stake > 1000000 || !data.loadout || typeof data.loadout !== "object") return;
+          opponentId = from;
+          opponentStake = data.stake;
+          const profile = data.profile || {};
+          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(profile.cosmetic) ? profile.cosmetic : "", profession: validProfession(profile.profession) };
+          publishDirect(from, {
+            type: "accept", profile: { name: catName, cosmetic, profession: selectedProfession },
+            stake: lockedStake, loadout: selectedLoadoutData()
+          });
+          $("overlayStatus").textContent = `已连接 ${opponentProfile.name}，等待开战…`;
+        } else if (data.type === "accept" && from === opponentId && !state) {
+          if (!Number.isSafeInteger(data.stake) || data.stake < 0 ||
+              data.stake > 1000000 || !data.loadout || typeof data.loadout !== "object") return;
+          opponentStake = data.stake;
+          const profile = data.profile || {};
+          opponentProfile = { name: String(profile.name || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(profile.cosmetic) ? profile.cosmetic : "", profession: validProfession(profile.profession) };
+          makeGame("online", {
+            host: true, opponentName: opponentProfile.name, opponentCosmetic: opponentProfile.cosmetic,
+            opponentProfession: opponentProfile.profession,
+            opponentStake, opponentLoadout: sanitizeLoadout(data.loadout)
+          });
+          publishDirect(from, {
+            type: "start", hostName: catName, hostCosmetic: cosmetic, hostProfession: selectedProfession,
+            guestName: opponentProfile.name, guestCosmetic: opponentProfile.cosmetic,
+            guestProfession: opponentProfile.profession, gameId: state.id,
+            hostStake: lockedStake, guestStake: opponentStake,
+            hostLoadout: selectedLoadoutData(), guestLoadout: sanitizeLoadout(data.loadout)
+          });
+        } else if (data.type === "start" && from === opponentId && !state) {
+          if (typeof data.gameId !== "string" ||
+              !Number.isSafeInteger(data.hostStake) || data.hostStake !== opponentStake ||
+              !Number.isSafeInteger(data.guestStake) || data.guestStake !== lockedStake ||
+              !data.hostLoadout || typeof data.hostLoadout !== "object") return;
+          const profile = { name: String(data.hostName || "联机玩家").slice(0, 16), cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(data.hostCosmetic) ? data.hostCosmetic : "", profession: validProfession(data.hostProfession) };
+          opponentProfile = profile;
+          makeGame("online", {
+            host: false, opponentName: profile.name, opponentCosmetic: profile.cosmetic,
+            hostProfession: profile.profession, opponentProfession: validProfession(data.guestProfession),
+            opponentStake, hostLoadout: sanitizeLoadout(data.hostLoadout), gameId: data.gameId
+          });
+        } else if (data.type === "input" && bigOnline && state && state.bigOnline && state.host && state.running &&
+                   onlineRoster.some(profile => profile.peerId === from) &&
+                   data.input && typeof data.input === "object") {
+          const remote = state.players.find(player => player.peerId === from);
+          if (remote) {
+            remote.remoteInput = {
+              x: clamp(Number(data.input.x) || 0, -1, 1), y: clamp(Number(data.input.y) || 0, -1, 1),
+              aim: Number.isFinite(data.input.aim) ? data.input.aim : remote.aim,
+              fire: Boolean(data.input.fire), pulse: Boolean(data.input.pulse)
+            };
+          }
+        } else if (data.type === "input" && from === opponentId && state && state.host && state.running &&
+                   data.input && typeof data.input === "object") {
+          const remote = state.players[1];
+          remote.remoteInput = {
+            x: clamp(Number(data.input.x) || 0, -1, 1), y: clamp(Number(data.input.y) || 0, -1, 1),
+            aim: Number.isFinite(data.input.aim) ? data.input.aim : remote.aim,
+            fire: Boolean(data.input.fire), pulse: Boolean(data.input.pulse)
+          };
+        } else if (data.type === "action" && state && state.host && state.running &&
+                   (bigOnline ? onlineRoster.some(profile => profile.peerId === from) : from === opponentId)) {
+          const remotePlayer = bigOnline ? state.players.find(player => player.peerId === from) : null;
+          const playerId = bigOnline ? remotePlayer && remotePlayer.id : data.playerId;
+          if (!bigOnline && playerId !== "p2") return;
+          if (data.ability === "profession" && playerId) activateProfessionSkill(playerId);
+          else if (["pearl", "drone"].includes(data.ability) && playerId) activateAbility(playerId, data.ability);
+        } else if (data.type === "petRoster" && from === opponentId && state && !state.host &&
+                   state.running && (data.playerId === "p1" || data.playerId === "p2") &&
+                   Array.isArray(data.pets)) {
+          const owner = state.players.find(player => player.id === data.playerId);
+          if (owner) owner.pets = data.pets.map(pet => ({ ...pet }));
+        } else if (data.type === "state" && from === opponentId && state && !state.host && data.state && data.state.id === state.id) {
+          const localPlayerId = state.localPlayerId;
+          state = { ...data.state, host: false, localPlayerId };
+          updateNames();
+        } else if (data.type === "finish" && from === opponentId && state && !state.host) {
+          const winner = state.players.find(player => player.id === data.winner) || null;
+          if (winner) winner.name = String(data.winnerName || winner.name).slice(0, 16);
+          showResult(winner, winner ? `${winner.name} 获胜！` : "平局。");
+        } else if (data.type === "quit" && (from === opponentId ||
+                   bigOnline && state && state.host && onlineRoster.some(profile => profile.peerId === from))) {
+          if (bigOnline && state && state.host) {
+            const departed = state.players.find(player => player.peerId === from);
+            if (departed) departed.hp = 0;
+            return;
+          }
+          if (state && state.running) {
+            const localSide = state.localPlayerId || (state.host ? "p1" : "p2");
+            showResult(state.players.find(player => player.id === localSide), "对手离开对战，本局判你获胜。");
+            closeOnline(false);
+          } else if (!state && stakeReserved) {
+            refundStake();
+            closeOnline(false);
+            showMenu("对手已离开", "本局尚未开始，战利品已退还。");
+          } else {
+            closeOnline(false);
+          }
+        }
+      }
+      function sendInput(pulse = false) {
+        if (!connected || !opponentId || !state || state.host || !state.running) return;
+        const now = performance.now();
+        if (!pulse && now - lastInputSend < 45) return;
+        lastInputSend = now;
+        const player = controlledPlayer();
+        const x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
+        const y = (keys.has("KeyS") || touchInput.down ? 1 : 0) - (keys.has("KeyW") || touchInput.up ? 1 : 0);
+        publishDirect(opponentId, {
+          type: "input", seq: ++inputSeq, playerId: player.id,
+          input: { x, y, aim: player.aim, fire: keys.has("Space") || touchInput.fire, pulse }
+        });
+      }
+      function broadcast(data) {
+        if (bigOnline && state && state.bigOnline) {
+          onlineRoster.filter(profile => profile.peerId !== peerId)
+            .forEach(profile => publishDirect(profile.peerId, data));
+        } else if (opponentId) publishDirect(opponentId, data);
+      }
+      function closeOnline(notifyOpponent = true) {
+        onlineAttemptId++;
+        clearInterval(queueTimer);
+        queueTimer = null;
+        if (notifyOpponent && connected) {
+          if (bigOnline) onlineRoster.filter(profile => profile.peerId !== peerId)
+            .forEach(profile => publishDirect(profile.peerId, { type: "quit" }));
+          else if (opponentId) publishDirect(opponentId, { type: "quit" });
+        }
+        if (goeasy) {
+          try { goeasy.disconnect({}); }
+          catch (error) { console.error("关闭 GoEasy 连接失败：", error); }
+        }
+        goeasy = null; connected = false; peerId = ""; opponentId = "";
+        opponentProfile = null; peers.clear(); onlineRoster = [];
+        activeLobby = LOBBY; activeInbox = INBOX;
+      }
+      function returnToMenu() {
+        if (mode === "online") {
+          if (state && state.running) {
+            const localSide = state.localPlayerId || (state.host ? "p1" : "p2");
+            settleMatch(state.players.find(player => player.id !== localSide), false);
+          } else if (!state && stakeReserved) {
+            refundStake();
+          }
+          closeOnline();
+        } else if (state && state.running) {
+          settleMatch(null, false);
+        }
+        state = null; mode = ""; largeConfig = null; bigOnline = false; keys.clear();
+        showMenu();
+      }
+
+      document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => {
+        if (button.dataset.mode === "ai") showDifficulty();
+        else if (button.dataset.mode === "local") { makeGame("local", null, emptyLoadout()); spawnItem(); spawnItem(); }
+        else if (button.dataset.mode === "large") showLargeSetup();
+        else showSetup("online", true);
+      }));
+      document.querySelectorAll("[data-difficulty]").forEach(button => button.addEventListener("click", () => {
+        aiDifficulty = Number(button.dataset.difficulty);
+        showSetup("ai", true);
+      }));
+      $("difficultyCancel").addEventListener("click", () => showMenu());
+      for (let count = 5; count <= 20; count++) {
+        $("largeEnemyCount").add(new Option(String(count), String(count)));
+      }
+      for (let count = 2; count <= 20; count++) {
+        $("largeOnlineCount").add(new Option(String(count), String(count)));
+      }
+      $("largeType").addEventListener("change", refreshLargeSetup);
+      $("largeTeamSize").addEventListener("change", refreshLargeSetup);
+      $("largeEnemyCount").addEventListener("change", refreshLargeSetup);
+      $("largeProfessionToggle").addEventListener("click", () => {
+        const panel = $("largeProfessionPanel");
+        panel.hidden = !panel.hidden;
+        $("largeProfessionToggle").setAttribute("aria-expanded", String(!panel.hidden));
+      });
+      $("largeProfessionReset").addEventListener("click", () => {
+        if (largeConfig) largeConfig.aiProfessions = {};
+        renderLargeProfessionAssignments();
+      });
+      $("largeCancel").addEventListener("click", () => { largeConfig = null; showMenu(); });
+      $("largeStart").addEventListener("click", () => {
+        const type = $("largeType").value;
+        largeConfig = {
+          type, teamSize: Number($("largeTeamSize").value), enemyCount: Number($("largeEnemyCount").value),
+          onlineCount: Number($("largeOnlineCount").value), difficulty: Number($("largeDifficulty").value),
+          profession: $("largeProfession").value,
+          aiProfessions: largeConfig && largeConfig.aiProfessions || {}
+        };
+        if (type === "online") {
+          $("largeStatus").textContent = "正在准备大战场联机…";
+          bigOnline = true;
+          startOnline();
+        } else {
+          makeLargeGame(largeConfig);
+        }
+      });
+      $("setupStart").addEventListener("click", () => {
+        const gameMode = setupMode;
+        const loadout = selectedLoadoutData();
+        readProfile();
+        if (loadout.pets.length > PET_LIMIT || loadout.equipment.length > EQUIPMENT_LIMIT) {
+          $("setupStatus").textContent = "最多装备 2 个宠物和 2 件装备。";
+          return;
+        }
+        if (gameMode === "online") {
+          const stake = Number($("bountyInput").value);
+          if (!Number.isSafeInteger(stake) || stake < 0 || stake > points) {
+            $("setupStatus").textContent = `战利品必须是 0 到当前积分 ${points} 之间的整数。`;
+            return;
+          }
+          if (!persistArenaChanges(-stake, arenaBag)) {
+            $("setupStatus").textContent = "战利品锁定失败，请检查积分数据后重试。";
+            return;
+          }
+          lockedStake = stake;
+          opponentStake = 0;
+          stakeReserved = true;
+          setupMode = "";
+          startOnline();
+        } else {
+          setupMode = "";
+          makeGame("ai", null, loadout);
+          spawnItem(); spawnItem();
+        }
+      });
+      $("setupCancel").addEventListener("click", () => showMenu());
+      $("overlayAction").addEventListener("click", () => {
+        if (overlayState === "waiting") returnToMenu();
+        else if (overlayState === "result") returnToMenu();
+      });
+      $("shopButton").addEventListener("click", openShop);
+      $("loadoutShopButton").addEventListener("click", openShop);
+      $("shopClose").addEventListener("click", closeShop);
+      $("shopProducts").addEventListener("click", event => {
+        const button = event.target.closest("[data-buy]");
+        if (button) buyItem(button.dataset.buy);
+      });
+      $("bagList").addEventListener("click", event => {
+        const button = event.target.closest("[data-heal]");
+        if (button) healBagPet(button.dataset.heal);
+      });
+      $("professionList").addEventListener("click", event => {
+        const button = event.target.closest("[data-profession-select]");
+        if (!button) return;
+        if (button.dataset.professionUnlock) {
+          unlockProfession(button.dataset.professionUnlock);
+          return;
+        }
+        selectedProfession = button.dataset.professionSelect;
+        $("setupStatus").textContent = selectedProfession
+          ? `${professionSpecs[selectedProfession].name}已选择。`
+          : "已选择无职业。";
+        renderProfessions();
+      });
+      $("menuButton").addEventListener("click", returnToMenu);
+      window.addEventListener("storage", event => {
+        if (event.key === ECONOMY_KEY || event.key === NAME_KEY) readProfile();
+      });
+      window.addEventListener("beforeunload", () => {
+        if (opponentId && connected) publishDirect(opponentId, { type: "quit" });
+        if (goeasy) goeasy.disconnect({});
+      });
+      readProfile();
+      showMenu();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

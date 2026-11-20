@@ -1338,6 +1338,11 @@
         const id = mode === "online" ? state.localPlayerId || (state.host ? "p1" : "p2") : "p1";
         return state.players.find(player => player.id === id) || state.players[0];
       }
+      function viewTarget() {
+        const local = controlledPlayer();
+        if (!local || local.hp > 0) return local;
+        return state.players.find(player => player.hp > 0 && player.team === local.team) || local;
+      }
 
       function showMenu(title = "准备好开战了吗？", copy = "收集场地道具并击败对手。生命值归零时战斗结束。") {
         overlayState = "menu";
@@ -1866,6 +1871,7 @@
           amount -= absorbed;
         }
         if (amount > 0) target.hp = Math.max(0, target.hp - amount);
+        if (target.hp < 1) target.hp = 0;
         target.invulnerable = .12;
       }
       function hitCover(x, y) {
@@ -2108,6 +2114,11 @@
       }
 
       function updatePlayer(player, dt) {
+        if (player.hp <= 0) {
+          player.input.x = 0; player.input.y = 0;
+          player.input.fire = false; player.input.pulse = false;
+          return;
+        }
         player.attackCooldown = Math.max(0, player.attackCooldown - dt);
         player.meleeCooldown = Math.max(0, player.meleeCooldown - dt);
         player.invulnerable = Math.max(0, player.invulnerable - dt);
@@ -2298,7 +2309,7 @@
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
             shot.vx *= Math.pow(.982, dt * 60); shot.vy *= Math.pow(.982, dt * 60);
             const owner = state.players.find(player => player.id === shot.owner);
-            const hitTarget = state.players.filter(player => owner ? isEnemy(owner, player) : player.id !== shot.owner)
+            const hitTarget = state.players.filter(player => (owner ? isEnemy(owner, player) : player.id !== shot.owner) && player.hp > 0)
               .some(player => distance(player, shot) < 25 ||
                 player.pets.some(pet => pet.alive && distance(pet, shot) < 23));
             if (hitTarget || hitCover(shot.x, shot.y) || shot.x < 52 || shot.x > W - 52 || shot.y < 52 || shot.y > H - 52 || shot.age > .9) {
@@ -2309,6 +2320,7 @@
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
             const owner = state.players.find(player => player.id === shot.owner);
             const target = state.players.find(player => (owner ? isEnemy(owner, player) : player.id !== shot.owner) &&
+              player.hp > 0 &&
               distance(player, shot) < 23 && !hitCover((player.x + shot.x) / 2, (player.y + shot.y) / 2));
             if (target) {
               applyDamage(target, shot.damage);
@@ -2325,7 +2337,7 @@
             shot.x += shot.vx * dt; shot.y += shot.vy * dt;
             let hitTarget = null, hitDistance = Infinity;
             const owner = state.players.find(player => player.id === shot.owner);
-            state.players.filter(player => owner ? isEnemy(owner, player) : player.id !== shot.owner).forEach(player => {
+            state.players.filter(player => (owner ? isEnemy(owner, player) : player.id !== shot.owner) && player.hp > 0).forEach(player => {
               const playerDistance = distance(player, shot);
               if (playerDistance < 23 && playerDistance < hitDistance) { hitTarget = player; hitDistance = playerDistance; }
               player.pets.filter(pet => pet.alive).forEach(pet => {
@@ -2479,8 +2491,9 @@
             `生存 ${Math.floor(state.elapsed)} 秒 · 击败 ${state.survivalKills} 名敌人 · 场上 ${enemies.length} 个`;
         }
         if (state.players[0]) {
-          camera.x += (state.players[0].x - camera.x) * Math.min(1, dt * 7);
-          camera.y += (state.players[0].y - camera.y) * Math.min(1, dt * 7);
+          const target = viewTarget() || state.players[0];
+          camera.x += (target.x - camera.x) * Math.min(1, dt * 7);
+          camera.y += (target.y - camera.y) * Math.min(1, dt * 7);
           camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
           camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
         }
@@ -2504,6 +2517,19 @@
           }
         });
         if ((mode === "large" || state.bigOnline) && state.gameType !== "survival") {
+          if (mode === "large" && state.players[0]) {
+            const local = state.players[0];
+            if (local.hp > 0) state.playerDown = false;
+            else if (!state.playerDown) {
+              state.playerDown = true;
+              if (state.gameType === "brawl") {
+                const rival = state.players.find(player => player.hp > 0 && isEnemy(local, player));
+                showResult(rival, "你已被击败，大混战结束。");
+              } else {
+                $("gameStatus").textContent = "你已阵亡 · 观战中";
+              }
+            }
+          }
           const aliveTeams = new Set(state.players.filter(player => player.hp > 0).map(player => player.team));
           if (aliveTeams.size <= 1) {
             const survivingTeam = aliveTeams.values().next().value;
@@ -2718,7 +2744,7 @@
           });
           ctx.globalAlpha = 1;
           state.players.forEach(player => player.pets.forEach(drawPet));
-          state.players.forEach(drawPlayer);
+          state.players.forEach(player => { if (player.hp > 0) drawPlayer(player); });
         } else {
           ctx.fillStyle = "#52616e"; ctx.font = "700 20px sans-serif"; ctx.textAlign = "center";
           ctx.fillText("选择一种模式，开始猫球对决", VIEW_W / 2, VIEW_H / 2);
@@ -2860,7 +2886,7 @@
         }
         updateGame(dt);
         if (state && mode === "online" && state.bigOnline && !state.host) {
-          const player = controlledPlayer();
+          const player = viewTarget() || controlledPlayer();
           camera.x += (player.x - camera.x) * Math.min(1, dt * 7);
           camera.y += (player.y - camera.y) * Math.min(1, dt * 7);
           camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
