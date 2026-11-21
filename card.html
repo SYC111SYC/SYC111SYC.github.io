@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>争上游 · 进贡局</title>
+<style>
+
+  * { box-sizing: border-box; font-family: system-ui; }
+  html, body { margin: 0; }
+  body {
+    max-width: 900px; margin: 16px auto; padding: 0 12px;
+    color: #303545; background: #fff;
+  }
+  [hidden] { display: none !important; }
+  .app { width: auto; display: block; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin: 10px 0;
+    padding: 12px; border: 1px solid #ccc; border-radius: 8px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark {
+    width: 38px; height: 38px; border-radius: 50%; display: grid;
+    place-items: center; background: #8fb0ff; color: #fff;
+    font-size: 18px; font-weight: 800;
+  }
+  .brand-text h1 { margin: 0; font-size: 19px; }
+  .brand-text p { margin: 2px 0 0; font-size: 12px; color: #6b7280; }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .round-chip {
+    padding: 5px 10px; border: 1px solid #cbd1dc; border-radius: 99px;
+    background: #f3f4f6; color: #58497d; font-size: 12px; font-weight: 700;
+  }
+
+  button {
+    padding: 7px 11px; border: 0; border-radius: 6px; background: #8fb0ff;
+    color: #fff; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .btn { padding: 7px 11px; border: 0; border-radius: 6px; background: #8fb0ff; color: #fff; font-weight: 700; }
+  .btn.primary { background: #8fb0ff; color: #fff; }
+  .btn.ghost {
+    padding: 6px 10px; border: 1px solid #cbd1dc; border-radius: 6px;
+    background: #fff; color: #303545; font-weight: 700;
+  }
+  .btn.ghost:hover { background: #f3f4f6; }
+
+  .table {
+    position: relative; min-height: 440px; margin: 10px 0;
+    border: 2px solid #d5c6a4; border-radius: 14px;
+    background: linear-gradient(#e9f7ff 0 70%, #dff0cf 70%);
+    overflow: hidden;
+  }
+  .seat {
+    position: absolute; display: flex; flex-direction: column; gap: 6px;
+    min-width: 132px; padding: 8px 10px;
+    border: 1px solid #cbd1dc; border-radius: 8px;
+    background: #ffffffe6; box-shadow: 0 1px 5px #00000014;
+  }
+  .seat-top { top: 12px; left: 50%; transform: translateX(-50%); align-items: center; }
+  .seat-left { left: 12px; top: 50%; transform: translateY(-50%); }
+  .seat-right { right: 12px; top: 50%; transform: translateY(-50%); }
+  .seat.active { border-color: #8fb0ff; box-shadow: 0 0 0 2px #8fb0ff33, 0 1px 5px #00000014; }
+  .seat.finished { opacity: .55; }
+  .seat-head { display: flex; align-items: center; gap: 6px; }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%; display: grid;
+    place-items: center; background: #8fb0ff; color: #fff;
+    font-size: 12px; font-weight: 700; flex: 0 0 auto;
+  }
+  .seat.active .avatar { background: #58497d; }
+  .seat-name { font-size: 13px; font-weight: 700; color: #303545; }
+  .role-tag {
+    padding: 1px 7px; border: 1px solid #e8c877; border-radius: 99px;
+    background: #ffe4a8; color: #704716; font-size: 10px; font-weight: 700;
+  }
+  .seat-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .count-tag { font-size: 11px; color: #6b7280; }
+  .turn-dot { width: 7px; height: 7px; border-radius: 50%; background: #d5dbe5; flex: 0 0 auto; }
+  .seat.active .turn-dot { background: #8fb0ff; box-shadow: 0 0 6px #8fb0ff; }
+  .seat-cards { display: flex; align-items: center; }
+  .seat-cards .mini-card + .mini-card { margin-left: -10px; }
+  .mini-card {
+    width: 18px; height: 26px; border: 1px solid #8fb0ff; border-radius: 3px;
+    background: #eef4ff; flex: 0 0 auto;
+  }
+
+  .center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    padding: 112px 150px 58px; text-align: center; pointer-events: none;
+  }
+  .center-head { display: flex; flex-direction: column; gap: 3px; }
+  .turn-text { font-size: 15px; font-weight: 700; color: #58497d; }
+  .trick-text { font-size: 12px; color: #596b80; }
+  .trick { min-height: 82px; display: flex; align-items: center; justify-content: center; }
+  .trick .card { width: 48px; height: 67px; pointer-events: none; }
+  .trick .card + .card { margin-left: -16px; }
+  .trick-empty { margin: 0; font-size: 12px; color: #7a8798; }
+  .center-foot { font-size: 11px; color: #7a8798; }
+
+  .card {
+    position: relative; width: 56px; height: 78px; flex: 0 0 auto;
+    padding: 0; border: 1px solid #cbd1dc; border-radius: 7px;
+    background: #fff; color: #303545; cursor: pointer;
+    box-shadow: 0 1px 4px #0000001a;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .card.red { color: #d0463f; }
+  .card .corner {
+    position: absolute; top: 4px; left: 5px; display: flex;
+    flex-direction: column; align-items: center; line-height: 1; font-weight: 800;
+  }
+  .card .corner b { font-size: 14px; }
+  .card .corner i { font-style: normal; font-size: 11px; margin-top: 1px; }
+  .card .pip { position: absolute; right: 6px; bottom: 4px; font-size: 20px; opacity: .8; }
+  .card:hover { transform: translateY(-6px); }
+  .card.picked { transform: translateY(-14px); box-shadow: 0 0 0 2px #8fb0ff, 0 6px 14px #8fb0ff40; }
+  .card.locked { cursor: default; }
+
+  .me-panel {
+    margin: 10px 0; padding: 10px 12px;
+    border: 1px solid #ccc; border-radius: 8px; background: #fff;
+  }
+  .me-panel.active { border-color: #8fb0ff; box-shadow: 0 0 0 2px #8fb0ff33; }
+  .me-head { display: flex; align-items: center; gap: 8px; }
+  .me-title { display: flex; flex-direction: column; }
+  .me-title strong { font-size: 13px; }
+  .me-title span { font-size: 11px; color: #6b7280; }
+  .me-tags { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .my-hand {
+    display: flex; align-items: flex-end; min-height: 88px;
+    padding: 16px 4px 4px; overflow-x: auto;
+  }
+  .my-hand .card + .card { margin-left: -22px; }
+  .my-hand .card { margin-top: 14px; }
+  .my-hand .card.picked { margin-top: 0; }
+
+  .actionbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin: 10px 0 22px;
+  }
+  .action-buttons { display: flex; gap: 8px; }
+  .statusline { flex: 1; min-width: 200px; text-align: right; font-size: 12px; color: #6b7280; }
+  .statusline.warn { color: #b45309; }
+  .statusline.good { color: #15803d; }
+
+  .stage-msg {
+    position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
+    background: #ffffffc9; color: #58497d;
+    font-size: 24px; font-weight: 800; letter-spacing: .1em;
+  }
+
+  .modal {
+    position: fixed; inset: 0; z-index: 50; display: flex;
+    align-items: center; justify-content: center; padding: 20px;
+    background: #1f293766;
+  }
+  .modal-card {
+    width: min(620px, 100%); max-height: 82vh; overflow: auto;
+    padding: 18px 20px; border: 1px solid #ccc; border-radius: 10px;
+    background: #fff; box-shadow: 0 10px 30px #00000033;
+  }
+  .modal-card h2 { margin: 0 0 10px; font-size: 18px; color: #303545; }
+  .modal-body { font-size: 13px; line-height: 1.7; color: #303545; }
+  .modal-body h3 { margin: 14px 0 4px; font-size: 13px; color: #58497d; }
+  .modal-body p { margin: 0 0 8px; }
+  .modal-body ul { margin: 0 0 8px; padding-left: 18px; }
+  .modal-body li { margin: 2px 0; }
+  .modal-body table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .modal-body th, .modal-body td { padding: 7px 9px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+  .modal-body th { color: #6b7280; font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+  .modal-body .place { color: #58497d; font-weight: 700; }
+  .rank-line { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 10px; }
+  .rank-line span {
+    padding: 3px 8px; border: 1px solid #cbd1dc; border-radius: 5px;
+    background: #f3f4f6; font-weight: 700;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .tribute-flow { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .tribute-chip {
+    padding: 8px 12px; border: 1px solid #cbd1dc; border-radius: 6px;
+    background: #f3f4f6; font-weight: 700;
+  }
+  .tribute-arrow { color: #8fb0ff; font-size: 16px; }
+
+  @media (max-width: 520px) {
+    .table { min-height: 390px; }
+    .seat { min-width: 96px; padding: 6px 8px; }
+    .seat-left { left: 6px; }
+    .seat-right { right: 6px; }
+    .seat-cards { display: none; }
+    .center { padding: 96px 98px 48px; }
+    .card { width: 50px; height: 70px; }
+    .my-hand .card + .card { margin-left: -32px; }
+    .statusline { text-align: left; }
+  }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">争</div>
+      <div class="brand-text">
+        <h1>争上游 · 进贡局</h1>
+        <p>四人一桌 · 一副牌 · 炸弹与火箭 · 下游进贡</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span class="round-chip" id="roundChip">第 1 局</span>
+      <button class="btn ghost" id="rulesBtn" type="button">规则</button>
+      <button class="btn ghost" id="rankBtn" type="button">排行榜</button>
+      <button class="btn ghost" id="restartBtn" type="button">重开</button>
+    </div>
+  </header>
+
+  <section class="table" id="table">
+    <article class="seat seat-top" id="seat2">
+      <div class="seat-head">
+        <span class="avatar">对</span>
+        <span class="seat-name">对家</span>
+        <span class="role-tag" id="role2" hidden>上游</span>
+      </div>
+      <div class="seat-cards" id="hand2"></div>
+      <div class="seat-meta"><span class="count-tag" id="count2">13 张</span><span class="turn-dot"></span></div>
+    </article>
+    <article class="seat seat-left" id="seat3">
+      <div class="seat-head">
+        <span class="avatar">上</span>
+        <span class="seat-name">上家</span>
+        <span class="role-tag" id="role3" hidden>上游</span>
+      </div>
+      <div class="seat-cards" id="hand3"></div>
+      <div class="seat-meta"><span class="count-tag" id="count3">13 张</span><span class="turn-dot"></span></div>
+    </article>
+    <article class="seat seat-right" id="seat1">
+      <div class="seat-head">
+        <span class="avatar">下</span>
+        <span class="seat-name">下家</span>
+        <span class="role-tag" id="role1" hidden>上游</span>
+      </div>
+      <div class="seat-cards" id="hand1"></div>
+      <div class="seat-meta"><span class="count-tag" id="count1">13 张</span><span class="turn-dot"></span></div>
+    </article>
+
+    <div class="center">
+      <div class="center-head">
+        <span class="turn-text" id="turnText">轮到你出牌</span>
+        <span class="trick-text" id="trickText">自由出牌</span>
+      </div>
+      <div class="trick" id="trick"><p class="trick-empty">桌面空着，出任意合法牌型</p></div>
+      <div class="center-foot">出牌顺序：你 → 右手边 → 对家 → 左手边</div>
+    </div>
+    <div class="stage-msg" id="stageMsg" hidden></div>
+  </section>
+
+  <section class="me-panel" id="mePanel">
+    <div class="me-head">
+      <span class="avatar">你</span>
+      <div class="me-title"><strong>你</strong><span id="myRole">等待发牌</span></div>
+      <div class="me-tags">
+        <span class="count-tag" id="count0">13 张</span>
+      </div>
+    </div>
+    <div class="my-hand" id="myHand"></div>
+  </section>
+
+  <footer class="actionbar">
+    <div class="action-buttons">
+      <button class="btn" id="passBtn" type="button">过牌</button>
+      <button class="btn primary" id="playBtn" type="button">出牌</button>
+      <button class="btn" id="hintBtn" type="button">提示</button>
+    </div>
+    <div class="statusline" id="statusline">选择手牌后点击「出牌」</div>
+  </footer>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-card">
+    <h2 id="modalTitle"></h2>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </div>
+</div>
+
+<script>
+const RANKS = ["4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2", "3"];
+const SUITS = ["♠", "♥", "♣", "♦"];
+const VAL = {};
+const BOMB_VAL = {};
+RANKS.forEach((rank, index) => { VAL[rank] = index + 1; BOMB_VAL[rank] = index + 1; });
+const SEQUENCE_MAX = VAL.A;
+const PLACE_NAMES = ["上游", "二游", "三游", "下游"];
+const PLACE_POINTS = [4, 2, 1, 0];
+const SEAT_NAMES = ["你", "下家", "对家", "上家"];
+
+let game = null;
+let selected = new Set();
+let hintList = [];
+let hintIndex = -1;
+let roundToken = 0;
+let actionLock = false;
+
+function createDeck() {
+  const deck = [];
+  SUITS.forEach(suit => RANKS.forEach(rank => {
+    deck.push({ id: `${rank}-${suit}`, rank, suit });
+  }));
+  return deck;
+}
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+function sortHand(hand) {
+  hand.sort((a, b) => VAL[a.rank] - VAL[b.rank] || SUITS.indexOf(a.suit) - SUITS.indexOf(b.suit));
+  return hand;
+}
+function findCard(hand, id) { return hand.find(card => card.id === id) || null; }
+function isRed(card) { return card.suit === "♥" || card.suit === "♦"; }
+
+function groupByRank(hand) {
+  const map = new Map();
+  hand.forEach(card => {
+    if (!map.has(card.rank)) map.set(card.rank, []);
+    map.get(card.rank).push(card);
+  });
+  return map;
+}
+
+function analyzeCombo(cards) {
+  const count = cards.length;
+  if (!count) return null;
+  const sorted = [...cards].sort((a, b) => VAL[a.rank] - VAL[b.rank]);
+  const values = sorted.map(card => VAL[card.rank]);
+  const unique = [...new Set(values)];
+  if (count === 1) return { kind: "normal", type: "single", val: values[0], len: 1, cards: sorted };
+  if (count === 2 && unique.length === 1) return { kind: "normal", type: "pair", val: values[0], len: 1, cards: sorted };
+  if (count === 3 && unique.length === 1) return { kind: "bomb", type: "bomb", val: BOMB_VAL[sorted[0].rank], len: 3, cards: sorted };
+  if (count === 4 && unique.length === 1) return { kind: "rocket", type: "rocket", val: BOMB_VAL[sorted[0].rank], len: 4, cards: sorted };
+  const consecutive = values.every((value, index) => index === 0 || value === values[index - 1] + 1);
+  const noHighRanks = unique[unique.length - 1] <= SEQUENCE_MAX;
+  if (consecutive && unique.length === count && count >= 5 && noHighRanks) {
+    return { kind: "normal", type: "straight", val: values[0], len: count, cards: sorted };
+  }
+  if (count >= 4 && count % 2 === 0) {
+    const counts = {};
+    values.forEach(value => { counts[value] = (counts[value] || 0) + 1; });
+    const keys = Object.keys(counts).map(Number).sort((a, b) => a - b);
+    const allPairs = keys.every(key => counts[key] === 2);
+    const run = keys.every((key, index) => index === 0 || key === keys[index - 1] + 1);
+    if (allPairs && run && keys.length >= 2 && keys[keys.length - 1] <= SEQUENCE_MAX) {
+      return { kind: "normal", type: "pairs", val: keys[0], len: keys.length, cards: sorted };
+    }
+  }
+  return null;
+}
+
+function canBeat(combo, target) {
+  if (!combo) return false;
+  if (!target) return true;
+  if (combo.kind === "bomb") {
+    if (target.kind === "normal") return true;
+    if (target.kind === "bomb") return combo.val > target.val;
+    return false;
+  }
+  if (combo.kind === "rocket") {
+    return target.kind !== "rocket" || combo.val > target.val;
+  }
+  return target.kind === "normal" && combo.type === target.type &&
+    combo.len === target.len && combo.val > target.val;
+}
+
+function comboName(combo) {
+  if (!combo) return "自由出牌";
+  const rank = combo.cards[0].rank;
+  if (combo.kind === "bomb") return `炸弹 · ${rank}`;
+  if (combo.kind === "rocket") return `火箭 · ${rank}`;
+  if (combo.type === "single") return `单张 ${rank}`;
+  if (combo.type === "pair") return `对子 ${rank}`;
+  if (combo.type === "straight") return `顺子 ${combo.len} 张`;
+  if (combo.type === "pairs") return `连对 ${combo.len} 组`;
+  return "牌型";
+}
+
+function allNormalCombos(hand, lengths) {
+  const group = groupByRank(hand);
+  const cardsOf = rank => group.get(rank) || [];
+  const combos = [];
+  RANKS.forEach((rank, index) => {
+    const cards = cardsOf(rank);
+    if (cards.length < 3) {
+      cards.forEach(card => combos.push({
+        kind: "normal", type: "single", val: index + 1, len: 1, cards: [card]
+      }));
+    }
+  });
+  RANKS.forEach((rank, index) => {
+    const cards = cardsOf(rank);
+    if (cards.length === 2) {
+      combos.push({ kind: "normal", type: "pair", val: index + 1, len: 1, cards: cards.slice(0, 2) });
+    }
+  });
+  for (let len = 5; len <= 11; len++) {
+    if (lengths && !lengths.straight.includes(len)) continue;
+    for (let start = 0; start + len - 1 <= RANKS.indexOf("A"); start++) {
+      const cards = [];
+      let ok = true;
+      for (let step = 0; step < len; step++) {
+        const rankCards = cardsOf(RANKS[start + step]);
+        if (!rankCards.length || rankCards.length >= 3) { ok = false; break; }
+        cards.push(rankCards[0]);
+      }
+      if (ok) combos.push({ kind: "normal", type: "straight", val: start + 1, len, cards });
+    }
+  }
+  for (let len = 2; len <= 6; len++) {
+    if (lengths && !lengths.pairs.includes(len)) continue;
+    for (let start = 0; start + len - 1 <= RANKS.indexOf("A"); start++) {
+      const cards = [];
+      let ok = true;
+      for (let step = 0; step < len; step++) {
+        const rankCards = cardsOf(RANKS[start + step]);
+        if (rankCards.length !== 2) { ok = false; break; }
+        cards.push(rankCards[0], rankCards[1]);
+      }
+      if (ok) combos.push({ kind: "normal", type: "pairs", val: start + 1, len, cards });
+    }
+  }
+  return combos;
+}
+
+function bombCombos(hand) {
+  const group = groupByRank(hand);
+  const combos = [];
+  RANKS.forEach(rank => {
+    const cards = group.get(rank) || [];
+    if (cards.length >= 3) {
+      combos.push({ kind: "bomb", type: "bomb", val: BOMB_VAL[rank], len: 3, cards: cards.slice(0, 3) });
+    }
+    if (cards.length >= 4) {
+      combos.push({ kind: "rocket", type: "rocket", val: BOMB_VAL[rank], len: 4, cards: cards.slice(0, 4) });
+    }
+  });
+  return combos;
+}
+
+function beatCandidates(hand, target) {
+  if (!target) return [...allNormalCombos(hand), ...bombCombos(hand)];
+  if (target.kind === "normal") {
+    const lengths = { straight: [target.len], pairs: [target.len] };
+    const normal = allNormalCombos(hand, lengths)
+      .filter(combo => combo.type === target.type && combo.val > target.val);
+    return [...normal, ...bombCombos(hand)];
+  }
+  if (target.kind === "bomb") {
+    return bombCombos(hand).filter(combo =>
+      combo.kind === "rocket" || (combo.kind === "bomb" && combo.val > target.val));
+  }
+  return bombCombos(hand).filter(combo => combo.kind === "rocket" && combo.val > target.val);
+}
+
+function followScore(combo) {
+  if (combo.kind === "rocket") return 900 + combo.val;
+  if (combo.kind === "bomb") return 700 + combo.val;
+  return combo.val * 3 + combo.cards.length * .2;
+}
+function leadScore(combo) {
+  if (combo.kind === "rocket") return 900 + combo.val;
+  if (combo.kind === "bomb") return 700 + combo.val;
+  return combo.val * 2 - combo.cards.length * 6;
+}
+function aiChoose(seat) {
+  const player = game.players[seat];
+  const target = game.lastPlay ? game.lastPlay.combo : null;
+  const list = beatCandidates(player.hand, target);
+  if (!list.length) return null;
+  const finishers = list.filter(combo => combo.cards.length === player.hand.length);
+  if (finishers.length) return finishers.sort((a, b) => followScore(a) - followScore(b))[0];
+  return target
+    ? list.sort((a, b) => followScore(a) - followScore(b))[0]
+    : list.sort((a, b) => leadScore(a) - leadScore(b))[0];
+}
+const $ = id => document.getElementById(id);
+let stageTimer = null;
+
+function cardElement(card, options = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `card${isRed(card) ? " red" : ""}${options.picked ? " picked" : ""}${options.locked ? " locked" : ""}`;
+  button.dataset.id = card.id;
+  button.disabled = Boolean(options.locked);
+  button.setAttribute("aria-label", `${card.rank}${card.suit}`);
+  if (options.picked) button.setAttribute("aria-pressed", "true");
+  const corner = document.createElement("span");
+  corner.className = "corner";
+  const rankEl = document.createElement("b");
+  rankEl.textContent = card.rank;
+  const suitEl = document.createElement("i");
+  suitEl.textContent = card.suit;
+  corner.append(rankEl, suitEl);
+  const pip = document.createElement("span");
+  pip.className = "pip";
+  pip.textContent = card.suit;
+  button.append(corner, pip);
+  if (!options.locked) button.addEventListener("click", () => toggleCard(card.id));
+  return button;
+}
+
+function renderMyHand() {
+  const box = $("myHand");
+  box.replaceChildren();
+  if (!game) return;
+  game.players[0].hand.forEach(card => {
+    box.appendChild(cardElement(card, { picked: selected.has(card.id) }));
+  });
+  $("count0").textContent = `${game.players[0].hand.length} 张`;
+  const player = game.players[0];
+  $("myRole").textContent = player.place
+    ? `第 ${player.place} 名 · ${PLACE_NAMES[player.place - 1]}`
+    : game.phase === "play" && game.turn === 0 ? "轮到你出牌" : "本局进行中";
+}
+
+function renderSeat(seat) {
+  const player = game.players[seat];
+  const box = $(`seat${seat}`);
+  box.classList.toggle("active", game.phase === "play" && game.turn === seat);
+  box.classList.toggle("finished", Boolean(player.place));
+  const role = $(`role${seat}`);
+  role.hidden = !player.place;
+  role.textContent = player.place ? PLACE_NAMES[player.place - 1] : "";
+  $(`count${seat}`).textContent = `${player.hand.length} 张`;
+  const handBox = $(`hand${seat}`);
+  handBox.replaceChildren();
+  for (let i = 0; i < Math.min(player.hand.length, 13); i++) {
+    const back = document.createElement("span");
+    back.className = "mini-card";
+    handBox.appendChild(back);
+  }
+}
+
+function renderTrick() {
+  const box = $("trick");
+  box.replaceChildren();
+  if (!game.display) {
+    const empty = document.createElement("p");
+    empty.className = "trick-empty";
+    empty.textContent = game.phase === "play" ? "桌面空着，出任意合法牌型" : "等待发牌";
+    box.appendChild(empty);
+    return;
+  }
+  game.display.cards.forEach(card => box.appendChild(cardElement(card, { locked: true })));
+}
+
+function renderStatus() {
+  const turnText = $("turnText");
+  if (game.phase === "result") turnText.textContent = "本局结束";
+  else if (game.phase === "install") turnText.textContent = "进贡阶段";
+  else if (game.phase === "deal") turnText.textContent = "发牌中…";
+  else turnText.textContent = game.turn === 0 ? "轮到你出牌" : `等待 ${SEAT_NAMES[game.turn]} 出牌`;
+  const last = game.lastPlay;
+  $("trickText").textContent = last
+    ? `${SEAT_NAMES[last.seat]} 打出 ${comboName(last.combo)}`
+    : "自由出牌";
+  $("mePanel").classList.toggle("active", game.phase === "play" && game.turn === 0);
+  $("roundChip").textContent = `第 ${game.round} 局`;
+}
+
+function updateButtons() {
+  const myTurn = game && game.phase === "play" && game.turn === 0 && !actionLock;
+  $("playBtn").disabled = !myTurn;
+  $("hintBtn").disabled = !myTurn;
+  $("passBtn").disabled = !myTurn || !game || !game.lastPlay;
+}
+
+function setStatus(text, tone = "") {
+  const el = $("statusline");
+  el.textContent = text;
+  el.className = `statusline${tone ? " " + tone : ""}`;
+}
+
+function refreshAll() {
+  if (!game) return;
+  for (let seat = 1; seat <= 3; seat++) {
+    if (game.players[seat]) renderSeat(seat);
+  }
+  renderMyHand();
+  renderTrick();
+  renderStatus();
+  updateButtons();
+}
+
+function openModal(title, html, actions) {
+  $("modalTitle").textContent = title;
+  $("modalBody").innerHTML = html;
+  const bar = $("modalActions");
+  bar.replaceChildren();
+  (actions || []).forEach(action => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `btn${action.primary ? " primary" : " ghost"}`;
+    button.textContent = action.label;
+    button.addEventListener("click", () => {
+      if (!action.keepOpen) closeModal();
+      if (action.onClick) action.onClick();
+    });
+    bar.appendChild(button);
+  });
+  $("modal").hidden = false;
+}
+function closeModal() { $("modal").hidden = true; }
+
+function showStage(text, duration) {
+  clearTimeout(stageTimer);
+  const el = $("stageMsg");
+  el.textContent = text;
+  el.hidden = false;
+  if (duration) stageTimer = setTimeout(() => { el.hidden = true; }, duration);
+}
+function hideStage() {
+  clearTimeout(stageTimer);
+  $("stageMsg").hidden = true;
+}
+
+function toggleCard(id) {
+  if (!game || game.phase !== "play" || game.turn !== 0 || actionLock) return;
+  if (!findCard(game.players[0].hand, id)) return;
+  if (selected.has(id)) selected.delete(id);
+  else selected.add(id);
+  hintIndex = -1;
+  hintList = [];
+  renderMyHand();
+  setStatus(selected.size ? `已选 ${selected.size} 张` : "选择手牌后点击「出牌」");
+}
+function newMatch() {
+  roundToken++;
+  game = {
+    round: 0, scores: [0, 0, 0, 0], rounds: [], players: [],
+    phase: "deal", turn: 0, lastPlay: null, display: null, passed: new Set(), tribute: null
+  };
+  closeModal();
+  hideStage();
+  selected.clear();
+  hintList = [];
+  hintIndex = -1;
+  startRound(false);
+}
+
+function startRound(withInstall) {
+  roundToken++;
+  const token = roundToken;
+  game.round += 1;
+  game.phase = "deal";
+  game.turn = 0;
+  game.lastPlay = null;
+  game.display = null;
+  game.passed = new Set();
+  game.tribute = null;
+  selected.clear();
+  hintList = [];
+  hintIndex = -1;
+  actionLock = false;
+  const deck = shuffle(createDeck());
+  game.players = SEAT_NAMES.map((name, seat) => ({
+    seat, name, hand: sortHand(deck.slice(seat * 13, seat * 13 + 13)), place: 0
+  }));
+  refreshAll();
+  setStatus("发牌中…");
+  showStage("发牌中", 1150);
+  setTimeout(() => {
+    if (token !== roundToken || !game) return;
+    hideStage();
+    if (withInstall && game.rounds.length) {
+      showInstall(token);
+      return;
+    }
+    game.phase = "play";
+    game.turn = 0;
+    refreshAll();
+    setStatus("第 1 局：你先出牌，可自由选择合法牌型", "good");
+    scheduleTurn();
+  }, 1200);
+}
+
+function showInstall(token) {
+  const order = game.rounds[game.rounds.length - 1].order;
+  const upstream = order[0];
+  const downstream = order[3];
+  game.phase = "install";
+  game.turn = downstream;
+  const downHand = game.players[downstream].hand;
+  const card = downHand.reduce((best, item) => VAL[item.rank] > VAL[best.rank] ? item : best, downHand[0]);
+  game.tribute = { upstream, downstream, card };
+  refreshAll();
+  showStage("进贡", 900);
+  const html = `
+    <p>上一局名次：${order.map((seat, index) => `${PLACE_NAMES[index]} <b>${SEAT_NAMES[seat]}</b>`).join(" · ")}</p>
+    <p>由下游 <b>${SEAT_NAMES[downstream]}</b> 向上游 <b>${SEAT_NAMES[upstream]}</b> 进贡手中最大的一张牌。</p>
+    <div class="tribute-flow">
+      <span class="tribute-chip">${SEAT_NAMES[downstream]} 进贡 ${card.rank}${card.suit}</span>
+      <span class="tribute-arrow">→</span>
+      <span class="tribute-chip">${SEAT_NAMES[upstream]}</span>
+      <span class="tribute-arrow">↩</span>
+      <span class="tribute-chip">返还一张废牌</span>
+    </div>
+    <p>进贡结束后由下游率先出牌。</p>
+  `;
+  openModal("进贡", html, [{ label: "开始进贡", primary: true, onClick: () => runTribute(token) }]);
+}
+
+function runTribute(token) {
+  if (token !== roundToken || !game || !game.tribute) return;
+  const { upstream, downstream, card } = game.tribute;
+  const down = game.players[downstream];
+  const up = game.players[upstream];
+  const tributeIndex = down.hand.findIndex(item => item.id === card.id);
+  if (tributeIndex >= 0) down.hand.splice(tributeIndex, 1);
+  up.hand.push(card);
+  sortHand(up.hand);
+  const sorted = [...up.hand].sort((a, b) => VAL[a.rank] - VAL[b.rank]);
+  const returned = sorted.find(item => item.id !== card.id) || sorted[0];
+  const returnIndex = up.hand.findIndex(item => item.id === returned.id);
+  if (returnIndex >= 0) up.hand.splice(returnIndex, 1);
+  down.hand.push(returned);
+  sortHand(down.hand);
+  game.tribute = { ...game.tribute, returned };
+  showStage("进贡", 850);
+  setTimeout(() => {
+    if (token !== roundToken || !game) return;
+    hideStage();
+    game.phase = "play";
+    game.turn = downstream;
+    game.lastPlay = null;
+    game.display = null;
+    game.passed = new Set();
+    refreshAll();
+    setStatus(`${SEAT_NAMES[downstream]} 进贡 ${card.rank}${card.suit}，${SEAT_NAMES[upstream]} 返还 ${returned.rank}${returned.suit} · 由${SEAT_NAMES[downstream]}率先出牌`, "good");
+    scheduleTurn();
+  }, 950);
+}
+
+function nextSeat(from) {
+  for (let step = 1; step <= 4; step++) {
+    const seat = (from + step) % 4;
+    if (!game.players[seat].place) return seat;
+  }
+  return from;
+}
+
+function tryPlay(seat, cards) {
+  if (!game || game.phase !== "play" || game.turn !== seat) return false;
+  const combo = analyzeCombo(cards);
+  if (!combo) {
+    if (seat === 0) setStatus("不是合法牌型：仅支持单张、对子、顺子、连对、炸弹、火箭", "warn");
+    return false;
+  }
+  const target = game.lastPlay ? game.lastPlay.combo : null;
+  if (!canBeat(combo, target)) {
+    if (seat === 0) setStatus(`需要压过「${comboName(target)}」或使用炸弹/火箭`, "warn");
+    return false;
+  }
+  const player = game.players[seat];
+  const ids = new Set(cards.map(card => card.id));
+  player.hand = player.hand.filter(card => !ids.has(card.id));
+  game.lastPlay = { seat, combo };
+  game.display = { cards: combo.cards, seat };
+  game.passed = new Set();
+  selected.clear();
+  hintList = [];
+  hintIndex = -1;
+  const text = `${SEAT_NAMES[seat]} 打出 ${comboName(combo)}`;
+  if (!player.hand.length) {
+    finishSeat(seat, text);
+  } else {
+    game.turn = nextSeat(seat);
+    refreshAll();
+    setStatus(text, seat === 0 ? "good" : "");
+    scheduleTurn();
+  }
+  return true;
+}
+
+function doPass(seat) {
+  if (!game || game.phase !== "play" || game.turn !== seat) return;
+  if (!game.lastPlay) {
+    if (seat === 0) setStatus("你是本轮首个出牌者，不能过牌", "warn");
+    return;
+  }
+  game.passed.add(seat);
+  const activeCount = game.players.filter(player => !player.place).length;
+  const lastSeat = game.lastPlay.seat;
+  if (game.passed.size >= activeCount - 1) {
+    game.lastPlay = null;
+    game.display = null;
+    game.passed = new Set();
+    game.turn = lastSeat;
+    refreshAll();
+    setStatus(`${SEAT_NAMES[seat]} 过牌 · 其余人皆过，${SEAT_NAMES[game.turn]}获得新牌权`, seat === 0 ? "warn" : "");
+    scheduleTurn();
+    return;
+  }
+  game.turn = nextSeat(seat);
+  refreshAll();
+  setStatus(seat === 0 ? "你选择了过牌" : `${SEAT_NAMES[seat]} 过牌`);
+  scheduleTurn();
+}
+
+function finishSeat(seat, text) {
+  const player = game.players[seat];
+  player.place = game.players.filter(item => item.place).length + 1;
+  const placeText = PLACE_NAMES[player.place - 1];
+  game.lastPlay = null;
+  game.display = null;
+  game.passed = new Set();
+  const activeLeft = game.players.filter(item => !item.place);
+  if (activeLeft.length <= 1) {
+    if (activeLeft.length === 1) activeLeft[0].place = 4;
+    endRound();
+    return;
+  }
+  game.turn = nextSeat(seat);
+  refreshAll();
+  setStatus(`${text} · ${SEAT_NAMES[seat]} 第 ${player.place} 名（${placeText}），由${SEAT_NAMES[game.turn]}接风出牌`, "good");
+  scheduleTurn();
+}
+
+function endRound() {
+  game.phase = "result";
+  const order = [...game.players].sort((a, b) => a.place - b.place).map(player => player.seat);
+  order.forEach((seat, index) => { game.scores[seat] += PLACE_POINTS[index]; });
+  game.rounds.push({ order, points: PLACE_POINTS.slice() });
+  refreshAll();
+  showResultModal();
+}
+
+function showResultModal() {
+  const round = game.rounds[game.rounds.length - 1];
+  const rows = round.order.map((seat, index) =>
+    `<tr><td class="place">${PLACE_NAMES[index]}</td><td>${SEAT_NAMES[seat]}</td><td>+${PLACE_POINTS[index]}</td></tr>`).join("");
+  openModal("本局结束", `
+    <p>本局结束。下一局发牌后，下游需要向上游进贡，并由下游率先出牌。</p>
+    <table><thead><tr><th>名次</th><th>玩家</th><th>积分</th></tr></thead><tbody>${rows}</tbody></table>
+  `, [
+    { label: "排行榜", onClick: () => showLeaderboard(true) },
+    { label: "下一局（进贡）", primary: true, onClick: () => startRound(true) }
+  ]);
+}
+
+function showLeaderboard(fromResult = false) {
+  const ranking = [...game.players].sort((a, b) => game.scores[b.seat] - game.scores[a.seat])
+    .map((player, index) => `<tr><td>${index + 1}</td><td>${SEAT_NAMES[player.seat]}</td><td>${game.scores[player.seat]} 分</td></tr>`).join("");
+  const history = game.rounds.length
+    ? game.rounds.map((round, index) =>
+      `<tr><td>第 ${index + 1} 局</td><td>${round.order.map(seat => SEAT_NAMES[seat]).join(" → ")}</td></tr>`).join("")
+    : `<tr><td colspan="2">还没有结束的牌局</td></tr>`;
+  openModal("排行榜", `
+    <p>名次积分：上游 +4 · 二游 +2 · 三游 +1 · 下游 +0。</p>
+    <table><thead><tr><th>#</th><th>玩家</th><th>累计积分</th></tr></thead><tbody>${ranking}</tbody></table>
+    <h3>每局出完顺序</h3>
+    <table><thead><tr><th>牌局</th><th>顺序</th></tr></thead><tbody>${history}</tbody></table>
+  `, fromResult
+    ? [{ label: "返回本局结果", primary: true, onClick: showResultModal }]
+    : [{ label: "关闭", primary: true }]);
+}
+
+function scheduleTurn() {
+  if (!game || game.phase !== "play") return;
+  if (game.turn === 0) {
+    refreshAll();
+    const target = game.lastPlay ? game.lastPlay.combo : null;
+    setStatus(target ? `轮到你出牌，需要压过「${comboName(target)}」` : "轮到你出牌，可自由出牌", "good");
+    return;
+  }
+  if (!$("modal").hidden) {
+    setTimeout(scheduleTurn, 350);
+    return;
+  }
+  refreshAll();
+  actionLock = true;
+  updateButtons();
+  const seat = game.turn;
+  const token = roundToken;
+  setTimeout(() => {
+    actionLock = false;
+    if (!game || token !== roundToken || game.phase !== "play" || game.turn !== seat) return;
+    if (!$("modal").hidden) {
+      scheduleTurn();
+      return;
+    }
+    const choice = aiChoose(seat);
+    if (choice) {
+      tryPlay(seat, choice.cards);
+    } else if (game.lastPlay) {
+      doPass(seat);
+    } else {
+      const lead = game.players[seat].hand[0];
+      if (lead) tryPlay(seat, [lead]);
+    }
+  }, 620 + Math.random() * 680);
+}
+
+function onPlayClick() {
+  if (!game || game.phase !== "play" || game.turn !== 0 || actionLock) return;
+  if (!selected.size) {
+    setStatus("先点选要出的牌", "warn");
+    return;
+  }
+  const cards = game.players[0].hand.filter(card => selected.has(card.id));
+  tryPlay(0, cards);
+}
+
+function onPassClick() {
+  if (!game || game.phase !== "play" || game.turn !== 0 || actionLock) return;
+  doPass(0);
+}
+
+function onHintClick() {
+  if (!game || game.phase !== "play" || game.turn !== 0 || actionLock) return;
+  const target = game.lastPlay ? game.lastPlay.combo : null;
+  let list = beatCandidates(game.players[0].hand, target);
+  list.sort((a, b) => followScore(a) - followScore(b));
+  if (!list.length) {
+    setStatus(game.lastPlay ? "没有能压过的牌，只能选择过牌" : "当前没有可出的牌", "warn");
+    selected.clear();
+    renderMyHand();
+    return;
+  }
+  hintList = list;
+  hintIndex = (hintIndex + 1) % list.length;
+  const combo = list[hintIndex];
+  selected = new Set(combo.cards.map(card => card.id));
+  renderMyHand();
+  setStatus(`提示 ${hintIndex + 1}/${list.length}：${comboName(combo)}，再点提示可更换`, "good");
+}
+
+function showRules() {
+  const rankLine = RANKS.map(rank => `<span>${rank}</span>`).join("");
+  openModal("规则", `
+    <h3>牌序</h3>
+    <p>从小到大依次为：</p>
+    <div class="rank-line">${rankLine}</div>
+    <p>3 是最大单张，2 次之；顺子与连对不能包含 2 和 3。</p>
+    <h3>普通牌型</h3>
+    <ul>
+      <li>只有单张、对子、顺子（至少 5 张连续牌）、连对（至少 2 组相连对子）。</li>
+      <li>不存在三带一、三带二、飞机等牌型。</li>
+    </ul>
+    <h3>炸弹与火箭</h3>
+    <ul>
+      <li>三张相同为炸弹，可压制所有普通牌型。</li>
+      <li>四张相同为火箭，威力大于炸弹。</li>
+      <li>炸弹之间、火箭之间按点数比大小；更大炸弹可压炸弹，更大火箭可压火箭，火箭可压炸弹。</li>
+    </ul>
+    <h3>进贡</h3>
+    <ul>
+      <li>每局按出完顺序分为上游、二游、三游、下游。</li>
+      <li>下一局发牌结束后，下游把手中最大的一张牌进贡给上游，上游返还一张废牌。</li>
+      <li>进贡结束后由下游率先出牌。</li>
+    </ul>
+    <h3>出牌流程</h3>
+    <ul>
+      <li>上家出牌后，下家需用同牌型更大的牌压制，或选择过牌。</li>
+      <li>连续多人过牌后，由最后出牌者获得新牌权。</li>
+      <li>率先出完手牌者为上游；四人全部出完本局结束。</li>
+    </ul>
+  `, [{ label: "知道了", primary: true }]);
+}
+
+$("rulesBtn").addEventListener("click", showRules);
+$("rankBtn").addEventListener("click", () => showLeaderboard(false));
+$("restartBtn").addEventListener("click", () => {
+  newMatch();
+  setStatus("重新开局，新的一局开始了", "good");
+});
+$("playBtn").addEventListener("click", onPlayClick);
+$("passBtn").addEventListener("click", onPassClick);
+$("hintBtn").addEventListener("click", onHintClick);
+
+newMatch();
+setStatus("选择手牌后点击「出牌」");
+</script>
+</body>
+</html>
