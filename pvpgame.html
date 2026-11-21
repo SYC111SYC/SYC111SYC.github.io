@@ -1142,10 +1142,7 @@
           state.localPlayerId = players[0].id;
           onlineRoster = roster;
           opponentId = roster.find(profile => profile.peerId !== peerId).peerId;
-          const snapshot = serializableState();
-          roster.slice(1).forEach(profile => publishDirect(profile.peerId, {
-            type: "bigStart", hostId: peerId, roster, state: snapshot
-          }));
+          roster.slice(1).forEach(profile => sendBigStart(profile.peerId));
         } else {
           state.localPlayerId = players.find(player => player.peerId === peerId).id;
         }
@@ -3076,7 +3073,7 @@
           if (!stillWaiting()) { stopCancelledAttempt(); return; }
           publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession } });
           queueTimer = setInterval(() => {
-            if ((!opponentId || bigOnline) && connected && overlayState === "waiting") {
+            if (!state && (!opponentId || bigOnline) && connected && overlayState === "waiting") {
               publishLobby({ type: "ready", from: peerId, profile: { name: catName, cosmetic, profession: selectedProfession } });
               tryMatch();
             }
@@ -3145,6 +3142,10 @@
             cosmetic: ["sign", "scooter", "ingot", "glasses"].includes(data.profile && data.profile.cosmetic) ? data.profile.cosmetic : "",
             profession: validProfession(data.profile && data.profile.profession)
           });
+          if (bigOnline && state && state.host && state.running &&
+              onlineRoster.some(profile => profile.peerId === data.from)) {
+            sendBigStart(data.from);
+          }
           tryMatch();
         } catch (error) {
           console.warn("忽略无法解析的匹配消息：", error);
@@ -3185,6 +3186,12 @@
           channel: `${activeInbox}${to}`,
           message: JSON.stringify({ from: peerId, to, data }),
           onSuccess: () => {}, onFailed: error => console.error("GoEasy 对战消息发送失败：", error)
+        });
+      }
+      function sendBigStart(to) {
+        if (!connected || !goeasy || !state || !state.bigOnline || !state.host) return;
+        publishDirect(to, {
+          type: "bigStart", hostId: peerId, roster: onlineRoster, state: serializableState()
         });
       }
       function onDirectMessage(message) {
