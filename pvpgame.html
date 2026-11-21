@@ -324,7 +324,7 @@
                 </select>
               </label>
               <label class="large-setting" id="largeTeamSetting">每队人数
-                <select id="largeTeamSize"><option>3</option><option>5</option><option>10</option></select>
+                <select id="largeTeamSize"><option>3</option><option>5</option><option>10</option><option>20</option><option>35</option></select>
               </label>
               <label class="large-setting" id="largeEnemySetting" hidden>敌人数量
                 <select id="largeEnemyCount"></select>
@@ -644,7 +644,7 @@
           if (reward) rewardLabel = `生存奖励 +${reward} 积分（单局上限 40）。`;
         } else if (mode === "large" && state.gameType === "teams" && localWinner && winner) {
           const teamSize = Number(largeConfig && largeConfig.teamSize) || 3;
-          reward = teamSize === 3 ? 15 : teamSize === 5 ? 25 : 40;
+          reward = teamSize === 3 ? 15 : teamSize === 5 ? 25 : teamSize === 10 ? 40 : teamSize === 20 ? 60 : 100;
           rewardLabel = `${teamSize}v${teamSize} 胜利奖励 +${reward} 积分。`;
         } else if (mode === "large" && state.gameType === "brawl" && localWinner && winner) {
           reward = 12 + Math.floor(Math.max(0, state.players.length - 1) / 2);
@@ -1318,7 +1318,7 @@
         const teamSize = Number($("largeTeamSize").value);
         const enemyCount = Number($("largeEnemyCount").value);
         const note = type === "teams"
-          ? `积分奖励：获胜队伍每人 +${teamSize === 3 ? 15 : teamSize === 5 ? 25 : 40} 分。`
+          ? `积分奖励：获胜队伍每人 +${teamSize === 3 ? 15 : teamSize === 5 ? 25 : teamSize === 10 ? 40 : teamSize === 20 ? 60 : 100} 分。`
           : type === "brawl" ? `积分奖励：大混战冠军 +${12 + Math.floor(enemyCount / 2)} 分。`
             : type === "survival" ? "积分奖励：每生存 15 秒 +1 分、每击败 3 名敌人 +1 分，单局上限 40 分。"
               : "积分奖励：联机大战场胜方每人 +15 分。";
@@ -3393,7 +3393,7 @@
         showSetup("ai", true);
       }));
       $("difficultyCancel").addEventListener("click", () => showMenu());
-      for (let count = 5; count <= 20; count++) {
+      for (let count = 5; count <= 90; count++) {
         $("largeEnemyCount").add(new Option(String(count), String(count)));
       }
       for (let count = 2; count <= 20; count++) {
