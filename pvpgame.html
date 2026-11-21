@@ -297,6 +297,7 @@
               <button class="mode-button" type="button" data-mode="ai"><strong>🤖 人机对战</strong><span>WASD 移动 · 鼠标瞄准 · 空格使用/攻击</span></button>
               <button class="mode-button" type="button" data-mode="local"><strong>⚔️ 本地 2 人</strong><span>P1：WASD + 空格　·　P2：方向键 + M</span></button>
               <button class="mode-button" type="button" data-mode="large"><strong>🗺️ 大战场</strong><span>组队对战 · 大混战 · 生存赛 · 多人联机</span></button>
+              <button class="mode-button" type="button" data-mode="cards"><strong>👑 皇室战争</strong><span>卡牌对战 · 能量部署 · 摧毁敌方大本营</span></button>
               <button class="mode-button" type="button" data-mode="online"><strong>🌐 联机双人</strong><span>GoEasy 自动匹配在线玩家</span></button>
             </div>
             <section id="difficultyPanel" hidden>
@@ -3382,6 +3383,9 @@
         if (button.dataset.mode === "ai") showDifficulty();
         else if (button.dataset.mode === "local") { makeGame("local", null, emptyLoadout()); spawnItem(); spawnItem(); }
         else if (button.dataset.mode === "large") showLargeSetup();
+        else if (button.dataset.mode === "cards") {
+          if (window.CardBattle) window.CardBattle.open();
+        }
         else showSetup("online", true);
       }));
       document.querySelectorAll("[data-difficulty]").forEach(button => button.addEventListener("click", () => {
@@ -3494,6 +3498,948 @@
       showMenu();
       requestAnimationFrame(frame);
     })();
+  </script>
+  <script>
+  /* ============================================================
+     皇室战争风格卡牌对战（独立模块）
+     与原有游戏完全解耦：独立 canvas、独立状态与循环，
+     通过菜单按钮 data-mode="cards" 打开。
+     ============================================================ */
+  (() => {
+    "use strict";
+
+    const W = 720;
+    const H = 960;
+    const MAX_ENERGY = 15;
+    const TEAM_COLOR = ["#4a7dff", "#e0574f"];
+    const CARD_ORDER = ["cat", "arrows", "doghouse", "dog", "elephant", "legion", "grenadecat", "minis", "flamedog"];
+
+    // 卡牌定义：cost 能量消耗，cooldown 使用冷却（秒）
+    const CARD_DEFS = {
+      cat:        { name: "猫球", cost: 3, cooldown: 3, type: "unit", icon: "cat", hp: 300, damage: 65, interval: 1.5, range: 200, speed: 64, radius: 15, ranged: true },
+      arrows:     { name: "万箭齐发", cost: 3, cooldown: 9, type: "spell", icon: "arrows", radius: 115, damage: 230 },
+      doghouse:   { name: "狗屋", cost: 4, cooldown: 12, type: "building", icon: "doghouse", hp: 600, radius: 26, duration: 20, spawnInterval: 5, spawnCount: 2 },
+      dog:        { name: "狗球", cost: 4, cooldown: 5, type: "unit", icon: "dog", hp: 520, damage: 170, interval: 2.5, range: 30, speed: 58, radius: 17 },
+      elephant:   { name: "象球", cost: 4, cooldown: 8, type: "unit", icon: "elephant", hp: 1700, damage: 160, interval: 2.6, range: 42, speed: 36, radius: 25, buildingsOnly: true },
+      legion:     { name: "猫球军团", cost: 7, cooldown: 15, type: "group", icon: "cat" },
+      grenadecat: { name: "手雷猫球", cost: 4, cooldown: 5, type: "unit", icon: "cat", hp: 280, damage: 95, interval: 2, range: 190, speed: 60, radius: 15, ranged: true, grenade: true },
+      minis:      { name: "迷你小猫军团", cost: 2, cooldown: 7, type: "group", icon: "cat" },
+      flamedog:   { name: "喷火狗球", cost: 4, cooldown: 6, type: "unit", icon: "dog", hp: 480, damage: 70, interval: 2, range: 125, speed: 56, radius: 17, cone: true }
+    };
+
+    // 内联 SVG（不引入外部图片）
+    const SVG_ARROWS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#eaf1ff"/><g stroke="#4a6cf7" stroke-width="4" stroke-linecap="round" fill="none"><path d="M14 50 50 14"/><path d="M42 14h8v8"/><path d="M22 50 50 22"/><path d="M44 22h6v6"/><path d="M30 50 50 30"/><path d="M44 30h6v6"/></g></svg>`;
+    const SVG_HOUSE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#fdf3e3"/><path d="M8 32 32 10l24 22" fill="#c98a4b"/><rect x="14" y="30" width="36" height="26" rx="4" fill="#e8c188"/><rect x="26" y="38" width="12" height="18" rx="6" fill="#6b4423"/><circle cx="32" cy="48" r="2.2" fill="#e8c188"/></svg>`;
+    const ICON_HTML = {
+      cat: `<img alt="" src="images/catball.png">`,
+      dog: `<img alt="" src="images/dogball.png">`,
+      elephant: `<img alt="" src="images/elephantball.png">`,
+      arrows: SVG_ARROWS,
+      doghouse: SVG_HOUSE
+    };
+
+    const unitImages = {};
+    ["cat", "dog", "elephant"].forEach(key => {
+      const image = new Image();
+      image.src = `images/${key}ball.png`;
+      unitImages[key] = image;
+    });
+
+    // ---------- 样式 ----------
+    const style = document.createElement("style");
+    style.textContent = `
+      #cbRoot{position:fixed;inset:0;z-index:4000;overflow:auto;background:#eef3fa;padding:16px;font-family:"Segoe UI","PingFang SC",system-ui,sans-serif;color:#243244}
+      #cbRoot[hidden]{display:none}
+      #cbRoot *{box-sizing:border-box}
+      .cb-shell{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+      .cb-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+      .cb-title{margin:0;font-size:20px}
+      .cb-sub{margin:3px 0 0;font-size:12px;color:#64748b}
+      .cb-head-actions{margin-left:auto;display:flex;gap:8px}
+      .cb-btn{padding:8px 13px;border:0;border-radius:8px;background:#5b8cff;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+      .cb-btn:hover{filter:brightness(1.05)}
+      .cb-btn.ghost{background:#fff;color:#334155;border:1px solid #cbd5e1}
+      .cb-main{display:flex;gap:14px;align-items:flex-start;justify-content:center}
+      .cb-stage{position:relative;flex:0 0 auto;height:min(68vh,700px);aspect-ratio:3/4;max-width:100%;border:2px solid #cbd5e1;border-radius:14px;overflow:hidden;background:#e8f1e0;box-shadow:0 10px 30px #0f172a14}
+      #cbCanvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none}
+      .cb-side{width:min(360px,100%);display:flex;flex-direction:column;gap:10px}
+      .cb-energy-box{border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;background:#fff}
+      .cb-energy-head{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
+      #cbEnergyText{color:#5b8cff}
+      .cb-energy-track{height:10px;border-radius:99px;background:#e2e8f0;overflow:hidden;margin:8px 0 6px}
+      .cb-energy-fill{height:100%;width:33%;border-radius:99px;background:linear-gradient(90deg,#7aa2ff,#5b8cff);transition:width .12s linear}
+      .cb-energy-note{margin:0;font-size:11px;color:#64748b}
+      .cb-hand{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+      .cb-card{position:relative;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:8px 6px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:inherit;color:#243244;transition:.12s}
+      .cb-card:hover{border-color:#5b8cff}
+      .cb-card.selected{border-color:#5b8cff;box-shadow:0 0 0 2px #5b8cff55;transform:translateY(-2px)}
+      .cb-card.disabled{opacity:.45;filter:grayscale(.35);cursor:not-allowed}
+      .cb-card .cb-cost{position:absolute;top:-6px;left:-6px;width:22px;height:22px;border-radius:50%;background:#6b5cff;color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;box-shadow:0 2px 6px #0002}
+      .cb-card .cb-icon{height:42px;display:grid;place-items:center}
+      .cb-card .cb-icon img{max-height:40px;max-width:46px;object-fit:contain;pointer-events:none}
+      .cb-card .cb-icon svg{width:42px;height:42px;display:block;pointer-events:none}
+      .cb-card .cb-name{font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none}
+      .cb-card .cb-cd{position:absolute;inset:0;border-radius:9px;background:#0f172a99;color:#fff;display:grid;place-items:center;font-size:15px;font-weight:800}
+      .cb-card .cb-cd[hidden]{display:none}
+      .cb-hint{margin:0;font-size:12px;color:#64748b;line-height:1.6;min-height:38px}
+      .cb-result{position:absolute;inset:0;background:#ffffffdb;display:grid;place-items:center;backdrop-filter:blur(2px)}
+      .cb-result[hidden]{display:none}
+      .cb-result-card{width:min(330px,86%);text-align:center;background:#fff;border:1px solid #cbd5e1;border-radius:14px;padding:22px 18px;box-shadow:0 20px 50px #0f172a2e}
+      .cb-result-card h3{margin:0 0 6px;font-size:20px}
+      .cb-result-card p{margin:0 0 16px;font-size:13px;color:#475569}
+      .cb-result-actions{display:flex;gap:8px;justify-content:center}
+      @media (max-width:900px){
+        .cb-main{flex-direction:column;align-items:center}
+        .cb-stage{height:min(56vh,540px)}
+        .cb-side{width:min(560px,100%)}
+        .cb-hand{grid-template-columns:repeat(3,1fr)}
+      }
+      @media (max-width:520px){
+        #cbRoot{padding:10px}
+        .cb-stage{height:min(52vh,470px)}
+        .cb-title{font-size:17px}
+        .cb-sub{display:none}
+      }
+    `;
+    document.head.appendChild(style);
+
+    // ---------- DOM ----------
+    const root = document.createElement("div");
+    root.id = "cbRoot";
+    root.hidden = true;
+    root.innerHTML = `
+      <div class="cb-shell">
+        <header class="cb-head">
+          <div>
+            <h2 class="cb-title">皇室战争 · 卡牌对战</h2>
+            <p class="cb-sub">摧毁敌方大本营获得胜利 · 能量上限 15 · 每 2 秒回复 1 点</p>
+          </div>
+          <div class="cb-head-actions">
+            <button class="cb-btn ghost" type="button" id="cbRestart">重新开局</button>
+            <button class="cb-btn ghost" type="button" id="cbClose">退出</button>
+          </div>
+        </header>
+        <div class="cb-main">
+          <div class="cb-stage">
+            <canvas id="cbCanvas" width="720" height="960"></canvas>
+            <div class="cb-result" id="cbResult" hidden>
+              <div class="cb-result-card">
+                <h3 id="cbResultTitle"></h3>
+                <p id="cbResultCopy"></p>
+                <div class="cb-result-actions">
+                  <button class="cb-btn" type="button" id="cbAgain">再来一局</button>
+                  <button class="cb-btn ghost" type="button" id="cbBack">返回菜单</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <aside class="cb-side">
+            <div class="cb-energy-box">
+              <div class="cb-energy-head"><span>能量</span><strong id="cbEnergyText">5 / 15</strong></div>
+              <div class="cb-energy-track"><div class="cb-energy-fill" id="cbEnergyFill"></div></div>
+              <p class="cb-energy-note">每 2 秒自动回复 1 点</p>
+            </div>
+            <div class="cb-hand" id="cbHand"></div>
+            <p class="cb-hint" id="cbHint">点击卡牌选中，再点击战场部署。蓝色半场为我方部署区。</p>
+          </aside>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(root);
+
+    const el = selector => root.querySelector(selector);
+    const canvas = el("#cbCanvas");
+    const ctx = canvas.getContext("2d");
+    const handEl = el("#cbHand");
+    const energyText = el("#cbEnergyText");
+    const energyFill = el("#cbEnergyFill");
+    const hintEl = el("#cbHint");
+    const resultEl = el("#cbResult");
+
+    CARD_ORDER.forEach(id => {
+      const def = CARD_DEFS[id];
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "cb-card";
+      button.dataset.card = id;
+      button.innerHTML = `<span class="cb-cost">${def.cost}</span><span class="cb-icon">${ICON_HTML[def.icon]}</span><span class="cb-name">${def.name}</span><span class="cb-cd" hidden></span>`;
+      button.addEventListener("click", () => selectCard(id));
+      handEl.appendChild(button);
+    });
+
+    // ---------- 状态 ----------
+    let G = null;
+    let rafId = 0;
+    let lastTs = 0;
+
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const rand = (min, max) => min + Math.random() * (max - min);
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+    function newGame() {
+      G = {
+        running: true, time: 0, energy: [5, 5], cd: [{}, {}],
+        units: [], buildings: [], towers: [], projectiles: [], effects: [],
+        selected: null, pointer: { x: W / 2, y: H * 0.75, inside: false },
+        aiTimer: 2.5, hudClock: 0
+      };
+      CARD_ORDER.forEach(id => { G.cd[0][id] = 0; G.cd[1][id] = 0; });
+      const tower = (team, kind, x, y, hp) => ({
+        type: "tower", team, kind, x, y,
+        r: kind === "king" ? 44 : 30, hp, maxHp: hp,
+        damage: kind === "king" ? 65 : 55, range: 250,
+        interval: kind === "king" ? 1.15 : 1.05, cd: 0.8
+      });
+      G.towers = [
+        tower(0, "king", 360, 880, 3200),
+        tower(0, "royal", 190, 782, 1600),
+        tower(0, "royal", 530, 782, 1600),
+        tower(1, "king", 360, 80, 3200),
+        tower(1, "royal", 190, 178, 1600),
+        tower(1, "royal", 530, 178, 1600)
+      ];
+      resultEl.hidden = true;
+      hint("点击卡牌选中，再点击战场部署。蓝色半场为我方部署区。");
+      updateHud();
+    }
+
+    function hint(text) { hintEl.textContent = text; }
+
+    // ---------- 玩家操作 ----------
+    function selectCard(id) {
+      if (!G || !G.running) return;
+      const def = CARD_DEFS[id];
+      if (G.energy[0] < def.cost) { hint("能量不足，暂时无法使用这张卡。"); return; }
+      if ((G.cd[0][id] || 0) > 0) { hint("这张卡还在冷却中。"); return; }
+      G.selected = G.selected === id ? null : id;
+      updateHud();
+      hint(G.selected ? `已选中「${def.name}」，点击战场部署。` : "已取消选择。");
+    }
+
+    function cancelSelection() {
+      if (!G) return;
+      G.selected = null;
+      updateHud();
+    }
+
+    function toField(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) / rect.width * W,
+        y: (event.clientY - rect.top) / rect.height * H
+      };
+    }
+
+    function tryDeploy(x, y) {
+      if (!G || !G.running) return;
+      const id = G.selected;
+      if (!id) { hint("先点击右侧卡牌选择要部署的卡牌。"); return; }
+      const def = CARD_DEFS[id];
+      if (G.energy[0] < def.cost) { hint("能量不足。"); return; }
+      if ((G.cd[0][id] || 0) > 0) { hint("这张卡还在冷却中。"); return; }
+      if (def.type !== "spell" && y < H / 2 + 10) { hint("单位与建筑只能部署在我方（蓝色）半场。"); return; }
+      castCard(0, id, clamp(x, 30, W - 30), clamp(y, 30, H - 30));
+      G.selected = null;
+      updateHud();
+      hint("部署成功。");
+    }
+
+    // ---------- 出牌 ----------
+    function castCard(team, id, x, y) {
+      const def = CARD_DEFS[id];
+      if (!G || !G.running || G.energy[team] < def.cost || (G.cd[team][id] || 0) > 0) return false;
+      G.energy[team] -= def.cost;
+      G.cd[team][id] = def.cooldown;
+      if (id === "cat" || id === "dog" || id === "elephant" || id === "grenadecat" || id === "flamedog") {
+        spawnUnit(team, def, x, y);
+      } else if (id === "legion") {
+        [[0, -32], [32, 0], [0, 32], [-32, 0]].forEach(([dx, dy]) => {
+          spawnUnit(team, CARD_DEFS.cat, x + dx, y + dy, { hp: 200, scale: 0.8 });
+        });
+        spawnUnit(team, CARD_DEFS.cat, x, y, { hp: 600, damage: 71.5, scale: 1.25, general: true });
+      } else if (id === "minis") {
+        for (let i = 0; i < 8; i++) {
+          const angle = i / 8 * Math.PI * 2;
+          spawnUnit(team, CARD_DEFS.cat, x + Math.cos(angle) * 36, y + Math.sin(angle) * 36, {
+            hp: 38, damage: 13, scale: 0.5, radius: 8, speed: 82
+          });
+        }
+      } else if (id === "arrows") {
+        castArrows(team, x, y);
+      } else if (id === "doghouse") {
+        placeDoghouse(team, x, y);
+      }
+      addEffect("spawn", { x, y, r: 34, life: 0.45, maxLife: 0.45, team });
+      if (team === 0) updateHud();
+      return true;
+    }
+
+    function spawnUnit(team, def, x, y, opts = {}) {
+      const hp = opts.hp ?? def.hp;
+      G.units.push({
+        type: "unit", team, x, y,
+        r: opts.radius ?? def.radius,
+        hp, maxHp: hp,
+        damage: opts.damage ?? def.damage,
+        interval: def.interval, range: def.range,
+        speed: opts.speed ?? def.speed,
+        ranged: !!def.ranged, grenade: !!def.grenade, cone: !!def.cone,
+        buildingsOnly: !!def.buildingsOnly,
+        sprite: def.icon, scale: opts.scale || 1, general: !!opts.general,
+        cd: 0.45, target: null, dead: false,
+        burnUntil: 0, burnDps: 0, hitFlash: 0
+      });
+    }
+
+    function castArrows(team, x, y) {
+      const def = CARD_DEFS.arrows;
+      G.units.forEach(unit => {
+        if (unit.dead || unit.team === team) return;
+        if (dist(unit, { x, y }) <= def.radius + unit.r) damage(unit, def.damage);
+      });
+      addEffect("arrows", { x, y, r: def.radius, life: 0.8, maxLife: 0.8, team });
+    }
+
+    function placeDoghouse(team, x, y) {
+      const def = CARD_DEFS.doghouse;
+      G.buildings.push({
+        type: "building", team, x, y, r: def.radius,
+        hp: def.hp, maxHp: def.hp,
+        duration: def.duration, spawnCd: def.spawnInterval
+      });
+    }
+
+    function damage(target, amount) {
+      if (!target || target.hp <= 0) return;
+      target.hp = Math.max(0, target.hp - amount);
+      target.hitFlash = 0.12;
+      if (target.hp <= 0 && target.type === "unit") {
+        target.dead = true;
+        addEffect("burst", { x: target.x, y: target.y, r: target.r * 1.7, life: 0.32, maxLife: 0.32, team: target.team });
+      }
+    }
+
+    function addEffect(type, props) {
+      if (!G) return;
+      G.effects.push({ type, life: 0.3, maxLife: 0.3, ...props });
+    }
+
+    function endGame(win) {
+      if (!G || !G.running) return;
+      G.running = false;
+      G.selected = null;
+      el("#cbResultTitle").textContent = win ? "胜利！" : "失败…";
+      el("#cbResultCopy").textContent = win ? "敌方大本营已被摧毁。" : "我方大本营被摧毁，再试一次吧。";
+      resultEl.hidden = false;
+      updateHud();
+    }
+
+    function updateHud() {
+      if (!G) return;
+      energyText.textContent = `${Math.floor(G.energy[0])} / ${MAX_ENERGY}`;
+      energyFill.style.width = `${(G.energy[0] / MAX_ENERGY) * 100}%`;
+      CARD_ORDER.forEach(id => {
+        const card = handEl.querySelector(`[data-card="${id}"]`);
+        if (!card) return;
+        const def = CARD_DEFS[id];
+        const cd = G.cd[0][id] || 0;
+        card.classList.toggle("disabled", G.energy[0] < def.cost || cd > 0);
+        card.classList.toggle("selected", G.selected === id);
+        const cdEl = card.querySelector(".cb-cd");
+        if (cd > 0) { cdEl.hidden = false; cdEl.textContent = Math.ceil(cd); }
+        else cdEl.hidden = true;
+      });
+    }
+
+    // ---------- 简单 AI ----------
+    function aiThink(dt) {
+      if (!G.running) return;
+      G.aiTimer -= dt;
+      if (G.aiTimer > 0) return;
+      G.aiTimer = 1.1 + Math.random() * 1.2;
+      const ready = CARD_ORDER.filter(id => G.energy[1] >= CARD_DEFS[id].cost && (G.cd[1][id] || 0) <= 0);
+      if (!ready.length) return;
+      const playerUnits = G.units.filter(unit => !unit.dead && unit.team === 0);
+      if (ready.includes("arrows") && playerUnits.length >= 3) {
+        const cx = playerUnits.reduce((sum, unit) => sum + unit.x, 0) / playerUnits.length;
+        const cy = playerUnits.reduce((sum, unit) => sum + unit.y, 0) / playerUnits.length;
+        castCard(1, "arrows", clamp(cx, 30, W - 30), clamp(cy, 30, H - 30));
+        return;
+      }
+      const id = ready[Math.floor(Math.random() * ready.length)];
+      const def = CARD_DEFS[id];
+      let x = [200, 360, 520][Math.floor(Math.random() * 3)] + rand(-26, 26);
+      let y = rand(150, 410);
+      if (def.type !== "spell" && playerUnits.length && Math.random() < 0.55) {
+        const closest = playerUnits.slice().sort((a, b) => a.y - b.y)[0];
+        if (closest.y < H * 0.6) {
+          x = clamp(closest.x + rand(-36, 36), 70, W - 70);
+          y = clamp(closest.y - rand(70, 120), 80, H * 0.47);
+        }
+      }
+      castCard(1, id, clamp(x, 40, W - 40), clamp(y, 50, H - 50));
+    }
+    // ---------- 战斗更新 ----------
+    function step(dt) {
+      if (!G || !G.running) return;
+      G.time += dt;
+      for (let team = 0; team < 2; team++) {
+        G.energy[team] = Math.min(MAX_ENERGY, G.energy[team] + dt / 2);
+        CARD_ORDER.forEach(id => {
+          G.cd[team][id] = Math.max(0, (G.cd[team][id] || 0) - dt);
+        });
+      }
+      aiThink(dt);
+      updateUnits(dt);
+      updateTowers(dt);
+      updateBuildings(dt);
+      updateProjectiles(dt);
+      updateEffects(dt);
+      G.units = G.units.filter(unit => !unit.dead);
+      G.buildings = G.buildings.filter(building => building.hp > 0 && building.duration > 0);
+      const playerKing = G.towers.find(tower => tower.team === 0 && tower.kind === "king");
+      const enemyKing = G.towers.find(tower => tower.team === 1 && tower.kind === "king");
+      if (enemyKing.hp <= 0) endGame(true);
+      else if (playerKing.hp <= 0) endGame(false);
+    }
+
+    function updateUnits(dt) {
+      for (const unit of G.units) {
+        if (unit.dead) continue;
+        unit.hitFlash = Math.max(0, unit.hitFlash - dt);
+        if (unit.burnUntil > G.time) {
+          unit.hp -= unit.burnDps * dt;
+          if (Math.random() < dt * 5) {
+            addEffect("ember", { x: unit.x + rand(-7, 7), y: unit.y + rand(-7, 7), life: 0.3, maxLife: 0.3 });
+          }
+          if (unit.hp <= 0) {
+            unit.hp = 0;
+            unit.dead = true;
+            addEffect("burst", { x: unit.x, y: unit.y, r: unit.r * 1.7, life: 0.32, maxLife: 0.32, team: unit.team });
+            continue;
+          }
+        }
+        const target = acquireTarget(unit);
+        if (!target) continue;
+        const distance = dist(unit, target);
+        const reach = unit.range + unit.r + (target.r || 0);
+        if (distance > reach) {
+          const angle = Math.atan2(target.y - unit.y, target.x - unit.x);
+          unit.x += Math.cos(angle) * unit.speed * dt;
+          unit.y += Math.sin(angle) * unit.speed * dt;
+        } else {
+          unit.cd -= dt;
+          if (unit.cd <= 0) {
+            unit.cd = unit.interval;
+            attackTarget(unit, target);
+          }
+        }
+      }
+      separateUnits();
+    }
+
+    function acquireTarget(unit) {
+      const enemyTeam = 1 - unit.team;
+      if (!unit.buildingsOnly) {
+        let nearestUnit = null;
+        let nearestDist = 320;
+        for (const other of G.units) {
+          if (other.dead || other.team !== enemyTeam) continue;
+          const distance = dist(unit, other);
+          if (distance < nearestDist) { nearestDist = distance; nearestUnit = other; }
+        }
+        if (nearestUnit) return nearestUnit;
+      }
+      let nearestStructure = null;
+      let structureDist = Infinity;
+      for (const structure of G.towers.concat(G.buildings)) {
+        if (structure.team !== enemyTeam || structure.hp <= 0) continue;
+        const distance = dist(unit, structure);
+        if (distance < structureDist) { structureDist = distance; nearestStructure = structure; }
+      }
+      return nearestStructure;
+    }
+
+    function attackTarget(unit, target) {
+      if (unit.grenade) {
+        G.projectiles.push({
+          type: "grenade", team: unit.team, x: unit.x, y: unit.y,
+          tx: target.x, ty: target.y, t: 0, duration: 0.5,
+          damage: unit.damage, radius: 55, dead: false
+        });
+        return;
+      }
+      if (unit.cone) {
+        const direction = Math.atan2(target.y - unit.y, target.x - unit.x);
+        G.units.forEach(other => {
+          if (other.dead || other.team === unit.team) return;
+          if (dist(unit, other) > unit.range + other.r) return;
+          let diff = Math.abs(Math.atan2(other.y - unit.y, other.x - unit.x) - direction);
+          if (diff > Math.PI) diff = Math.PI * 2 - diff;
+          if (diff <= Math.PI / 3) {
+            damage(other, unit.damage);
+            other.burnUntil = G.time + 3;
+            other.burnDps = 18;
+          }
+        });
+        addEffect("flame", { x: unit.x, y: unit.y, angle: direction, r: unit.range, life: 0.3, maxLife: 0.3, team: unit.team });
+        return;
+      }
+      damage(target, unit.damage);
+      if (unit.ranged) {
+        addEffect("shot", { x1: unit.x, y1: unit.y, x2: target.x, y2: target.y, team: unit.team, life: 0.12, maxLife: 0.12 });
+      } else {
+        addEffect("burst", { x: target.x, y: target.y, r: 10, life: 0.16, maxLife: 0.16, team: unit.team });
+      }
+    }
+
+    function separateUnits() {
+      const list = G.units.filter(unit => !unit.dead);
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const a = list[i];
+          const b = list[j];
+          if (a.team !== b.team) continue;
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          let distance = Math.hypot(dx, dy);
+          const minDistance = (a.r + b.r) * 0.95;
+          if (distance === 0) { dx = rand(-1, 1); dy = rand(-1, 1); distance = 0.01; }
+          if (distance < minDistance) {
+            const push = (minDistance - distance) / 2;
+            dx /= distance;
+            dy /= distance;
+            a.x -= dx * push; a.y -= dy * push;
+            b.x += dx * push; b.y += dy * push;
+          }
+        }
+      }
+      list.forEach(unit => {
+        unit.x = clamp(unit.x, 16, W - 16);
+        unit.y = clamp(unit.y, 16, H - 16);
+      });
+    }
+
+    function updateTowers(dt) {
+      for (const tower of G.towers) {
+        if (tower.hp <= 0) continue;
+        tower.hitFlash = Math.max(0, (tower.hitFlash || 0) - dt);
+        tower.cd -= dt;
+        if (tower.cd > 0) continue;
+        let target = null;
+        let nearestDist = tower.range;
+        for (const unit of G.units) {
+          if (unit.dead || unit.team === tower.team) continue;
+          const distance = dist(tower, unit);
+          if (distance < nearestDist) { nearestDist = distance; target = unit; }
+        }
+        if (!target) continue;
+        tower.cd = tower.interval;
+        damage(target, tower.damage);
+        addEffect("shot", { x1: tower.x, y1: tower.y, x2: target.x, y2: target.y, team: tower.team, life: 0.14, maxLife: 0.14 });
+      }
+    }
+
+    function updateBuildings(dt) {
+      for (const building of G.buildings) {
+        if (building.hp <= 0) continue;
+        building.hitFlash = Math.max(0, (building.hitFlash || 0) - dt);
+        building.duration -= dt;
+        building.spawnCd -= dt;
+        if (building.spawnCd <= 0) {
+          building.spawnCd += CARD_DEFS.doghouse.spawnInterval;
+          for (let i = 0; i < CARD_DEFS.doghouse.spawnCount; i++) {
+            spawnUnit(building.team, CARD_DEFS.dog, building.x + rand(-22, 22), building.y + rand(6, 26));
+            addEffect("spawn", { x: building.x, y: building.y + 10, r: 26, life: 0.4, maxLife: 0.4, team: building.team });
+          }
+        }
+      }
+    }
+
+    function updateProjectiles(dt) {
+      for (const projectile of G.projectiles) {
+        projectile.t += dt;
+        if (projectile.t < projectile.duration) continue;
+        projectile.dead = true;
+        for (const unit of G.units) {
+          if (unit.dead || unit.team === projectile.team) continue;
+          if (dist(unit, { x: projectile.tx, y: projectile.ty }) <= projectile.radius + unit.r) {
+            damage(unit, projectile.damage);
+          }
+        }
+        addEffect("grenade", { x: projectile.tx, y: projectile.ty, r: projectile.radius, life: 0.4, maxLife: 0.4, team: projectile.team });
+      }
+      G.projectiles = G.projectiles.filter(projectile => !projectile.dead);
+    }
+
+    function updateEffects(dt) {
+      for (const effect of G.effects) effect.life -= dt;
+      G.effects = G.effects.filter(effect => effect.life > 0);
+    }
+    // ---------- 渲染 ----------
+    function roundRectPath(x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x + width, y, x + width, y + height, radius);
+      ctx.arcTo(x + width, y + height, x, y + height, radius);
+      ctx.arcTo(x, y + height, x, y, radius);
+      ctx.arcTo(x, y, x + width, y, radius);
+      ctx.closePath();
+    }
+
+    function drawHpBar(x, y, width, ratio) {
+      const barWidth = Math.max(24, width);
+      ctx.fillStyle = "rgba(15,23,42,.25)";
+      ctx.fillRect(x - barWidth / 2, y, barWidth, 5);
+      ctx.fillStyle = ratio > 0.5 ? "#22c55e" : ratio > 0.25 ? "#f59e0b" : "#ef4444";
+      ctx.fillRect(x - barWidth / 2, y, barWidth * clamp(ratio, 0, 1), 5);
+    }
+
+    function drawTower(tower) {
+      const color = TEAM_COLOR[tower.team];
+      if (tower.hp <= 0) {
+        ctx.fillStyle = "rgba(148,163,184,.55)";
+        ctx.beginPath();
+        ctx.arc(tower.x, tower.y, tower.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#64748b";
+        ctx.font = "12px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("已摧毁", tower.x, tower.y);
+        return;
+      }
+      ctx.save();
+      ctx.translate(tower.x, tower.y);
+      ctx.fillStyle = "#fff";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 4;
+      roundRectPath(-tower.r, -tower.r, tower.r * 2, tower.r * 2, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      const tooth = tower.r * 0.34;
+      for (let i = -1; i <= 1; i++) {
+        ctx.fillRect(i * tooth * 1.7 - tooth / 2, -tower.r - tooth * 0.7, tooth, tooth * 0.7);
+      }
+      ctx.globalAlpha = 0.16;
+      ctx.beginPath();
+      ctx.arc(0, 0, tower.r * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = color;
+      ctx.font = `700 ${tower.kind === "king" ? 15 : 12}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(tower.kind === "king" ? "本营" : "塔", 0, 1);
+      ctx.restore();
+      drawHpBar(tower.x, tower.y - tower.r - 14, tower.r * 2, tower.hp / tower.maxHp);
+      ctx.fillStyle = "#475569";
+      ctx.font = "11px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(tower.kind === "king" ? "大本营" : "皇家塔", tower.x, tower.y + tower.r + 15);
+    }
+
+    function drawBuilding(building) {
+      const size = building.r * 2.4;
+      ctx.save();
+      ctx.strokeStyle = TEAM_COLOR[building.team];
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(building.x, building.y, building.r + 5, 0, Math.PI * 2);
+      ctx.stroke();
+      // 狗屋：内联绘制（不使用外部图片）
+      ctx.fillStyle = "#e8c188";
+      roundRectPath(building.x - size / 2, building.y - size * 0.22, size, size * 0.6, 5);
+      ctx.fill();
+      ctx.fillStyle = "#c98a4b";
+      ctx.beginPath();
+      ctx.moveTo(building.x - size / 2 - 4, building.y - size * 0.2);
+      ctx.lineTo(building.x, building.y - size * 0.6);
+      ctx.lineTo(building.x + size / 2 + 4, building.y - size * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#6b4423";
+      roundRectPath(building.x - size * 0.13, building.y + size * 0.06, size * 0.26, size * 0.32, 6);
+      ctx.fill();
+      ctx.restore();
+      drawHpBar(building.x, building.y - building.r - 16, building.r * 2, building.hp / building.maxHp);
+      const ratio = Math.max(0, building.duration / CARD_DEFS.doghouse.duration);
+      ctx.fillStyle = "rgba(91,140,255,.2)";
+      ctx.fillRect(building.x - building.r, building.y + building.r + 8, building.r * 2, 4);
+      ctx.fillStyle = "#5b8cff";
+      ctx.fillRect(building.x - building.r, building.y + building.r + 8, building.r * 2 * ratio, 4);
+    }
+
+    function drawUnit(unit) {
+      const image = unitImages[unit.sprite] || unitImages.cat;
+      const size = unit.scale < 0.7 ? 22 : (unit.r * 2 + 16) * unit.scale;
+      ctx.save();
+      ctx.strokeStyle = TEAM_COLOR[unit.team];
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(unit.x, unit.y, size / 2 + 2, 0, Math.PI * 2);
+      ctx.stroke();
+      if (unit.cone) {
+        ctx.strokeStyle = "#f97316";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(unit.x, unit.y, size / 2 + 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (image && image.complete && image.naturalWidth) {
+        ctx.drawImage(image, unit.x - size / 2, unit.y - size / 2, size, size);
+      } else {
+        ctx.fillStyle = TEAM_COLOR[unit.team];
+        ctx.beginPath();
+        ctx.arc(unit.x, unit.y, size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (unit.general) {
+        ctx.fillStyle = "#f59e0b";
+        ctx.beginPath();
+        ctx.arc(unit.x + size / 2, unit.y - size / 2, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 10px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("将", unit.x + size / 2, unit.y - size / 2 + 1);
+      }
+      if (unit.grenade) {
+        ctx.fillStyle = "#334155";
+        ctx.beginPath();
+        ctx.arc(unit.x + size * 0.3, unit.y + size * 0.28, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (unit.hitFlash > 0) {
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(unit.x, unit.y, size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+      drawHpBar(unit.x, unit.y - size / 2 - 11, Math.max(28, size * 0.9), unit.hp / unit.maxHp);
+    }
+
+    function drawProjectile(projectile) {
+      const progress = projectile.t / projectile.duration;
+      const x = projectile.x + (projectile.tx - projectile.x) * progress;
+      const y = projectile.y + (projectile.ty - projectile.y) * progress - Math.sin(Math.PI * progress) * 80;
+      ctx.fillStyle = "#334155";
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fbbf24";
+      ctx.beginPath();
+      ctx.arc(x - 2, y - 2, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawEffect(effect) {
+      const progress = 1 - effect.life / effect.maxLife;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, effect.life / effect.maxLife);
+      if (effect.type === "spawn") {
+        ctx.strokeStyle = TEAM_COLOR[effect.team];
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r * (0.4 + progress), 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (effect.type === "shot") {
+        ctx.strokeStyle = effect.team === 0 ? "#7aa2ff" : "#f08a84";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(effect.x1, effect.y1);
+        ctx.lineTo(effect.x2, effect.y2);
+        ctx.stroke();
+      } else if (effect.type === "burst") {
+        ctx.strokeStyle = TEAM_COLOR[effect.team];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r * (0.5 + progress), 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (effect.type === "arrows") {
+        ctx.fillStyle = "rgba(74,108,247,.08)";
+        ctx.strokeStyle = "#4a6cf7";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r, 0, Math.PI * 2);
+        ctx.fill();
+        for (let i = 0; i < 12; i++) {
+          const angle = i * 2.3;
+          const radius = effect.r * (0.2 + (i % 5) / 6);
+          const x = effect.x + Math.cos(angle) * radius;
+          const y = effect.y + Math.sin(angle) * radius;
+          const fall = progress * 44;
+          ctx.beginPath();
+          ctx.moveTo(x, y - 30 + fall);
+          ctx.lineTo(x - 6, y - 14 + fall);
+          ctx.stroke();
+        }
+      } else if (effect.type === "grenade") {
+        ctx.fillStyle = "rgba(245,158,11,.22)";
+        ctx.strokeStyle = "#f59e0b";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r * (0.45 + progress * 0.8), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (effect.type === "flame") {
+        const spread = Math.PI / 3;
+        const gradient = ctx.createRadialGradient(effect.x, effect.y, 8, effect.x, effect.y, effect.r);
+        gradient.addColorStop(0, "rgba(255,196,80,.95)");
+        gradient.addColorStop(1, "rgba(240,90,40,0)");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        ctx.arc(effect.x, effect.y, effect.r, effect.angle - spread, effect.angle + spread);
+        ctx.closePath();
+        ctx.fill();
+      } else if (effect.type === "ember") {
+        ctx.fillStyle = "#f97316";
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawGhost() {
+      if (!G || !G.running || !G.selected || !G.pointer.inside) return;
+      const def = CARD_DEFS[G.selected];
+      const valid = def.type === "spell" || G.pointer.y > H / 2 + 10;
+      ctx.save();
+      ctx.strokeStyle = valid ? "#5b8cff" : "#e0574f";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.arc(G.pointer.x, G.pointer.y, def.type === "spell" ? def.radius : 34, 0, Math.PI * 2);
+      ctx.stroke();
+      if (def.type === "spell") {
+        ctx.fillStyle = valid ? "rgba(91,140,255,.12)" : "rgba(224,87,79,.10)";
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function draw() {
+      if (!G) return;
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "#e9f2df";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "rgba(224,87,79,.055)";
+      ctx.fillRect(0, 0, W, H / 2);
+      ctx.fillStyle = "rgba(74,125,255,.06)";
+      ctx.fillRect(0, H / 2, W, H / 2);
+      ctx.strokeStyle = "rgba(148,163,184,.35)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([10, 12]);
+      [190, 360, 530].forEach(x => {
+        ctx.beginPath();
+        ctx.moveTo(x, 20);
+        ctx.lineTo(x, H - 20);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "rgba(120,140,160,.55)";
+      ctx.beginPath();
+      ctx.moveTo(12, H / 2);
+      ctx.lineTo(W - 12, H / 2);
+      ctx.stroke();
+      if (G.selected && CARD_DEFS[G.selected].type !== "spell") {
+        ctx.fillStyle = "rgba(74,125,255,.05)";
+        ctx.fillRect(0, H / 2, W, H / 2);
+        ctx.strokeStyle = "rgba(74,125,255,.7)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(6, H / 2 + 2, W - 12, H / 2 - 8);
+      }
+      G.towers.forEach(drawTower);
+      G.buildings.forEach(drawBuilding);
+      G.units.filter(unit => !unit.dead).sort((a, b) => a.y - b.y).forEach(drawUnit);
+      G.projectiles.forEach(drawProjectile);
+      G.effects.forEach(drawEffect);
+      drawGhost();
+    }
+
+    // ---------- 循环与交互 ----------
+    let previousOverflow = "";
+
+    function loop(timestamp) {
+      if (root.hidden) { rafId = 0; return; }
+      if (!lastTs) lastTs = timestamp;
+      const dt = Math.min(0.05, (timestamp - lastTs) / 1000);
+      lastTs = timestamp;
+      if (G) {
+        step(dt);
+        draw();
+        G.hudClock += dt;
+        if (G.hudClock >= 0.1) {
+          G.hudClock = 0;
+          updateHud();
+        }
+      }
+      rafId = requestAnimationFrame(loop);
+    }
+
+    function open() {
+      if (!root.hidden) return;
+      root.hidden = false;
+      previousOverflow = document.documentElement.style.overflow;
+      document.documentElement.style.overflow = "hidden";
+      lastTs = 0;
+      newGame();
+      if (!rafId) rafId = requestAnimationFrame(loop);
+    }
+
+    function close() {
+      root.hidden = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = 0;
+      document.documentElement.style.overflow = previousOverflow;
+      G = null;
+    }
+
+    canvas.addEventListener("pointermove", event => {
+      if (!G) return;
+      const point = toField(event);
+      G.pointer = { x: point.x, y: point.y, inside: true };
+    });
+    canvas.addEventListener("pointerleave", () => {
+      if (G) G.pointer.inside = false;
+    });
+    canvas.addEventListener("click", event => {
+      const point = toField(event);
+      tryDeploy(point.x, point.y);
+    });
+    canvas.addEventListener("contextmenu", event => {
+      event.preventDefault();
+      cancelSelection();
+    });
+
+    el("#cbClose").addEventListener("click", close);
+    el("#cbBack").addEventListener("click", close);
+    el("#cbRestart").addEventListener("click", () => newGame());
+    el("#cbAgain").addEventListener("click", () => newGame());
+
+    window.addEventListener("keydown", event => {
+      if (root.hidden) return;
+      if (event.key === "Escape") {
+        if (G && G.selected) cancelSelection();
+        else close();
+        return;
+      }
+      const index = Number(event.key) - 1;
+      if (Number.isInteger(index) && index >= 0 && index < CARD_ORDER.length) {
+        selectCard(CARD_ORDER[index]);
+      }
+    });
+
+    window.CardBattle = { open, close };
+  })();
   </script>
 </body>
 </html>
