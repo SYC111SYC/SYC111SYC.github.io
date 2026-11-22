@@ -3512,7 +3512,7 @@
     const H = 960;
     const MAX_ENERGY = 15;
     const TEAM_COLOR = ["#4a7dff", "#e0574f"];
-    const CARD_ORDER = ["cat", "arrows", "doghouse", "dog", "elephant", "legion", "grenadecat", "minis", "flamedog"];
+    const CARD_ORDER = ["cat", "arrows", "doghouse", "dog", "elephant", "legion", "grenadecat", "minis", "flamedog", "tank", "lightning", "ice", "charm", "elephantrider", "flyingelephant"];
 
     // 卡牌定义：cost 能量消耗，cooldown 使用冷却（秒）
     const CARD_DEFS = {
@@ -3524,18 +3524,36 @@
       legion:     { name: "猫球军团", cost: 7, cooldown: 15, type: "group", icon: "cat" },
       grenadecat: { name: "手雷猫球", cost: 4, cooldown: 5, type: "unit", icon: "cat", hp: 280, damage: 95, interval: 2, range: 190, speed: 60, radius: 15, ranged: true, grenade: true },
       minis:      { name: "迷你小猫军团", cost: 2, cooldown: 7, type: "group", icon: "cat" },
-      flamedog:   { name: "喷火狗球", cost: 4, cooldown: 6, type: "unit", icon: "dog", hp: 480, damage: 70, interval: 2, range: 125, speed: 56, radius: 17, cone: true }
+      flamedog:   { name: "喷火狗球", cost: 4, cooldown: 6, type: "unit", icon: "dog", hp: 480, damage: 70, interval: 2, range: 125, speed: 56, radius: 17, cone: true },
+      tank:          { name: "坦克", cost: 9, cooldown: 12, type: "unit", icon: "tank", hp: 3600, damage: 185, interval: 2.2, range: 240, speed: 36, radius: 23, ranged: true, fireball: true },
+      lightning:     { name: "闪电法师猫球", cost: 4, cooldown: 8, type: "unit", icon: "lightning", hp: 420, damage: 95, interval: 1.7, range: 205, speed: 60, radius: 15, ranged: true, lightning: true },
+      ice:           { name: "寒冰法师猫球", cost: 4, cooldown: 8, type: "unit", icon: "ice", hp: 400, damage: 70, interval: 1.7, range: 205, speed: 60, radius: 15, ranged: true, ice: true },
+      charm:         { name: "魅惑法师猫球", cost: 5, cooldown: 10, type: "unit", icon: "charm", hp: 440, damage: 60, interval: 1.6, range: 215, speed: 58, radius: 15, ranged: true, charm: true },
+      elephantrider: { name: "象兵狗球", cost: 7, cooldown: 9, type: "unit", icon: "elephantrider", sprite: "elephant", hp: 2100, damage: 145, interval: 2.2, range: 46, speed: 58, radius: 26, buildingsOnly: true, kind: "elephantrider" },
+      flyingelephant:{ name: "小飞象球", cost: 8, cooldown: 12, type: "unit", icon: "flyingelephant" }
     };
 
     // 内联 SVG（不引入外部图片）
     const SVG_ARROWS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#eaf1ff"/><g stroke="#4a6cf7" stroke-width="4" stroke-linecap="round" fill="none"><path d="M14 50 50 14"/><path d="M42 14h8v8"/><path d="M22 50 50 22"/><path d="M44 22h6v6"/><path d="M30 50 50 30"/><path d="M44 30h6v6"/></g></svg>`;
     const SVG_HOUSE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#fdf3e3"/><path d="M8 32 32 10l24 22" fill="#c98a4b"/><rect x="14" y="30" width="36" height="26" rx="4" fill="#e8c188"/><rect x="26" y="38" width="12" height="18" rx="6" fill="#6b4423"/><circle cx="32" cy="48" r="2.2" fill="#e8c188"/></svg>`;
+    const SVG_TANK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#eef2ff"/><rect x="6" y="40" width="52" height="14" rx="4" fill="#475569"/><circle cx="32" cy="34" r="16" fill="#94a3b8" stroke="#334155" stroke-width="3"/><circle cx="32" cy="34" r="8" fill="#cbd5e1"/><rect x="44" y="30" width="16" height="7" rx="2" fill="#334155"/></svg>`;
+    const SVG_LIGHTNING = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#fffbeb"/><path d="M36 8 20 36h11l-5 20 20-30H32z" fill="#f59e0b" stroke="#b45309" stroke-width="2" stroke-linejoin="round"/></svg>`;
+    const SVG_ICE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#ecfeff"/><g stroke="#0ea5e9" stroke-width="3.5" stroke-linecap="round" fill="none"><path d="M32 12v40M14 22l36 20M50 22 14 42"/><path d="M32 12l-5 6M32 12l5 6M32 52l-5-6M32 52l5-6"/></g></svg>`;
+    const SVG_CHARM = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#fdf2f8"/><path d="M32 52S12 38 12 24c0-7 6-12 12-12 4 0 7 2 8 5 1-3 4-5 8-5 6 0 12 5 12 12 0 14-20 28-20 28z" fill="#ec4899" stroke="#be185d" stroke-width="2" stroke-linejoin="round"/></svg>`;
+    const SVG_RIDER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#f0fdf4"/><ellipse cx="32" cy="42" rx="20" ry="13" fill="#a3a3a3" stroke="#525252" stroke-width="2"/><circle cx="20" cy="40" r="4" fill="#525252"/><path d="M48 38c4-3 6-8 4-12" stroke="#525252" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="32" cy="24" r="9" fill="#fca5a5" stroke="#b91c1c" stroke-width="2"/><circle cx="29" cy="23" r="1.6" fill="#1f2937"/><circle cx="35" cy="23" r="1.6" fill="#1f2937"/></svg>`;
+    const SVG_FLYER = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#eff6ff"/><path d="M8 30c6-8 14-8 20-2M56 30c-6-8-14-8-20-2" stroke="#60a5fa" stroke-width="3.5" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="36" rx="18" ry="12" fill="#a3a3a3" stroke="#525252" stroke-width="2"/><circle cx="22" cy="34" r="3.5" fill="#525252"/><path d="M46 32c3-2 5-6 3-9" stroke="#525252" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`;
     const ICON_HTML = {
       cat: `<img alt="" src="images/catball.png">`,
       dog: `<img alt="" src="images/dogball.png">`,
       elephant: `<img alt="" src="images/elephantball.png">`,
       arrows: SVG_ARROWS,
-      doghouse: SVG_HOUSE
+      doghouse: SVG_HOUSE,
+      tank: SVG_TANK,
+      lightning: SVG_LIGHTNING,
+      ice: SVG_ICE,
+      charm: SVG_CHARM,
+      elephantrider: SVG_RIDER,
+      flyingelephant: SVG_FLYER
     };
 
     const unitImages = {};
@@ -3750,7 +3768,9 @@
       if (!G || !G.running || G.energy[team] < def.cost || (G.cd[team][id] || 0) > 0) return false;
       G.energy[team] -= def.cost;
       G.cd[team][id] = def.cooldown;
-      if (id === "cat" || id === "dog" || id === "elephant" || id === "grenadecat" || id === "flamedog") {
+      if (id === "flyingelephant") {
+        spawnFlyingElephant(team, x, y);
+      } else if (def.type === "unit") {
         spawnUnit(team, def, x, y);
       } else if (id === "legion") {
         [[0, -32], [32, 0], [0, 32], [-32, 0]].forEach(([dx, dy]) => {
@@ -3784,10 +3804,13 @@
         interval: def.interval, range: def.range,
         speed: opts.speed ?? def.speed,
         ranged: !!def.ranged, grenade: !!def.grenade, cone: !!def.cone,
+        fireball: !!def.fireball, lightning: !!def.lightning, ice: !!def.ice, charm: !!def.charm,
         buildingsOnly: !!def.buildingsOnly,
-        sprite: def.icon, scale: opts.scale || 1, general: !!opts.general,
+        kind: opts.kind || def.kind || null,
+        sprite: opts.sprite || def.sprite || def.icon, scale: opts.scale || 1, general: !!opts.general,
         cd: 0.45, target: null, dead: false,
-        burnUntil: 0, burnDps: 0, hitFlash: 0
+        burnUntil: 0, burnDps: 0, hitFlash: 0,
+        slowUntil: 0, slowFactor: 1, charmedUntil: 0, originalTeam: -1
       });
     }
 
@@ -3813,10 +3836,45 @@
       if (!target || target.hp <= 0) return;
       target.hp = Math.max(0, target.hp - amount);
       target.hitFlash = 0.12;
-      if (target.hp <= 0 && target.type === "unit") {
-        target.dead = true;
-        addEffect("burst", { x: target.x, y: target.y, r: target.r * 1.7, life: 0.32, maxLife: 0.32, team: target.team });
+      if (target.hp <= 0 && target.type === "unit") killUnit(target);
+    }
+
+    function killUnit(unit) {
+      if (unit.dead) return;
+      unit.dead = true;
+      addEffect("burst", { x: unit.x, y: unit.y, r: unit.r * 1.7, life: 0.32, maxLife: 0.32, team: unit.team });
+      if (unit.kind === "elephantrider" && !unit.riderSpawned) {
+        unit.riderSpawned = true;
+        spawnUnit(unit.team, CARD_DEFS.dog, unit.x + rand(-6, 6), unit.y + rand(-6, 6));
+        addEffect("spawn", { x: unit.x, y: unit.y, r: 26, life: 0.4, maxLife: 0.4, team: unit.team });
       }
+    }
+
+    function applySlow(unit) {
+      if (!unit || unit.type !== "unit") return;
+      unit.slowUntil = G.time + 3;
+      unit.slowFactor = 0.4;
+    }
+
+    function applyCharm(unit) {
+      if (!unit || unit.type !== "unit" || unit.kind === "elephantrider" || unit.flying) return;
+      if (unit.charmedUntil && unit.charmedUntil > G.time) {
+        unit.charmedUntil = G.time + 4;
+        return;
+      }
+      unit.originalTeam = unit.team;
+      unit.team = 1 - unit.team;
+      unit.charmedUntil = G.time + 4;
+    }
+
+    function spawnFlyingElephant(team, x, y) {
+      G.units.push({
+        type: "unit", team, x, y, r: 22,
+        hp: 9999, maxHp: 9999, damage: 0, interval: 0, range: 0, speed: 0,
+        flying: true, kind: "flyingelephant", sprite: "elephant", scale: 1,
+        cd: 0, target: null, dead: false, hitFlash: 0,
+        slowUntil: 0, slowFactor: 1, charmedUntil: 0, originalTeam: -1
+      });
     }
 
     function addEffect(type, props) {
@@ -3907,6 +3965,15 @@
       for (const unit of G.units) {
         if (unit.dead) continue;
         unit.hitFlash = Math.max(0, unit.hitFlash - dt);
+        if (unit.charmedUntil && unit.charmedUntil <= G.time && unit.originalTeam !== -1) {
+          unit.team = unit.originalTeam;
+          unit.originalTeam = -1;
+          unit.charmedUntil = 0;
+        }
+        if (unit.flying) {
+          updateFlyingElephant(unit, dt);
+          continue;
+        }
         if (unit.burnUntil > G.time) {
           unit.hp -= unit.burnDps * dt;
           if (Math.random() < dt * 5) {
@@ -3914,8 +3981,7 @@
           }
           if (unit.hp <= 0) {
             unit.hp = 0;
-            unit.dead = true;
-            addEffect("burst", { x: unit.x, y: unit.y, r: unit.r * 1.7, life: 0.32, maxLife: 0.32, team: unit.team });
+            killUnit(unit);
             continue;
           }
         }
@@ -3923,12 +3989,14 @@
         if (!target) continue;
         const distance = dist(unit, target);
         const reach = unit.range + unit.r + (target.r || 0);
+        const slowed = unit.slowUntil > G.time;
+        const speedFactor = slowed ? (unit.slowFactor || 0.4) : 1;
         if (distance > reach) {
           const angle = Math.atan2(target.y - unit.y, target.x - unit.x);
-          unit.x += Math.cos(angle) * unit.speed * dt;
-          unit.y += Math.sin(angle) * unit.speed * dt;
+          unit.x += Math.cos(angle) * unit.speed * speedFactor * dt;
+          unit.y += Math.sin(angle) * unit.speed * speedFactor * dt;
         } else {
-          unit.cd -= dt;
+          unit.cd -= dt * (slowed ? 0.5 : 1);
           if (unit.cd <= 0) {
             unit.cd = unit.interval;
             attackTarget(unit, target);
@@ -3938,13 +4006,59 @@
       separateUnits();
     }
 
+    function updateFlyingElephant(unit, dt) {
+      const enemyTeam = 1 - unit.team;
+      let target = null;
+      let best = Infinity;
+      for (const u of G.units) {
+        if (u.dead || u.team !== enemyTeam || u.flying) continue;
+        const d = dist(unit, u);
+        if (d < best) { best = d; target = u; }
+      }
+      if (!target) {
+        for (const s of G.towers.concat(G.buildings)) {
+          if (s.team !== enemyTeam || s.hp <= 0) continue;
+          const d = dist(unit, s);
+          if (d < best) { best = d; target = s; }
+        }
+      }
+      if (!target) return;
+      const d = dist(unit, target);
+      const speed = 250;
+      const hitR = (target.r || 14) + 6;
+      if (d > hitR && d > speed * dt) {
+        const a = Math.atan2(target.y - unit.y, target.x - unit.x);
+        unit.x += Math.cos(a) * speed * dt;
+        unit.y += Math.sin(a) * speed * dt;
+      } else {
+        landFlyingElephant(unit);
+      }
+    }
+
+    function landFlyingElephant(unit) {
+      const enemyTeam = 1 - unit.team;
+      const radius = 95;
+      addEffect("crush", { x: unit.x, y: unit.y, r: radius, life: 0.5, maxLife: 0.5, team: unit.team });
+      for (const u of G.units) {
+        if (u.dead || u.team !== enemyTeam || u.flying) continue;
+        if (dist(u, unit) <= radius + u.r) damage(u, 320);
+      }
+      for (const s of G.towers) {
+        if (s.team !== enemyTeam || s.hp <= 0) continue;
+        if (dist(s, unit) <= radius + s.r) damage(s, 150);
+      }
+      unit.dead = true;
+      addEffect("spawn", { x: unit.x, y: unit.y, r: 30, life: 0.4, maxLife: 0.4, team: unit.team });
+      spawnUnit(unit.team, CARD_DEFS.elephant, unit.x, unit.y);
+    }
+
     function acquireTarget(unit) {
       const enemyTeam = 1 - unit.team;
       if (!unit.buildingsOnly) {
         let nearestUnit = null;
         let nearestDist = 320;
         for (const other of G.units) {
-          if (other.dead || other.team !== enemyTeam) continue;
+          if (other.dead || other.flying || other.team !== enemyTeam) continue;
           const distance = dist(unit, other);
           if (distance < nearestDist) { nearestDist = distance; nearestUnit = other; }
         }
@@ -3985,6 +4099,17 @@
         addEffect("flame", { x: unit.x, y: unit.y, angle: direction, r: unit.range, life: 0.3, maxLife: 0.3, team: unit.team });
         return;
       }
+      if (unit.fireball || unit.lightning || unit.ice || unit.charm) {
+        const kind = unit.fireball ? "fireball" : unit.lightning ? "lightning" : unit.ice ? "ice" : "charm";
+        G.projectiles.push({
+          type: kind, team: unit.team, x: unit.x, y: unit.y,
+          target, lx: target.x, ly: target.y,
+          damage: unit.damage, speed: 360,
+          radius: unit.fireball ? 42 : (unit.lightning ? 75 : 0),
+          dead: false
+        });
+        return;
+      }
       damage(target, unit.damage);
       if (unit.ranged) {
         addEffect("shot", { x1: unit.x, y1: unit.y, x2: target.x, y2: target.y, team: unit.team, life: 0.12, maxLife: 0.12 });
@@ -3999,7 +4124,7 @@
         for (let j = i + 1; j < list.length; j++) {
           const a = list[i];
           const b = list[j];
-          if (a.team !== b.team) continue;
+          if (a.team !== b.team || a.flying || b.flying) continue;
           let dx = b.x - a.x;
           let dy = b.y - a.y;
           let distance = Math.hypot(dx, dy);
@@ -4029,7 +4154,7 @@
         let target = null;
         let nearestDist = tower.range;
         for (const unit of G.units) {
-          if (unit.dead || unit.team === tower.team) continue;
+          if (unit.dead || unit.flying || unit.team === tower.team) continue;
           const distance = dist(tower, unit);
           if (distance < nearestDist) { nearestDist = distance; target = unit; }
         }
@@ -4057,19 +4182,71 @@
     }
 
     function updateProjectiles(dt) {
-      for (const projectile of G.projectiles) {
-        projectile.t += dt;
-        if (projectile.t < projectile.duration) continue;
-        projectile.dead = true;
-        for (const unit of G.units) {
-          if (unit.dead || unit.team === projectile.team) continue;
-          if (dist(unit, { x: projectile.tx, y: projectile.ty }) <= projectile.radius + unit.r) {
-            damage(unit, projectile.damage);
+      for (const p of G.projectiles) {
+        if (p.type === "grenade") {
+          p.t += dt;
+          if (p.t < p.duration) continue;
+          p.dead = true;
+          for (const unit of G.units) {
+            if (unit.dead || unit.team === p.team) continue;
+            if (dist(unit, { x: p.tx, y: p.ty }) <= p.radius + unit.r) damage(unit, p.damage);
           }
+          addEffect("grenade", { x: p.tx, y: p.ty, r: p.radius, life: 0.4, maxLife: 0.4, team: p.team });
+          continue;
         }
-        addEffect("grenade", { x: projectile.tx, y: projectile.ty, r: projectile.radius, life: 0.4, maxLife: 0.4, team: projectile.team });
+        let tx = p.lx, ty = p.ly;
+        if (p.target && p.target.hp > 0 && !p.target.dead) {
+          tx = p.target.x; ty = p.target.y;
+          p.lx = tx; p.ly = ty;
+        }
+        const dx = tx - p.x, dy = ty - p.y;
+        const d = Math.hypot(dx, dy);
+        const hitR = (p.target && p.target.r ? p.target.r : 14) + 8;
+        if (d <= hitR || d <= p.speed * dt) {
+          p.x = tx; p.y = ty;
+          p.dead = true;
+          applyProjectileHit(p);
+        } else {
+          p.x += dx / d * p.speed * dt;
+          p.y += dy / d * p.speed * dt;
+        }
       }
-      G.projectiles = G.projectiles.filter(projectile => !projectile.dead);
+      G.projectiles = G.projectiles.filter(p => !p.dead);
+    }
+
+    function applyProjectileHit(p) {
+      const enemyTeam = 1 - p.team;
+      if (p.type === "fireball") {
+        if (p.target && p.target.hp > 0) damage(p.target, p.damage);
+        for (const unit of G.units) {
+          if (unit.dead || unit.team !== enemyTeam || unit === p.target) continue;
+          if (dist(unit, { x: p.x, y: p.y }) <= p.radius + unit.r) damage(unit, p.damage * 0.5);
+        }
+        addEffect("fireball", { x: p.x, y: p.y, r: p.radius, life: 0.4, maxLife: 0.4, team: p.team });
+      } else if (p.type === "lightning") {
+        const hit = new Set();
+        if (p.target && p.target.hp > 0) { damage(p.target, p.damage); hit.add(p.target); }
+        const chain = G.units
+          .filter(u => !u.dead && u.team === enemyTeam && !hit.has(u))
+          .sort((a, b) => dist(a, { x: p.x, y: p.y }) - dist(b, { x: p.x, y: p.y }));
+        let count = 0;
+        for (const u of chain) {
+          if (dist(u, { x: p.x, y: p.y }) > p.radius) break;
+          damage(u, p.damage * 0.6);
+          hit.add(u);
+          if (++count >= 3) break;
+        }
+        addEffect("lightning", { x: p.x, y: p.y, r: p.radius, life: 0.35, maxLife: 0.35, team: p.team });
+      } else if (p.type === "ice") {
+        if (p.target && p.target.hp > 0) { damage(p.target, p.damage); applySlow(p.target); }
+        addEffect("ice", { x: p.x, y: p.y, life: 0.4, maxLife: 0.4, team: p.team });
+      } else if (p.type === "charm") {
+        if (p.target && p.target.hp > 0) {
+          damage(p.target, p.damage);
+          if (Math.random() < 0.1) applyCharm(p.target);
+        }
+        addEffect("charm", { x: p.x, y: p.y, life: 0.4, maxLife: 0.4, team: p.team });
+      }
     }
 
     function updateEffects(dt) {
@@ -4174,69 +4351,191 @@
     function drawUnit(unit) {
       const image = unitImages[unit.sprite] || unitImages.cat;
       const size = unit.scale < 0.7 ? 22 : (unit.r * 2 + 16) * unit.scale;
+      const flying = !!unit.flying;
+      const lift = flying ? 16 : 0;
+      const cx = unit.x;
+      const cy = unit.y - lift;
       ctx.save();
+      if (flying) {
+        ctx.fillStyle = "rgba(15,23,42,.22)";
+        ctx.beginPath();
+        ctx.ellipse(unit.x, unit.y + size * 0.32, size * 0.5, size * 0.17, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.strokeStyle = TEAM_COLOR[unit.team];
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(unit.x, unit.y, size / 2 + 2, 0, Math.PI * 2);
+      ctx.arc(cx, cy, size / 2 + 2, 0, Math.PI * 2);
       ctx.stroke();
       if (unit.cone) {
         ctx.strokeStyle = "#f97316";
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
-        ctx.arc(unit.x, unit.y, size / 2 + 6, 0, Math.PI * 2);
+        ctx.arc(cx, cy, size / 2 + 6, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
       }
       if (image && image.complete && image.naturalWidth) {
-        ctx.drawImage(image, unit.x - size / 2, unit.y - size / 2, size, size);
+        ctx.drawImage(image, cx - size / 2, cy - size / 2, size, size);
       } else {
         ctx.fillStyle = TEAM_COLOR[unit.team];
         ctx.beginPath();
-        ctx.arc(unit.x, unit.y, size / 2, 0, Math.PI * 2);
+        ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (flying) {
+        ctx.fillStyle = "rgba(96,165,250,.85)";
+        ctx.beginPath();
+        ctx.ellipse(cx - size * 0.52, cy - 2, size * 0.22, size * 0.12, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(cx + size * 0.52, cy - 2, size * 0.22, size * 0.12, 0.5, 0, Math.PI * 2);
         ctx.fill();
       }
       if (unit.general) {
         ctx.fillStyle = "#f59e0b";
         ctx.beginPath();
-        ctx.arc(unit.x + size / 2, unit.y - size / 2, 8, 0, Math.PI * 2);
+        ctx.arc(cx + size / 2, cy - size / 2, 8, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = "#fff";
         ctx.font = "700 10px system-ui";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("将", unit.x + size / 2, unit.y - size / 2 + 1);
+        ctx.fillText("将", cx + size / 2, cy - size / 2 + 1);
       }
       if (unit.grenade) {
         ctx.fillStyle = "#334155";
         ctx.beginPath();
-        ctx.arc(unit.x + size * 0.3, unit.y + size * 0.28, 4, 0, Math.PI * 2);
+        ctx.arc(cx + size * 0.3, cy + size * 0.28, 4, 0, Math.PI * 2);
         ctx.fill();
+      }
+      if (unit.fireball) {
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size / 2 + 1, Math.PI * 1.15, Math.PI * 1.85);
+        ctx.stroke();
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(cx + size * 0.3, cy - 3, size * 0.32, 6);
+      }
+      if (unit.lightning) drawMageBadge(cx, cy, size, "#facc15", "bolt");
+      if (unit.ice) drawMageBadge(cx, cy, size, "#38bdf8", "snow");
+      if (unit.charm) drawMageBadge(cx, cy, size, "#ec4899", "heart");
+      if (unit.kind === "elephantrider") {
+        const r = size * 0.24;
+        const dog = unitImages.dog;
+        if (dog && dog.complete && dog.naturalWidth) {
+          ctx.drawImage(dog, cx - r, cy - size * 0.5 - r * 1.6, r * 2, r * 2);
+        } else {
+          ctx.fillStyle = "#ef4444";
+          ctx.beginPath();
+          ctx.arc(cx, cy - size * 0.5 - r, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      if (unit.slowUntil > G.time) {
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, size / 2 + 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (unit.charmedUntil > G.time) {
+        ctx.strokeStyle = "#ec4899";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size / 2 + 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#f472b6";
+        ctx.font = "11px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("♥", cx, cy - size / 2 - 11);
       }
       if (unit.hitFlash > 0) {
         ctx.globalAlpha = 0.3;
         ctx.fillStyle = "#fff";
         ctx.beginPath();
-        ctx.arc(unit.x, unit.y, size / 2, 0, Math.PI * 2);
+        ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
       }
       ctx.restore();
-      drawHpBar(unit.x, unit.y - size / 2 - 11, Math.max(28, size * 0.9), unit.hp / unit.maxHp);
+      drawHpBar(cx, cy - size / 2 - 11, Math.max(28, size * 0.9), unit.hp / unit.maxHp);
     }
 
-    function drawProjectile(projectile) {
-      const progress = projectile.t / projectile.duration;
-      const x = projectile.x + (projectile.tx - projectile.x) * progress;
-      const y = projectile.y + (projectile.ty - projectile.y) * progress - Math.sin(Math.PI * progress) * 80;
-      ctx.fillStyle = "#334155";
+    function drawMageBadge(cx, cy, size, color, symbol) {
+      const bx = cx + size * 0.42;
+      const by = cy - size * 0.42;
+      ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.arc(bx, by, 7, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#fbbf24";
-      ctx.beginPath();
-      ctx.arc(x - 2, y - 2, 2.2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.3;
+      if (symbol === "bolt") {
+        ctx.beginPath();
+        ctx.moveTo(bx - 2, by - 3); ctx.lineTo(bx + 1, by - 1); ctx.lineTo(bx - 1, by + 3); ctx.lineTo(bx + 2, by + 1);
+        ctx.stroke();
+      } else if (symbol === "snow") {
+        for (let i = 0; i < 3; i++) {
+          const a = i * Math.PI / 3;
+          ctx.beginPath();
+          ctx.moveTo(bx - Math.cos(a) * 3.5, by - Math.sin(a) * 3.5);
+          ctx.lineTo(bx + Math.cos(a) * 3.5, by + Math.sin(a) * 3.5);
+          ctx.stroke();
+        }
+      } else if (symbol === "heart") {
+        ctx.fillStyle = "#fff";
+        ctx.font = "8px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("♥", bx, by + 0.5);
+      }
+    }
+
+    function drawProjectile(p) {
+      let x, y;
+      if (p.type === "grenade") {
+        const progress = p.t / p.duration;
+        x = p.x + (p.tx - p.x) * progress;
+        y = p.y + (p.ty - p.y) * progress - Math.sin(Math.PI * progress) * 80;
+      } else {
+        x = p.x; y = p.y;
+      }
+      if (p.type === "fireball") {
+        const g = ctx.createRadialGradient(x, y, 1, x, y, 11);
+        g.addColorStop(0, "#fff7cc"); g.addColorStop(0.5, "#fb923c"); g.addColorStop(1, "rgba(239,68,68,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fde68a";
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+      } else if (p.type === "lightning") {
+        ctx.fillStyle = "#fde68a";
+        ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#facc15"; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 3; i++) {
+          const a = i * 2.1 + x * 0.01;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * 10, y + Math.sin(a) * 10); ctx.stroke();
+        }
+      } else if (p.type === "ice") {
+        ctx.fillStyle = "rgba(125,211,252,.9)";
+        ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#0ea5e9"; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5); ctx.stroke();
+      } else if (p.type === "charm") {
+        ctx.fillStyle = "#f472b6";
+        ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.font = "8px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("♥", x, y + 0.5);
+      } else {
+        ctx.fillStyle = "#334155";
+        ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fbbf24";
+        ctx.beginPath(); ctx.arc(x - 2, y - 2, 2.2, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
     function drawEffect(effect) {
@@ -4304,6 +4603,71 @@
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, 3, 0, Math.PI * 2);
         ctx.fill();
+      } else if (effect.type === "fireball") {
+        ctx.fillStyle = "rgba(251,146,60,.25)";
+        ctx.strokeStyle = "#f97316";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r * (0.5 + progress * 0.8), 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      } else if (effect.type === "lightning") {
+        ctx.strokeStyle = "#facc15";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r * (0.4 + progress * 0.7), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "#fde68a";
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.047;
+          const rr = effect.r * (0.4 + progress * 0.6);
+          ctx.beginPath();
+          ctx.moveTo(effect.x, effect.y);
+          ctx.lineTo(effect.x + Math.cos(a) * rr, effect.y + Math.sin(a) * rr);
+          ctx.stroke();
+        }
+      } else if (effect.type === "ice") {
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, 14 + progress * 16, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "#7dd3fc";
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 6; i++) {
+          const a = i * Math.PI / 3;
+          ctx.beginPath();
+          ctx.moveTo(effect.x, effect.y);
+          ctx.lineTo(effect.x + Math.cos(a) * (12 + progress * 18), effect.y + Math.sin(a) * (12 + progress * 18));
+          ctx.stroke();
+        }
+      } else if (effect.type === "charm") {
+        ctx.strokeStyle = "#ec4899";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, 12 + progress * 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#f472b6";
+        ctx.font = "14px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("♥", effect.x, effect.y);
+      } else if (effect.type === "crush") {
+        ctx.fillStyle = "rgba(120,113,108,.28)";
+        ctx.strokeStyle = "#78716c";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.r * (0.3 + progress * 0.9), 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#a8a29e";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 8; i++) {
+          const a = i * 0.785;
+          const r1 = effect.r * (0.3 + progress * 0.5);
+          const r2 = effect.r * (0.45 + progress * 0.7);
+          ctx.beginPath();
+          ctx.moveTo(effect.x + Math.cos(a) * r1, effect.y + Math.sin(a) * r1);
+          ctx.lineTo(effect.x + Math.cos(a) * r2, effect.y + Math.sin(a) * r2);
+          ctx.stroke();
+        }
       }
       ctx.restore();
     }
