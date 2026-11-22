@@ -3606,6 +3606,13 @@
       .cb-result-card h3{margin:0 0 6px;font-size:20px}
       .cb-result-card p{margin:0 0 16px;font-size:13px;color:#475569}
       .cb-result-actions{display:flex;gap:8px;justify-content:center}
+      .cb-netbar{display:flex;align-items:center;gap:9px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;padding:8px 12px;font-size:12px;font-weight:700;color:#334155}
+      .cb-netbar[hidden]{display:none}
+      .cb-net-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex:0 0 auto}
+      .cb-netbar.waiting .cb-net-dot{background:#f59e0b}
+      .cb-netbar.playing .cb-net-dot{background:#5b8cff}
+      .cb-netbar.error .cb-net-dot{background:#ef4444}
+      .cb-netbar button{margin-left:auto;padding:5px 10px;font-size:11px}
       @media (max-width:900px){
         .cb-main{flex-direction:column;align-items:center}
         .cb-stage{height:min(56vh,540px)}
@@ -3633,10 +3640,16 @@
             <p class="cb-sub">摧毁敌方大本营获得胜利 · 能量上限 15 · 每 2 秒回复 1 点</p>
           </div>
           <div class="cb-head-actions">
+            <button class="cb-btn" type="button" id="cbOnline">🌐 联机对战</button>
             <button class="cb-btn ghost" type="button" id="cbRestart">重新开局</button>
             <button class="cb-btn ghost" type="button" id="cbClose">退出</button>
           </div>
         </header>
+        <div class="cb-netbar" id="cbNetBar" hidden>
+          <span class="cb-net-dot"></span>
+          <span id="cbNetStatus">正在连接 GoEasy…</span>
+          <button class="cb-btn ghost" type="button" id="cbNetCancel">取消联机</button>
+        </div>
         <div class="cb-main">
           <div class="cb-stage">
             <canvas id="cbCanvas" width="720" height="960"></canvas>
@@ -3673,6 +3686,8 @@
     const energyFill = el("#cbEnergyFill");
     const hintEl = el("#cbHint");
     const resultEl = el("#cbResult");
+    const netBar = el("#cbNetBar");
+    const netStatusEl = el("#cbNetStatus");
 
     CARD_ORDER.forEach(id => {
       const def = CARD_DEFS[id];
@@ -3689,6 +3704,21 @@
     let G = null;
     let rafId = 0;
     let lastTs = 0;
+    let myTeam = 0;          // 本地玩家阵营：0 蓝方（主机）/ 1 红方（客机）
+
+    // ---------- 联机配置（GoEasy）----------
+    const NET_HOST = "hangzhou.goeasy.io";
+    const NET_KEY = "BC-98335ad497924a1e9b8d730919ae0472";
+    const NET_LOBBY = "catball-royale-lobby-syc111syc-v1";
+    const NET_INBOX = "catball-royale-inbox-";
+    const SPRITE_KEYS = ["cat", "dog", "elephant"];
+    const PROJ_KEYS = ["fireball", "lightning", "ice", "charm"];
+    let net = null;          // 当前联机会话
+    let netSyncClock = 0;
+    let cbName = (() => {
+      try { return (localStorage.getItem("catball_pet_name_v1") || "猫球玩家").slice(0, 12); }
+      catch (error) { return "猫球玩家"; }
+    })();
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const rand = (min, max) => min + Math.random() * (max - min);
@@ -3727,8 +3757,8 @@
     function selectCard(id) {
       if (!G || !G.running) return;
       const def = CARD_DEFS[id];
-      if (G.energy[0] < def.cost) { hint("能量不足，暂时无法使用这张卡。"); return; }
-      if ((G.cd[0][id] || 0) > 0) { hint("这张卡还在冷却中。"); return; }
+      if (G.energy[myTeam] < def.cost) { hint("能量不足，暂时无法使用这张卡。"); return; }
+      if ((G.cd[myTeam][id] || 0) > 0) { hint("这张卡还在冷却中。"); return; }
       G.selected = G.selected === id ? null : id;
       updateHud();
       hint(G.selected ? `已选中「${def.name}」，点击战场部署。` : "已取消选择。");
@@ -3748,15 +3778,29 @@
       };
     }
 
+    function inDeployZone(def, y) {
+      if (def.type === "spell") return true;
+      return myTeam === 0 ? y > H / 2 + 10 : y < H / 2 - 10;
+    }
+
     function tryDeploy(x, y) {
       if (!G || !G.running) return;
       const id = G.selected;
       if (!id) { hint("先点击右侧卡牌选择要部署的卡牌。"); return; }
       const def = CARD_DEFS[id];
-      if (G.energy[0] < def.cost) { hint("能量不足。"); return; }
-      if ((G.cd[0][id] || 0) > 0) { hint("这张卡还在冷却中。"); return; }
-      if (def.type !== "spell" && y < H / 2 + 10) { hint("单位与建筑只能部署在我方（蓝色）半场。"); return; }
-      castCard(0, id, clamp(x, 30, W - 30), clamp(y, 30, H - 30));
+      if (G.energy[myTeam] < def.cost) { hint("能量不足。"); return; }
+      if ((G.cd[myTeam][id] || 0) > 0) { hint("这张卡还在冷却中。"); return; }
+      if (!inDeployZone(def, y)) { hint(myTeam === 0 ? "单位与建筑只能部署在我方（蓝色）半场。" : "单位与建筑只能部署在我方（红色）半场。"); return; }
+      const fx = clamp(x, 30, W - 30);
+      const fy = clamp(y, 30, H - 30);
+      if (isNetGuest()) {
+        sendNet({ type: "deploy", id, x: fx, y: fy }, net.opponent);
+        G.selected = null;
+        hint("已向主机提交部署请求…");
+        updateHud();
+        return;
+      }
+      castCard(myTeam, id, fx, fy);
       G.selected = null;
       updateHud();
       hint("部署成功。");
@@ -3882,26 +3926,31 @@
       G.effects.push({ type, life: 0.3, maxLife: 0.3, ...props });
     }
 
-    function endGame(win) {
+    function endGame(winningTeam) {
       if (!G || !G.running) return;
       G.running = false;
       G.selected = null;
+      showResult(winningTeam === myTeam);
+      updateHud();
+      if (isNetHost()) sendNet({ type: "end", win: winningTeam }, net.opponent);
+    }
+
+    function showResult(win) {
       el("#cbResultTitle").textContent = win ? "胜利！" : "失败…";
       el("#cbResultCopy").textContent = win ? "敌方大本营已被摧毁。" : "我方大本营被摧毁，再试一次吧。";
       resultEl.hidden = false;
-      updateHud();
     }
 
     function updateHud() {
       if (!G) return;
-      energyText.textContent = `${Math.floor(G.energy[0])} / ${MAX_ENERGY}`;
-      energyFill.style.width = `${(G.energy[0] / MAX_ENERGY) * 100}%`;
+      energyText.textContent = `${Math.floor(G.energy[myTeam])} / ${MAX_ENERGY}`;
+      energyFill.style.width = `${(G.energy[myTeam] / MAX_ENERGY) * 100}%`;
       CARD_ORDER.forEach(id => {
         const card = handEl.querySelector(`[data-card="${id}"]`);
         if (!card) return;
         const def = CARD_DEFS[id];
-        const cd = G.cd[0][id] || 0;
-        card.classList.toggle("disabled", G.energy[0] < def.cost || cd > 0);
+        const cd = G.cd[myTeam][id] || 0;
+        card.classList.toggle("disabled", G.energy[myTeam] < def.cost || cd > 0);
         card.classList.toggle("selected", G.selected === id);
         const cdEl = card.querySelector(".cb-cd");
         if (cd > 0) { cdEl.hidden = false; cdEl.textContent = Math.ceil(cd); }
@@ -3947,7 +3996,7 @@
           G.cd[team][id] = Math.max(0, (G.cd[team][id] || 0) - dt);
         });
       }
-      aiThink(dt);
+      if (!isOnline()) aiThink(dt);
       updateUnits(dt);
       updateTowers(dt);
       updateBuildings(dt);
@@ -3955,10 +4004,10 @@
       updateEffects(dt);
       G.units = G.units.filter(unit => !unit.dead);
       G.buildings = G.buildings.filter(building => building.hp > 0 && building.duration > 0);
-      const playerKing = G.towers.find(tower => tower.team === 0 && tower.kind === "king");
-      const enemyKing = G.towers.find(tower => tower.team === 1 && tower.kind === "king");
-      if (enemyKing.hp <= 0) endGame(true);
-      else if (playerKing.hp <= 0) endGame(false);
+      const king0 = G.towers.find(tower => tower.team === 0 && tower.kind === "king");
+      const king1 = G.towers.find(tower => tower.team === 1 && tower.kind === "king");
+      if (king1.hp <= 0) endGame(0);
+      else if (king0.hp <= 0) endGame(1);
     }
 
     function updateUnits(dt) {
@@ -4675,7 +4724,7 @@
     function drawGhost() {
       if (!G || !G.running || !G.selected || !G.pointer.inside) return;
       const def = CARD_DEFS[G.selected];
-      const valid = def.type === "spell" || G.pointer.y > H / 2 + 10;
+      const valid = inDeployZone(def, G.pointer.y);
       ctx.save();
       ctx.strokeStyle = valid ? "#5b8cff" : "#e0574f";
       ctx.lineWidth = 2;
@@ -4715,11 +4764,12 @@
       ctx.lineTo(W - 12, H / 2);
       ctx.stroke();
       if (G.selected && CARD_DEFS[G.selected].type !== "spell") {
+        const top = myTeam === 1;
         ctx.fillStyle = "rgba(74,125,255,.05)";
-        ctx.fillRect(0, H / 2, W, H / 2);
+        ctx.fillRect(0, top ? 0 : H / 2, W, H / 2);
         ctx.strokeStyle = "rgba(74,125,255,.7)";
         ctx.lineWidth = 2;
-        ctx.strokeRect(6, H / 2 + 2, W - 12, H / 2 - 8);
+        ctx.strokeRect(6, top ? 6 : H / 2 + 2, W - 12, H / 2 - 8);
       }
       G.towers.forEach(drawTower);
       G.buildings.forEach(drawBuilding);
@@ -4738,7 +4788,8 @@
       const dt = Math.min(0.05, (timestamp - lastTs) / 1000);
       lastTs = timestamp;
       if (G) {
-        step(dt);
+        if (!isNetGuest()) step(dt);
+        if (isNetHost()) netSyncTick(dt);
         draw();
         G.hudClock += dt;
         if (G.hudClock >= 0.1) {
@@ -4755,6 +4806,7 @@
       previousOverflow = document.documentElement.style.overflow;
       document.documentElement.style.overflow = "hidden";
       lastTs = 0;
+      myTeam = 0;
       newGame();
       if (!rafId) rafId = requestAnimationFrame(loop);
     }
@@ -4764,6 +4816,8 @@
       if (rafId) cancelAnimationFrame(rafId);
       rafId = 0;
       document.documentElement.style.overflow = previousOverflow;
+      cancelNet(true);
+      myTeam = 0;
       G = null;
     }
 
@@ -4786,8 +4840,10 @@
 
     el("#cbClose").addEventListener("click", close);
     el("#cbBack").addEventListener("click", close);
-    el("#cbRestart").addEventListener("click", () => newGame());
-    el("#cbAgain").addEventListener("click", () => newGame());
+    el("#cbRestart").addEventListener("click", restartGame);
+    el("#cbAgain").addEventListener("click", restartGame);
+    el("#cbOnline").addEventListener("click", () => { if (net) cancelNet(); else startNet(); });
+    el("#cbNetCancel").addEventListener("click", () => cancelNet());
 
     window.addEventListener("keydown", event => {
       if (root.hidden) return;
@@ -4801,6 +4857,303 @@
         selectCard(CARD_ORDER[index]);
       }
     });
+
+    // ---------- 联机对战（GoEasy，主机权威同步）----------
+    function isOnline() { return !!(net && net.matched); }
+    function isNetHost() { return !!(net && net.matched && net.role === "host"); }
+    function isNetGuest() { return !!(net && net.matched && net.role === "guest"); }
+
+    function netStatus(text, state) {
+      netBar.hidden = false;
+      netBar.className = "cb-netbar" + (state ? " " + state : "");
+      netStatusEl.textContent = text;
+    }
+
+    function netOp(start) {
+      return new Promise((resolve, reject) => start({
+        onSuccess: resolve,
+        onFailed: error => reject(new Error((error && (error.content || error.message)) || String(error)))
+      }));
+    }
+
+    function netRandomId() {
+      const token = window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      return `cb-royale-${token}`;
+    }
+
+    function netPublish(client, channel, payload) {
+      if (!client) return;
+      client.pubsub.publish({
+        channel, message: JSON.stringify(payload),
+        onSuccess: () => {}, onFailed: error => console.warn("皇室战争联机消息发送失败：", error)
+      });
+    }
+
+    function sendNet(payload, to) {
+      if (!net || !net.client || !to) return;
+      netPublish(net.client, NET_INBOX + to, { ...payload, from: net.id });
+    }
+
+    function startNet() {
+      if (net) return;
+      if (!window.GoEasy || typeof window.GoEasy.getInstance !== "function") {
+        hint("GoEasy SDK 未加载，无法联机。");
+        netStatus("GoEasy SDK 未加载，无法联机", "error");
+        return;
+      }
+      const session = { client: null, id: netRandomId(), role: "", opponent: "", matched: false, timer: 0 };
+      net = session;
+      netStatus("正在连接 GoEasy…", "waiting");
+      el("#cbOnline").textContent = "🌐 联机中…";
+      (async () => {
+        try {
+          const client = window.GoEasy.getInstance({ host: NET_HOST, appkey: NET_KEY, modules: ["pubsub"] });
+          session.client = client;
+          if (net !== session) { try { client.disconnect({}); } catch (error) {} return; }
+          await netOp(cb => client.connect({ id: session.id, data: { name: cbName }, ...cb }));
+          if (net !== session) return;
+          await netOp(cb => client.pubsub.subscribe({ channel: NET_LOBBY, presence: { enable: true }, onMessage: onNetLobby, ...cb }));
+          if (net !== session) return;
+          await netOp(cb => client.pubsub.subscribe({ channel: NET_INBOX + session.id, onMessage: onNetDirect, ...cb }));
+          if (net !== session) return;
+          await netOp(cb => client.pubsub.subscribePresence({ channel: NET_LOBBY, onPresence: onNetPresence, ...cb }));
+          if (net !== session) return;
+          netStatus("已连接，正在寻找对手…", "waiting");
+          publishNetLobby({ type: "ready", name: cbName });
+          session.timer = setInterval(() => {
+            if (net !== session || session.matched) return;
+            publishNetLobby({ type: "ready", name: cbName });
+            // 主机持续重发 match，避免客机订阅较晚而错过
+            if (session.role === "host" && session.opponent) sendNet({ type: "match", name: cbName }, session.opponent);
+          }, 2500);
+        } catch (error) {
+          if (net !== session) return;
+          console.error("皇室战争联机失败：", error);
+          cancelNet(true);
+          netStatus("连接失败：" + (error.message || "请稍后重试"), "error");
+        }
+      })();
+    }
+
+    function publishNetLobby(payload) {
+      if (!net || !net.client) return;
+      netPublish(net.client, NET_LOBBY, { ...payload, from: net.id });
+    }
+
+    function cancelNet(silent) {
+      if (!net) return;
+      const session = net;
+      net = null;
+      if (session.timer) clearInterval(session.timer);
+      if (session.matched && session.opponent) {
+        netPublish(session.client, NET_INBOX + session.opponent, { type: "bye", from: session.id });
+      }
+      if (session.client) {
+        try { session.client.disconnect({}); } catch (error) { console.warn("关闭皇室战争联机连接失败：", error); }
+      }
+      netBar.hidden = true;
+      el("#cbOnline").textContent = "🌐 联机对战";
+      myTeam = 0;
+      if (!silent) {
+        newGame();
+        hint("已退出联机，恢复人机对战。");
+      }
+    }
+
+    function restartGame() {
+      if (isNetGuest()) { hint("等待主机重新开局…"); return; }
+      newGame();
+      if (isNetHost()) sendNet({ type: "start" }, net.opponent);
+    }
+
+    function onNetLobby(message) {
+      try {
+        const data = typeof message.content === "string" ? JSON.parse(message.content) : message.content;
+        if (!data || data.type !== "ready" || typeof data.from !== "string") return;
+        if (!net || net.matched || data.from === net.id) return;
+        if (net.id < data.from) {
+          net.role = "host";
+          net.opponent = data.from;
+          netStatus("发现对手，正在建立对局…", "waiting");
+          sendNet({ type: "match", name: cbName }, data.from);
+        }
+      } catch (error) {
+        console.warn("忽略无法解析的皇室战争匹配消息：", error);
+      }
+    }
+
+    function onNetPresence(event) {
+      if (!event || !event.member || !event.member.id) return;
+      if (event.action !== "leave") return;
+      if (!net || !net.matched || event.member.id !== net.opponent) return;
+      if (G && G.running) {
+        G.running = false;
+        showResult(true);
+        hint("对手已离线，本局判你获胜。");
+      }
+      netStatus("对手已离线", "error");
+    }
+
+    function onNetDirect(message) {
+      let data;
+      try {
+        data = typeof message.content === "string" ? JSON.parse(message.content) : message.content;
+      } catch (error) { return; }
+      if (!data || !net || !data.type) return;
+
+      if (data.type === "match") {
+        if (net.matched || net.id < data.from) return;
+        net.role = "guest";
+        net.opponent = data.from;
+        net.matched = true;
+        myTeam = 1;
+        if (net.timer) { clearInterval(net.timer); net.timer = 0; }
+        netStatus("已匹配，等待主机开始…", "playing");
+        el("#cbOnline").textContent = "🌐 联机中";
+        sendNet({ type: "ack" }, data.from);
+        newGame();
+        hint("已连接主机，正在等待战场同步…");
+        return;
+      }
+
+      if (data.type === "ack") {
+        if (net.matched || net.role !== "host" || data.from !== net.opponent) return;
+        net.matched = true;
+        myTeam = 0;
+        if (net.timer) { clearInterval(net.timer); net.timer = 0; }
+        netStatus("对局开始 · 你是蓝方（下方）", "playing");
+        el("#cbOnline").textContent = "🌐 联机中";
+        newGame();
+        hint("联机对战开始：你是蓝方，选中卡牌后点击下方半场部署。");
+        return;
+      }
+
+      if (!net.matched || data.from !== net.opponent) return;
+
+      if (data.type === "deploy") {
+        if (net.role !== "host" || !G || !G.running) return;
+        const def = CARD_DEFS[data.id];
+        if (!def || typeof data.x !== "number" || typeof data.y !== "number") return;
+        if (def.type !== "spell" && data.y > H / 2 - 10) return;
+        castCard(1, data.id, clamp(data.x, 30, W - 30), clamp(data.y, 30, H - 30));
+      } else if (data.type === "sync") {
+        if (net.role !== "guest") return;
+        applySnapshot(data.s);
+      } else if (data.type === "start") {
+        if (net.role !== "guest") return;
+        newGame();
+        hint("主机已重新开局。");
+      } else if (data.type === "end") {
+        if (net.role !== "guest") return;
+        if (G) { G.running = false; G.selected = null; }
+        showResult(data.win === myTeam);
+        updateHud();
+      } else if (data.type === "bye") {
+        if (G && G.running) {
+          G.running = false;
+          showResult(true);
+          hint("对手已离线，本局判你获胜。");
+        }
+        netStatus("对手已离线", "error");
+      }
+    }
+
+    function netSyncTick(dt) {
+      if (!G || !G.running) return;
+      netSyncClock += dt;
+      if (netSyncClock < 0.08) return;
+      netSyncClock = 0;
+      sendNet({ type: "sync", s: packSnapshot() }, net.opponent);
+    }
+
+    function packSnapshot() {
+      const round1 = value => Math.round(value * 10) / 10;
+      const packCd = table => {
+        const out = {};
+        CARD_ORDER.forEach(id => {
+          const value = table[id] || 0;
+          if (value > 0) out[id] = round1(value);
+        });
+        return out;
+      };
+      const packUnit = unit => {
+        let flags = 0;
+        if (unit.general) flags |= 1;
+        if (unit.grenade) flags |= 2;
+        if (unit.cone) flags |= 4;
+        if (unit.fireball) flags |= 8;
+        if (unit.lightning) flags |= 16;
+        if (unit.ice) flags |= 32;
+        if (unit.charm) flags |= 64;
+        if (unit.flying) flags |= 128;
+        if (unit.kind === "elephantrider") flags |= 256;
+        if (unit.slowUntil > G.time) flags |= 512;
+        if (unit.charmedUntil > G.time) flags |= 1024;
+        return [
+          unit.team, Math.round(unit.x), Math.round(unit.y), Math.round(unit.r),
+          Math.round(unit.hp), unit.maxHp,
+          Math.max(0, SPRITE_KEYS.indexOf(unit.sprite)),
+          round1(unit.scale || 1), flags
+        ];
+      };
+      return {
+        t: round1(G.time),
+        e: [round1(G.energy[0]), round1(G.energy[1])],
+        c: [packCd(G.cd[0]), packCd(G.cd[1])],
+        u: G.units.filter(unit => !unit.dead).map(packUnit),
+        b: G.buildings.filter(building => building.hp > 0).map(building => [
+          building.team, Math.round(building.x), Math.round(building.y), building.r,
+          Math.round(building.hp), building.maxHp, round1(building.duration || 0)
+        ]),
+        w: G.towers.map(tower => Math.round(tower.hp)),
+        p: G.projectiles
+          .filter(projectile => projectile.type !== "grenade")
+          .map(projectile => [Math.round(projectile.x), Math.round(projectile.y), Math.max(0, PROJ_KEYS.indexOf(projectile.type))])
+      };
+    }
+
+    function applySnapshot(snapshot) {
+      if (!G || !snapshot || !G.running) return;
+      const unpackCd = table => {
+        const out = {};
+        CARD_ORDER.forEach(id => { out[id] = 0; });
+        Object.keys(table || {}).forEach(id => { if (id in out) out[id] = table[id]; });
+        return out;
+      };
+      G.time = snapshot.t;
+      G.energy = [snapshot.e[0], snapshot.e[1]];
+      G.cd = [unpackCd(snapshot.c[0]), unpackCd(snapshot.c[1])];
+      G.units = (snapshot.u || []).map(row => {
+        const flags = row[8];
+        return {
+          type: "unit", team: row[0], x: row[1], y: row[2], r: row[3],
+          hp: row[4], maxHp: row[5],
+          sprite: SPRITE_KEYS[row[6]] || "cat", scale: row[7],
+          general: !!(flags & 1), grenade: !!(flags & 2), cone: !!(flags & 4),
+          fireball: !!(flags & 8), lightning: !!(flags & 16), ice: !!(flags & 32),
+          charm: !!(flags & 64), flying: !!(flags & 128),
+          kind: (flags & 256) ? "elephantrider" : null,
+          slowUntil: (flags & 512) ? G.time + 1 : 0,
+          charmedUntil: (flags & 1024) ? G.time + 1 : 0,
+          hitFlash: 0, dead: false
+        };
+      });
+      G.buildings = (snapshot.b || []).map(row => ({
+        type: "building", team: row[0], x: row[1], y: row[2], r: row[3],
+        hp: row[4], maxHp: row[5], duration: row[6]
+      }));
+      (snapshot.w || []).forEach((hp, index) => { if (G.towers[index]) G.towers[index].hp = hp; });
+      G.projectiles = (snapshot.p || []).map(row => ({
+        type: PROJ_KEYS[row[2]] || "fireball", x: row[0], y: row[1], dead: false
+      }));
+      G.running = true;
+      if (!resultEl.hidden) resultEl.hidden = true;
+      if (net && net.role === "guest" && !net.started) {
+        net.started = true;
+        netStatus("对局进行中 · 你是红方（上方）", "playing");
+        hint("联机对战开始：你是红方，选中卡牌后点击上方半场部署。");
+      }
+    }
 
     window.CardBattle = { open, close };
   })();
