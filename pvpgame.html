@@ -3517,14 +3517,14 @@
     // 卡牌定义：cost 能量消耗，cooldown 使用冷却（秒）
     const CARD_DEFS = {
       cat:        { name: "猫球", cost: 3, cooldown: 3, type: "unit", icon: "cat", hp: 300, damage: 65, interval: 1.5, range: 200, speed: 64, radius: 15, ranged: true },
-      arrows:     { name: "万箭齐发", cost: 3, cooldown: 12, type: "spell", icon: "arrows", radius: 115, damage: 230 },
+      arrows:     { name: "万箭齐发", cost: 3, cooldown: 16, type: "spell", icon: "arrows", radius: 115, damage: 230 },
       doghouse:   { name: "狗屋", cost: 4, cooldown: 12, type: "building", icon: "doghouse", hp: 600, radius: 26, duration: 20, spawnInterval: 5, spawnCount: 2 },
       dog:        { name: "狗球", cost: 4, cooldown: 5, type: "unit", icon: "dog", hp: 520, damage: 170, interval: 2.5, range: 30, speed: 58, radius: 17 },
       elephant:   { name: "象球", cost: 4, cooldown: 8, type: "unit", icon: "elephant", hp: 1700, damage: 160, interval: 2.6, range: 42, speed: 36, radius: 25, buildingsOnly: true },
       legion:     { name: "猫球军团", cost: 7, cooldown: 15, type: "group", icon: "cat" },
       grenadecat: { name: "手雷猫球", cost: 4, cooldown: 5, type: "unit", icon: "cat", hp: 280, damage: 95, interval: 2, range: 190, speed: 60, radius: 15, ranged: true, grenade: true },
       minis:      { name: "迷你小猫军团", cost: 2, cooldown: 7, type: "group", icon: "cat" },
-      flamedog:   { name: "喷火狗球", cost: 4, cooldown: 6, type: "unit", icon: "dog", hp: 480, damage: 70, interval: 2, range: 300, speed: 56, radius: 17, cone: true },
+      flamedog:   { name: "喷火狗球", cost: 4, cooldown: 6, type: "unit", icon: "dog", hp: 480, damage: 70, interval: 2, range: 180, speed: 56, radius: 17, cone: true },
       tank:          { name: "坦克", cost: 14, cooldown: 12, type: "unit", icon: "tank", hp: 1200, damage: 185, interval: 2.2, range: 240, speed: 36, radius: 23, ranged: true, fireball: true },
       lightning:     { name: "闪电法师猫球", cost: 4, cooldown: 8, type: "unit", icon: "lightning", hp: 420, damage: 95, interval: 1.7, range: 205, speed: 60, radius: 15, ranged: true, lightning: true },
       ice:           { name: "寒冰法师猫球", cost: 4, cooldown: 8, type: "unit", icon: "ice", hp: 400, damage: 70, interval: 1.7, range: 205, speed: 60, radius: 15, ranged: true, ice: true },
