@@ -3599,6 +3599,109 @@
             const query = params.toString();
             history.replaceState(null, '', location.pathname + (query ? `?${query}` : '') + location.hash);
         })();
+        /* ========== 人机对战胜利生成礼品码模块 ========== */
+const AI_WIN_KEY = "catball_ai_wins_v1";
+const AI_CODES_KEY = "catball_ai_local_codes_v1";
+const CREATE_CODE_API = "https://rnrppmyrvauogudyjekq.supabase.co/functions/v1/create-code";
+
+const aiWinProgressEl = document.getElementById("aiWinProgress");
+const aiWinBarEl = document.getElementById("aiWinBar");
+const aiRewardCountEl = document.getElementById("aiRewardCount");
+const claimAiCodeBtn = document.getElementById("claimAiCodeBtn");
+const aiCodeMsgEl = document.getElementById("aiCodeMsg");
+const aiCodeBoxEl = document.getElementById("aiCodeBox");
+
+// 读取本地胜场数据
+function getAiWinData(){
+  try{
+    const raw = safeGet(AI_WIN_KEY)||'{"wins":0,"availableReward":0}';
+    return JSON.parse(raw);
+  }catch(e){
+    return { wins:0, availableReward:0 };
+  }
+}
+function saveAiWinData(obj){
+  safeSet(AI_WIN_KEY, JSON.stringify(obj));
+  renderAiRewardPanel();
+}
+// 读取本机生成过的礼品码列表
+function getLocalAiCodes(){
+  try{
+    return JSON.parse(safeGet(AI_CODES_KEY)||"[]");
+  }catch(e){return [];}
+}
+function saveLocalAiCodes(arr){
+  safeSet(AI_CODES_KEY, JSON.stringify(arr));
+  renderAiCodeList();
+}
+
+// 更新UI面板
+function renderAiRewardPanel(){
+  const d = getAiWinData();
+  const pct = Math.min(100, Math.floor((d.wins %10)/10*100));
+  aiWinProgressEl.textContent = d.wins %10;
+  aiWinBarEl.style.width = pct +"%";
+  aiRewardCountEl.textContent = d.availableReward;
+  claimAiCodeBtn.disabled = d.availableReward <= 0;
+}
+// 渲染本机礼品码列表
+function renderAiCodeList(){
+  const list = getLocalAiCodes();
+  aiCodeBoxEl.innerHTML = "";
+  if(!list.length){
+    aiCodeBoxEl.innerHTML = "<div style='color:#888;font-size:12px'>暂无生成的礼品码</div>";
+    return;
+  }
+  list.forEach(item=>{
+    const div = document.createElement("div");
+    div.style = "display:flex;gap:8px;align-items:center;background:#f3f4f6;padding:6px 10px;border-radius:6px;font-family:monospace;";
+    div.innerHTML = `<span>${item.code}</span>
+    <button data-copy="${item.code}" style="margin-left:auto;border:none;background:#cbd5e8;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:12px;">复制</button>`;
+    aiCodeBoxEl.appendChild(div);
+  })
+  // 复制按钮事件
+  aiCodeBoxEl.querySelectorAll("button[data-copy]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      await navigator.clipboard.writeText(btn.dataset.copy);
+      btn.textContent="已复制!";
+      setTimeout(()=>btn.textContent="复制",1200);
+    }
+  })
+}
+
+// 领取：调用supabase create‑code接口生成礼品码
+claimAiCodeBtn.onclick = async function(){
+  aiCodeMsgEl.textContent = "正在生成礼品码...";
+  claimAiCodeBtn.disabled = true;
+  const data = getAiWinData();
+  try{
+    const res = await fetch(CREATE_CODE_API,{
+      method:"POST",
+      headers:{"Content‑Type":"application/json"}
+    });
+    const ret = await res.json();
+    if(!ret.success){
+      aiCodeMsgEl.textContent = "生成失败："+ret.message;
+      claimAiCodeBtn.disabled = false;
+      return;
+    }
+    // 成功，扣除一个可领取档位，保存本机记录
+    data.availableReward -=1;
+    saveAiWinData(data);
+    const localList = getLocalAiCodes();
+    localList.push({code:ret.code, points:ret.points, time:Date.now()});
+    saveLocalAiCodes(localList);
+    aiCodeMsgEl.style.color="#28863b";
+    aiCodeMsgEl.textContent = "✅礼品码生成成功！";
+  }catch(err){
+    aiCodeMsgEl.textContent = "网络请求失败";
+  }
+  renderAiRewardPanel();
+}
+
+// 初始化
+renderAiRewardPanel();
+renderAiCodeList();
     </script>
 </body>
 </html>
