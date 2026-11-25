@@ -1402,6 +1402,27 @@
             ? winner.team === (state.players.find(player => player.id === localSide) || {}).team
             : winner.id === localSide : true);
         const rewardText = settleMatch(winner, Boolean(localWinner));
+
+        // ========== 【这里粘贴新增人机胜场统计代码】==========
+        if(mode === "ai" && localWinner === true){
+          function safeGet(key) { try { return localStorage.getItem(key); }catch(e){return null;}}
+          function safeSet(key,val){try{localStorage.setItem(key,val);return true;}catch(e){return false;}}
+          const AI_WIN_KEY = "catball_ai_wins_v1";
+          let winData;
+          try{
+            winData = JSON.parse(safeGet(AI_WIN_KEY)||'{"wins":0,"availableReward":0}');
+          }catch(e){
+            winData = { wins:0, availableReward:0 };
+          }
+          winData.wins += 1;
+          // 每满10局增加一个可领取档位
+          if(winData.wins >0 && winData.wins %10 ===0){
+            winData.availableReward +=1;
+          }
+          safeSet(AI_WIN_KEY, JSON.stringify(winData));
+        }
+        // ======================================================
+
         const heading = winner ? `${winner.name} 获胜！` : "平局";
         resultMessage = `${message || heading}${rewardText ? ` ${rewardText}` : ""}`;
         $("overlayIcon").textContent = winner ? "🏆" : "🤝";
