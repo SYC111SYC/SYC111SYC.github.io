@@ -1,400 +1,68 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>礼品码兑换 · 猫球对决</title>
-  <style>
-    :root {
-      --bg: #10172b;
-      --panel: rgba(26, 36, 61, .92);
-      --line: rgba(177, 196, 255, .16);
-      --muted: #9aa8c8;
-      --mint: #7af3d1;
-      --gold: #ffd675;
-      --danger: #ff7b8f;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background:
-        radial-gradient(ellipse at 50% -18%, rgba(86, 122, 207, .28), transparent 55%),
-        radial-gradient(ellipse at 100% 80%, rgba(200, 89, 143, .12), transparent 35%),
-        var(--bg);
-      color: #f3f5ff;
-      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
-      padding: 24px 16px;
-    }
-    .page {
-      max-width: 520px;
-      margin: 0 auto;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-      font-weight: 900;
-      letter-spacing: .15em;
-      color: var(--mint);
-      margin-bottom: 22px;
-    }
-    .brand-mark {
-      width: 36px;
-      height: 36px;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(122,243,209,.5);
-      border-radius: 12px;
-      background: rgba(122,243,209,.09);
-      font-size: 19px;
-      box-shadow: 0 0 24px rgba(122,243,209,.1);
-    }
-    h1 {
-      margin: 0 0 18px;
-      font-size: 28px;
-      letter-spacing: -.04em;
-    }
-    .card {
-      border: 1px solid rgba(170,190,255,.19);
-      border-radius: 16px;
-      background: var(--panel);
-      box-shadow: 0 24px 80px rgba(0,0,0,.32);
-      padding: 20px;
-      margin-bottom: 14px;
-    }
-    .points-card {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .points-label {
-      color: var(--muted);
-      font-size: 12px;
-    }
-    .points-value {
-      color: var(--gold);
-      font-size: 28px;
-      font-weight: 900;
-      transition: transform .2s;
-    }
-    .points-value.bump {
-      transform: scale(1.15);
-    }
-    .form-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    input {
-      flex: 1;
-      min-height: 44px;
-      padding: 0 14px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: rgba(255,255,255,.045);
-      color: #fff;
-      font: inherit;
-      font-size: 15px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      outline: none;
-      transition: border-color .15s;
-    }
-    input:focus {
-      border-color: rgba(122,243,209,.5);
-    }
-    button {
-      min-height: 44px;
-      padding: 0 20px;
-      border: 0;
-      border-radius: 10px;
-      color: #11242d;
-      background: linear-gradient(135deg,#82f5d4,#7fc7ff);
-      font-size: 14px;
-      font-weight: 900;
-      cursor: pointer;
-      transition: transform .15s;
-      font-family: inherit;
-    }
-    button:hover {
-      transform: translateY(-2px);
-    }
-    button:disabled {
-      opacity: .5;
-      cursor: not-allowed;
-      transform: none;
-    }
-    .status {
-      min-height: 20px;
-      margin-top: 10px;
-      font-size: 12px;
-    }
-    .status.success { color: var(--mint); }
-    .status.error { color: var(--danger); }
-    .history-title {
-      margin: 0 0 10px;
-      font-size: 13px;
-      color: var(--muted);
-      font-weight: 700;
-    }
-    .history-list {
-      display: grid;
-      gap: 6px;
-      max-height: 260px;
-      overflow-y: auto;
-    }
-    .history-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 9px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255,255,255,.03);
-      font-size: 12px;
-    }
-    .history-code {
-      font-weight: 800;
-      letter-spacing: .08em;
-    }
-    .history-reward {
-      color: var(--gold);
-      font-weight: 700;
-    }
-    .history-time {
-      color: var(--muted);
-      font-size: 11px;
-      margin-top: 2px;
-    }
-    .empty {
-      color: var(--muted);
-      font-size: 12px;
-      text-align: center;
-      padding: 18px 0;
-    }
-    .footer {
-      margin-top: 16px;
-      text-align: center;
-      color: #74809f;
-      font-size: 10px;
-    }
-    .footer a {
-      color: var(--mint);
-      text-decoration: none;
-    }
-    @media (max-width: 480px) {
-      h1 { font-size: 24px; }
-      .points-value { font-size: 24px; }
-      .card { padding: 16px; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>礼品码兑换</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
+body{background:#111;color:#fff;height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.box{width:100%;max-width:400px;background:#222;padding:30px;border-radius:16px}
+h2{text-align:center;margin-bottom:24px}
+input{width:100%;padding:14px 16px;border-radius:10px;border:none;font-size:16px;margin-bottom:16px}
+button{width:100%;padding:14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:16px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:0.6;cursor:not-allowed}
+#msg{margin-top:16px;text-align:center;font-size:15px}
+</style>
 </head>
 <body>
-  <main class="page">
-    <div class="brand">
-      <span class="brand-mark">✦</span>
-      <span>CATBALL&nbsp; / &nbsp;REDEEM</span>
-    </div>
+<div class="box">
+  <h2>礼品码兑换</h2>
+  <input id="codeInput" placeholder="输入礼品码" />
+  <button id="submitBtn">立即兑换</button>
+  <div id="msg"></div>
+</div>
+<script>
+const REDEEM_API = "https://rnrppmyrvauogudyjekq.supabase.co/functions/v1/redeem";
 
-    <h1>礼品码兑换</h1>
+const input = document.getElementById("codeInput");
+const btn = document.getElementById("submitBtn");
+const msg = document.getElementById("msg");
 
-    <div class="card points-card">
-      <div>
-        <div class="points-label">当前猫球积分</div>
-        <div class="points-value" id="pointsValue">0</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="points-label">输入礼品码</div>
-      <div class="form-row">
-        <input type="text" id="codeInput" placeholder="请输入礼品码" maxlength="32" autocomplete="off">
-        <button type="button" id="redeemBtn">兑换</button>
-      </div>
-      <div class="status" id="status"></div>
-    </div>
-
-    <div class="card">
-      <div class="history-title">兑换记录</div>
-      <div class="history-list" id="historyList">
-        <div class="empty">暂无兑换记录</div>
-      </div>
-    </div>
-
-    <div class="footer">
-      <a href="pvpgame.html">返回猫球对决</a>
-    </div>
-  </main>
-
-  <script>
-    "use strict";
-
-    // ========== 礼品码配置 ==========
-    // 在此处添加/删除礼品码，格式："码": { points: 积分数, desc: "描述" }
-    // 码不区分大小写，用户输入会自动转为大写
-    const GIFT_CODES = {
-      "SYC100":    { points: 100, desc: "新手指引礼包" },
-      "WELCOME50": { points: 50,  desc: "欢迎回归礼包" }
-    };
-
-    const ECONOMY_KEY = "catball_economy_v1";
-    const REDEEMED_KEY = "catball_redeemed_codes_v1";
-
-    const $ = id => document.getElementById(id);
-    const pointsEl = $("pointsValue");
-    const inputEl = $("codeInput");
-    const btnEl = $("redeemBtn");
-    const statusEl = $("status");
-    const historyEl = $("historyList");
-
-    let currentPoints = 0;
-    let redeemedCodes = {};
-
-    // 读取当前积分
-    function loadPoints() {
-      try {
-        const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
-        currentPoints = Number.isSafeInteger(data.points) && data.points >= 0 ? data.points : 0;
-      } catch (e) {
-        currentPoints = 0;
-      }
-      pointsEl.textContent = currentPoints;
+btn.onclick = async ()=>{
+  const code = input.value.trim();
+  if(!code){
+    msg.innerText = "请输入礼品码";
+    msg.style.color="#f87171";
+    return;
+  }
+  btn.disabled=true;
+  msg.innerText="兑换中...";
+  msg.style.color="#aaa";
+  try{
+    const res = await fetch(REDEEM_API,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({code})
+    })
+    const data = await res.json();
+    if(data.success){
+      msg.innerText=data.message;
+      msg.style.color="#4ade80";
+      let save = JSON.parse(localStorage.getItem("catball_economy_v1")||"{}");
+      save.points = (save.points||0)+data.points;
+      localStorage.setItem("catball_economy_v1",JSON.stringify(save));
+    }else{
+      msg.innerText=data.message;
+      msg.style.color="#f87171";
     }
-
-    // 读取已兑换记录
-    function loadRedeemed() {
-      try {
-        redeemedCodes = JSON.parse(localStorage.getItem(REDEEMED_KEY) || "{}");
-      } catch (e) {
-        redeemedCodes = {};
-      }
-      renderHistory();
-    }
-
-    // 保存积分
-    function savePoints(points) {
-      try {
-        const data = JSON.parse(localStorage.getItem(ECONOMY_KEY) || "{}");
-        if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("存档格式错误");
-        data.points = points;
-        localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
-        currentPoints = points;
-        pointsEl.textContent = points;
-        pointsEl.classList.add("bump");
-        setTimeout(() => pointsEl.classList.remove("bump"), 200);
-        return true;
-      } catch (e) {
-        console.error("保存积分失败：", e);
-        return false;
-      }
-    }
-
-    // 保存兑换记录
-    function saveRedeemed(code, reward) {
-      redeemedCodes[code.toUpperCase()] = {
-        time: Date.now(),
-        reward: reward
-      };
-      localStorage.setItem(REDEEMED_KEY, JSON.stringify(redeemedCodes));
-      renderHistory();
-    }
-
-    // 渲染兑换记录
-    function renderHistory() {
-      const entries = Object.entries(redeemedCodes)
-        .sort((a, b) => b[1].time - a[1].time);
-      
-      if (!entries.length) {
-        historyEl.innerHTML = '<div class="empty">暂无兑换记录</div>';
-        return;
-      }
-
-      historyEl.innerHTML = "";
-      entries.forEach(([code, info]) => {
-        const item = document.createElement("div");
-        item.className = "history-item";
-        const time = new Date(info.time);
-        const timeStr = `${time.getFullYear()}-${String(time.getMonth()+1).padStart(2,'0')}-${String(time.getDate()).padStart(2,'0')} ${String(time.getHours()).padStart(2,'0')}:${String(time.getMinutes()).padStart(2,'0')}`;
-        
-        item.innerHTML = `
-          <div>
-            <div class="history-code">${code}</div>
-            <div class="history-time">${timeStr}</div>
-          </div>
-          <div class="history-reward">+${info.reward} 积分</div>
-        `;
-        historyEl.appendChild(item);
-      });
-    }
-
-    // 执行兑换
-    function redeem() {
-      const code = inputEl.value.trim().toUpperCase();
-      statusEl.className = "status";
-      statusEl.textContent = "";
-
-      if (!code) {
-        statusEl.className = "status error";
-        statusEl.textContent = "请输入礼品码";
-        return;
-      }
-
-      // 校验是否已兑换
-      if (redeemedCodes[code]) {
-        statusEl.className = "status error";
-        statusEl.textContent = "该礼品码已兑换过";
-        return;
-      }
-
-      // 校验礼品码是否有效
-      const gift = GIFT_CODES[code];
-      if (!gift) {
-        statusEl.className = "status error";
-        statusEl.textContent = "无效的礼品码";
-        return;
-      }
-
-      const reward = gift.points;
-      if (!Number.isSafeInteger(reward) || reward < 0) {
-        statusEl.className = "status error";
-        statusEl.textContent = "礼品码配置错误";
-        return;
-      }
-
-      // 计算新积分，防溢出
-      const newPoints = currentPoints + reward;
-      if (!Number.isSafeInteger(newPoints) || newPoints > 99999999) {
-        statusEl.className = "status error";
-        statusEl.textContent = "积分已达上限，无法兑换";
-        return;
-      }
-
-      // 先保存积分，再记兑换记录
-      const saved = savePoints(newPoints);
-      if (!saved) {
-        statusEl.className = "status error";
-        statusEl.textContent = "兑换失败，请检查浏览器存储";
-        return;
-      }
-
-      saveRedeemed(code, reward);
-      inputEl.value = "";
-      statusEl.className = "status success";
-      statusEl.textContent = `兑换成功！获得 ${reward} 积分，返回游戏即可看到。`;
-    }
-
-    // 事件绑定
-    btnEl.addEventListener("click", redeem);
-    inputEl.addEventListener("keydown", e => {
-      if (e.key === "Enter") redeem();
-    });
-
-    // 初始化
-    loadPoints();
-    loadRedeemed();
-    inputEl.focus();
-  </script>
+  }catch(e){
+    console.error(e);
+    msg.innerText="网络请求失败";
+    msg.style.color="#f87171";
+  }
+  btn.disabled=false;
+}
+</script>
 </body>
 </html>
