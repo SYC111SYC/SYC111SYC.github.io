@@ -1261,6 +1261,29 @@
             </div>
         </div>
     </div>
+    <div class="post-card">
+  <div class="fold-header">
+    <span>🎁 人机对战奖励</span>
+    <span class="fold-arrow">▼</span>
+  </div>
+  <div class="fold-content open">
+    <div style="padding:10px 4px;">
+      <div style="margin-bottom:12px;">
+        <div>人机对战胜利进度：<span id="aiWinProgress">0</span>/10</div>
+        <div style="height:10px;background:#e2e8f0;border-radius:6px;margin:6px 0;overflow:hidden;">
+          <div id="aiWinBar" style="height:100%;width:0%;background:#60a5fa;"></div>
+        </div>
+        <div>可领取档位：<strong id="aiRewardCount">0</strong> 个（每赢10局可领1个60‑70积分礼品码）</div>
+      </div>
+      <button id="claimAiCodeBtn" disabled style="padding:8px 14px;border:none;border-radius:8px;background:#8fb0ff;color:#fff;font-weight:bold;cursor:pointer;">领取礼品码</button>
+      <div id="aiCodeMsg" style="margin:10px 0;min-height:20px;color:#c53030;"></div>
+      <div id="aiCodeList" style="margin-top:14px;">
+        <div style="font-size:13px;color:#666;margin-bottom:6px;">本机已生成礼品码：</div>
+        <div id="aiCodeBox" style="display:grid;gap:6px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
     <main id="postList">加载中...</main>
 
