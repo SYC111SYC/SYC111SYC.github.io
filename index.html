@@ -3702,6 +3702,34 @@ claimAiCodeBtn.onclick = async function(){
 // 初始化
 renderAiRewardPanel();
 renderAiCodeList();
+/* ========== URL 参数调试：?win=1 直接加1个可领取档位 ========== */
+(function initWinParam(){
+  // 读取地址栏里的 win 参数，例如 index.html?win=1
+  const params = new URLSearchParams(location.search);
+  if(!params.has("win")) return;
+
+  const addTier = Number(params.get("win"));
+  if(!Number.isSafeInteger(addTier) || addTier <= 0) return;
+
+  let winData;
+  try{
+    winData = JSON.parse(safeGet(AI_WIN_KEY) || '{"wins":0,"availableReward":0}');
+  }catch(e){
+    winData = { wins:0, availableReward:0 };
+  }
+
+  // 每1胜1个档位：wins 按 10 局一档累加
+  winData.wins = (winData.wins || 0) + addTier * 10;
+  winData.availableReward = (winData.availableReward || 0) + addTier;
+  safeSet(AI_WIN_KEY, JSON.stringify(winData));
+
+  // 清掉地址栏参数，刷新后不留痕
+  params.delete("win");
+  const query = params.toString();
+  history.replaceState(null, "", location.pathname + (query ? "?" + query : "") + location.hash);
+
+  renderAiRewardPanel();
+})();
     </script>
 </body>
 </html>
