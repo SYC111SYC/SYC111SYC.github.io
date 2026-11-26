@@ -1064,7 +1064,7 @@
             color: #fff;
         }
 
-        /* ========== 人机胜场兑换码卡片 ========== */
+        /* ========== 连续签到兑换码卡片 ========== */
         .win-code-card {
             margin: 16px 0;
             border: 1px solid #e2e8f0;
@@ -1326,14 +1326,14 @@
         </div>
     </div>
 
-    <!-- ========== 人机胜场兑换码卡片 ========== -->
+    <!-- ========== 连续签到兑换码卡片 ========== -->
     <div class="post-card win-code-card" id="winCodeCard">
         <div class="win-code-head">
-            <span class="win-code-title">🎖️ 人机胜场奖励</span>
-            <span class="win-code-progress" id="winCodeProgress">0 / 10</span>
+            <span class="win-code-title">🎁 连续签到奖励</span>
+            <span class="win-code-progress" id="winCodeProgress">0 / 7</span>
         </div>
         <div class="win-code-body">
-            <p class="win-code-desc">在「人机对战」中每赢 <strong>10 局</strong>，即可领取一个礼品码，价值 <strong>60~70 积分</strong>，每个码仅限兑换一次。</p>
+            <p class="win-code-desc">连续签到每满 <strong>7 天</strong>，即可领取一个礼品码，价值 <strong>15~40 积分</strong>，每个码仅限兑换一次。</p>
             <div class="win-code-bar"><div class="win-code-bar-fill" id="winCodeBarFill"></div></div>
             <button type="button" class="win-code-claim-btn" id="winCodeClaimBtn">领取礼品码</button>
             <div class="win-code-status" id="winCodeStatus" role="status" aria-live="polite"></div>
@@ -3657,19 +3657,19 @@
         })();
 
         /* =========================================================
-           人机胜场奖励卡片
-           胜场数由 pvpgame.html 写入 localStorage（每赢 1 局 +1）
-           每满 10 局可领取一个 60~70 积分的礼品码（写入 Supabase）
+           连续签到奖励卡片
+           连续签到天数复用签到存档 catball_fortune_streak_v1
+           每满 7 天可领取一个 15~40 积分的礼品码（写入 Supabase）
            ========================================================= */
         (function winCodeCard() {
-            var WINS_KEY = 'catball_ai_wins_v1';        // 本机人机累计胜场
-            var CLAIMED_KEY = 'catball_ai_code_claims_v1'; // 已领取档位数量
-            var CODES_KEY = 'catball_ai_codes_v1';      // 本机已生成的礼品码记录
+            var STREAK_KEY = 'catball_fortune_streak_v1';   // 签到连续天数（复用签到存档）
+            var CLAIMED_KEY = 'catball_sign_code_claims_v1'; // 已领取档位数量
+            var CODES_KEY = 'catball_sign_codes_v1';      // 本机已生成的礼品码记录
             var CREATE_API = 'https://rnrppmyrvauogudyjekq.supabase.co/functions/v1/createcode';
 
-            var WINS_PER_CODE = 10;
-            var POINTS_MIN = 60;
-            var POINTS_MAX = 70;
+            var DAYS_PER_CODE = 7;
+            var POINTS_MIN = 15;
+            var POINTS_MAX = 40;
 
             var $ = function (id) { return document.getElementById(id); };
             var progressEl = $('winCodeProgress');
@@ -3688,6 +3688,21 @@
                 var n = Number(safeGet(key));
                 return Number.isSafeInteger(n) && n >= 0 ? n : fallback;
             }
+
+            // 读取当前连续签到天数（签到存档 { last, count }）
+            function readStreak() {
+                try {
+                    var obj = JSON.parse(safeGet(STREAK_KEY) || '{}');
+                    return Number.isSafeInteger(obj.count) && obj.count >= 0 ? obj.count : 0;
+                } catch (e) { return 0; }
+            }
+            function writeStreak(count) {
+                var obj;
+                try { obj = JSON.parse(safeGet(STREAK_KEY) || '{}'); } catch (e) { obj = {}; }
+                obj.count = count;
+                safeSet(STREAK_KEY, JSON.stringify(obj));
+            }
+
             function readCodes() {
                 try {
                     var obj = JSON.parse(safeGet(CODES_KEY) || '[]');
@@ -3698,21 +3713,35 @@
                 safeSet(CODES_KEY, JSON.stringify(arr));
             }
 
-            // 档位 = 累计胜场 / 10 向下取整 - 已领取，下限 0，绝不出现负数
+            // 调试参数 ?day=xxx：把连续签到天数直接设为 xxx（仅开发测试用）
+            (function applyDayParam() {
+                var params;
+                try { params = new URLSearchParams(location.search); } catch (e) { return; }
+                if (!params.has('day')) return;
+                var days = Number(params.get('day'));
+                if (Number.isSafeInteger(days) && days >= 0) {
+                    writeStreak(days);
+                }
+                params.delete('day');
+                var query = params.toString();
+                history.replaceState(null, '', location.pathname + (query ? '?' + query : '') + location.hash);
+            })();
+
+            // 档位 = 连续天数 / 7 向下取整 - 已领取，下限 0，绝不出现负数
             function getPending() {
-                var totalWins = readInt(WINS_KEY, 0);
+                var totalDays = readStreak();
                 var claimed = readInt(CLAIMED_KEY, 0);
-                var totalTier = Math.floor(totalWins / WINS_PER_CODE);
+                var totalTier = Math.floor(totalDays / DAYS_PER_CODE);
                 return Math.max(0, totalTier - claimed);
             }
 
             function refresh() {
-                var totalWins = readInt(WINS_KEY, 0);
+                var totalDays = readStreak();
                 var pending = getPending();
-                var inTier = totalWins % WINS_PER_CODE;
+                var inTier = totalDays % DAYS_PER_CODE;
 
-                progressEl.textContent = inTier + ' / ' + WINS_PER_CODE;
-                barFill.style.width = Math.round((inTier / WINS_PER_CODE) * 100) + '%';
+                progressEl.textContent = inTier + ' / ' + DAYS_PER_CODE;
+                barFill.style.width = Math.round((inTier / DAYS_PER_CODE) * 100) + '%';
                 claimBtn.disabled = pending <= 0;
 
                 if (pending > 0) {
@@ -3743,7 +3772,7 @@
                     codeEl.textContent = item.code;
                     var descEl = document.createElement('span');
                     descEl.className = 'desc';
-                    descEl.textContent = item.desc || '人机胜场礼包';
+                    descEl.textContent = item.desc || '连续签到礼包';
                     meta.appendChild(codeEl);
                     meta.appendChild(descEl);
 
@@ -3805,7 +3834,7 @@
             }
             function genCode() {
                 var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-                var s = 'AI';
+                var s = 'DQ';
                 for (var i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
                 return s;
             }
@@ -3818,11 +3847,11 @@
                     return;
                 }
 
-                var totalWins = readInt(WINS_KEY, 0);
+                var totalDays = readStreak();
                 var claimed = readInt(CLAIMED_KEY, 0);
                 var points = randomPoints();
                 var code = genCode();
-                var remark = '人机胜场礼包（第 ' + (claimed + 1) + ' 档）';
+                var remark = '连续签到礼包（第 ' + (claimed + 1) + ' 档）';
 
                 claimBtn.disabled = true;
                 setStatus('', '正在生成礼品码…');
@@ -3848,7 +3877,7 @@
                         writeCodes(codes);
                     }
                     // 已领取档位 +1，不会超过总档位
-                    safeSet(CLAIMED_KEY, String(Math.min(claimed + 1, Math.floor(totalWins / WINS_PER_CODE))));
+                    safeSet(CLAIMED_KEY, String(Math.min(claimed + 1, Math.floor(totalDays / DAYS_PER_CODE))));
 
                     setStatus('ok', '礼品码已生成：' + (data.code || code) + '，可在兑换页兑换。');
                     refresh();
@@ -3866,7 +3895,7 @@
 
             // 进入页面只渲染，不发请求
             refresh();
-            // 从对战页返回时刷新一次进度
+            // 签到/返回时刷新一次进度
             window.addEventListener('focus', refresh);
         })();
     </script>
