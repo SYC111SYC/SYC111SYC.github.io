@@ -3670,20 +3670,20 @@ function renderAiCodeList(){
   })
 }
 
-// 领取：调用supabase create‑code接口生成礼品码
 claimAiCodeBtn.onclick = async function(){
   aiCodeMsgEl.textContent = "正在生成礼品码...";
   claimAiCodeBtn.disabled = true;
   const data = getAiWinData();
   try{
+    // 这里你自己确定积分，例如随机 60~70
+    const rewardPoints = Math.floor(Math.random() * 11) + 60;
     const res = await fetch(CREATE_CODE_API,{
       method:"POST",
-      headers:{"Content-Type":"application/json"}
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ points: rewardPoints })
     });
-    // 调试弹窗
     const textBody = await res.text();
     alert(`状态码：${res.status}\n返回原始：${textBody}`);
-    // 继续走原来逻辑
     let ret;
     try {
       ret = JSON.parse(textBody);
@@ -3699,7 +3699,6 @@ claimAiCodeBtn.onclick = async function(){
       renderAiRewardPanel();
       return;
     }
-    // 成功，扣除一个可领取档位，保存本机记录
     data.availableReward -=1;
     saveAiWinData(data);
     const localList = getLocalAiCodes();
@@ -3713,10 +3712,6 @@ claimAiCodeBtn.onclick = async function(){
   }
   renderAiRewardPanel();
 }
-
-// 初始化
-renderAiRewardPanel();
-renderAiCodeList();
 /* ========== URL 参数调试：?win=1 直接加1个可领取档位 ========== */
 (function initWinParam(){
   // 读取地址栏里的 win 参数，例如 index.html?win=1
