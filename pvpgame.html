@@ -237,6 +237,8 @@
       .dpad button { min-height: 39px; }
     }
   </style>
+  <link rel="stylesheet" href="css/account.css">
+  <script src="js/account.js"></script>
 </head>
 <body>
   <main class="page">
@@ -460,6 +462,7 @@
         cyborg: { name: "生化人", price: 80, description: "生命 ×2 · 肉搏距离 ×2 并吸血 · 移速 -30%" }
       };
       let lockedStake = 0, opponentStake = 0, stakeReserved = false, shopReturnSetup = false;
+      let setupStartPending = false;
       const BAG_CAPACITY = 8, PET_LIMIT = 2, EQUIPMENT_LIMIT = 2;
       const petSpecs = {
         elephant: { name: "象球", maxHp: 400, speed: 36, price: 45, description: "400 HP · 移速 0.2 倍 · 靠近后每秒踩踏 12 伤害", image: elephantImage },
@@ -564,8 +567,26 @@
         });
       }
 
-      function unlockProfession(id) {
+      async function unlockProfession(id) {
         if (!Object.prototype.hasOwnProperty.call(professionSpecs, id) || unlockedProfessions.has(id)) return;
+        if (unlockProfession.loginPending) return;
+        unlockProfession.loginPending = true;
+        let loggedIn = false;
+        try {
+          loggedIn = Boolean(window.CatballAccount) &&
+            await window.CatballAccount.ensureLogin("登录后才能使用积分解锁职业。");
+        } finally {
+          unlockProfession.loginPending = false;
+        }
+        if (!loggedIn) {
+          $("setupStatus").textContent = "请先登录后再解锁职业。";
+          return;
+        }
+        readProfile();
+        if (unlockedProfessions.has(id)) {
+          renderProfessions();
+          return;
+        }
         const price = professionSpecs[id].price;
         if (points < price) {
           $("setupStatus").textContent = `需要 ${price} 积分才能解锁该职业。`;
@@ -587,6 +608,7 @@
           data.inventory.pvpProfessions = [...professions].filter(value =>
             Object.prototype.hasOwnProperty.call(professionSpecs, value));
           localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
+          if (window.CatballAccount) window.CatballAccount.markDirty();
           readProfile();
           selectedProfession = id;
           $("setupStatus").textContent = `已解锁并选择${professionSpecs[id].name}。`;
@@ -607,6 +629,7 @@
           data.points = current + pointsDelta;
           data.inventory.pvpBag = nextBag.map(item => ({ ...item }));
           localStorage.setItem(ECONOMY_KEY, JSON.stringify(data));
+          if (window.CatballAccount) window.CatballAccount.markDirty();
           readProfile();
           return true;
         } catch (error) {
@@ -827,9 +850,21 @@
         else showMenu();
       }
 
-      function buyItem(type) {
+      async function buyItem(type) {
         const product = shopItems[type];
-        if (!product) return;
+        if (!product || buyItem.loginPending) return;
+        buyItem.loginPending = true;
+        let loggedIn = false;
+        try {
+          loggedIn = Boolean(window.CatballAccount) &&
+            await window.CatballAccount.ensureLogin("登录后才能使用积分购买背包物品。");
+        } finally {
+          buyItem.loginPending = false;
+        }
+        if (!loggedIn) {
+          $("shopStatus").textContent = "请先登录后再购买。";
+          return;
+        }
         readProfile();
         if (arenaBag.length >= BAG_CAPACITY) {
           $("shopStatus").textContent = "背包已满（8 格），请先整理后再购买。";
@@ -849,7 +884,20 @@
         renderLoadout();
       }
 
-      function healBagPet(id) {
+      async function healBagPet(id) {
+        if (healBagPet.loginPending) return;
+        healBagPet.loginPending = true;
+        let loggedIn = false;
+        try {
+          loggedIn = Boolean(window.CatballAccount) &&
+            await window.CatballAccount.ensureLogin("登录后才能使用积分修复宠物。");
+        } finally {
+          healBagPet.loginPending = false;
+        }
+        if (!loggedIn) {
+          $("shopStatus").textContent = "请先登录后再修复宠物。";
+          return;
+        }
         readProfile();
         const item = arenaBag.find(entry => entry.id === id);
         if (!item || !petSpecs[item.type] || item.hp >= petSpecs[item.type].maxHp) return;
@@ -3449,7 +3497,8 @@
           makeLargeGame(largeConfig);
         }
       });
-      $("setupStart").addEventListener("click", () => {
+      $("setupStart").addEventListener("click", async () => {
+        if (setupStartPending) return;
         const gameMode = setupMode;
         const loadout = selectedLoadoutData();
         readProfile();
@@ -3462,6 +3511,25 @@
           if (!Number.isSafeInteger(stake) || stake < 0 || stake > points) {
             $("setupStatus").textContent = `战利品必须是 0 到当前积分 ${points} 之间的整数。`;
             return;
+          }
+          if (stake > 0) {
+            setupStartPending = true;
+            let loggedIn = false;
+            try {
+              loggedIn = Boolean(window.CatballAccount) &&
+                await window.CatballAccount.ensureLogin("登录后才能使用积分设置联机战利品。");
+            } finally {
+              setupStartPending = false;
+            }
+            if (!loggedIn) {
+              $("setupStatus").textContent = "请先登录后再设置积分战利品。";
+              return;
+            }
+            readProfile();
+            if (stake > points) {
+              $("setupStatus").textContent = `云端积分已更新，当前最多可设置 ${points} 积分。`;
+              return;
+            }
           }
           if (!persistArenaChanges(-stake, arenaBag)) {
             $("setupStatus").textContent = "战利品锁定失败，请检查积分数据后重试。";
@@ -3511,6 +3579,13 @@
       window.addEventListener("storage", event => {
         if (event.key === ECONOMY_KEY || event.key === NAME_KEY) readProfile();
       });
+      function refreshAccountProfile() {
+        readProfile();
+        renderLoadout();
+        renderProfessions();
+      }
+      window.addEventListener("catball:account-state", refreshAccountProfile);
+      if (window.CatballAccount) window.CatballAccount.ready.then(refreshAccountProfile);
       window.addEventListener("beforeunload", () => {
         if (opponentId && connected) publishDirect(opponentId, { type: "quit" });
         if (goeasy) goeasy.disconnect({});
@@ -5175,6 +5250,13 @@
         hint("联机对战开始：你是红方，选中卡牌后点击上方半场部署。");
       }
     }
+
+    function refreshCardBattleName() {
+      try { cbName = (localStorage.getItem("catball_pet_name_v1") || "猫球玩家").slice(0, 12); }
+      catch (error) { cbName = "猫球玩家"; }
+    }
+    window.addEventListener("catball:account-state", refreshCardBattleName);
+    if (window.CatballAccount) window.CatballAccount.ready.then(refreshCardBattleName);
 
     window.CardBattle = { open, close };
   })();

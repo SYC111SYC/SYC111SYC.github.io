@@ -14,6 +14,8 @@ button{width:100%;padding:14px;border:none;border-radius:10px;background:#2563eb
 button:disabled{opacity:0.6;cursor:not-allowed}
 #msg{margin-top:16px;text-align:center;font-size:15px}
 </style>
+<link rel="stylesheet" href="css/account.css">
+<script src="js/account.js"></script>
 </head>
 <body>
 <div class="box">
@@ -23,45 +25,39 @@ button:disabled{opacity:0.6;cursor:not-allowed}
   <div id="msg"></div>
 </div>
 <script>
-const REDEEM_API = "https://rnrppmyrvauogudyjekq.supabase.co/functions/v1/redeem";
-
 const input = document.getElementById("codeInput");
 const btn = document.getElementById("submitBtn");
 const msg = document.getElementById("msg");
 
 btn.onclick = async ()=>{
-  const code = input.value.trim();
+  const code = input.value.trim().toUpperCase();
   if(!code){
     msg.innerText = "请输入礼品码";
     msg.style.color="#f87171";
     return;
   }
   btn.disabled=true;
-  msg.innerText="兑换中...";
+  msg.innerText="等待登录并读取云存档...";
   msg.style.color="#aaa";
   try{
-    const res = await fetch(REDEEM_API,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({code})
-    })
-    const data = await res.json();
-    if(data.success){
-      msg.innerText=data.message;
-      msg.style.color="#4ade80";
-      let save = JSON.parse(localStorage.getItem("catball_economy_v1")||"{}");
-      save.points = (save.points||0)+data.points;
-      localStorage.setItem("catball_economy_v1",JSON.stringify(save));
-    }else{
-      msg.innerText=data.message;
+    const loggedIn = await window.CatballAccount.ensureLogin("登录后才能兑换礼品码。");
+    if(!loggedIn){
+      msg.innerText="请先登录后再兑换";
       msg.style.color="#f87171";
+      return;
     }
+    msg.innerText="兑换中...";
+    const data = await window.CatballAccount.redeem(code);
+    msg.innerText = data.ok && data.points > 0 ? `${data.msg}（+${data.points} 积分）` : (data.msg || "兑换失败");
+    msg.style.color = data.ok ? "#4ade80" : "#f87171";
+    if(data.ok) input.value="";
   }catch(e){
     console.error(e);
     msg.innerText="网络请求失败";
     msg.style.color="#f87171";
+  }finally{
+    btn.disabled=false;
   }
-  btn.disabled=false;
 }
 </script>
 </body>

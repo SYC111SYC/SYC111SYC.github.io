@@ -51,6 +51,8 @@ button:disabled{opacity:.55;cursor:not-allowed}
 [hidden]{display:none!important}
 @media(max-width:520px){.arena{height:390px}.cat.local{left:18%}.cat.remote{left:82%}.math-board{top:12px;min-height:174px;padding:7px 8px}.math-question{font-size:18px}}
 </style>
+<link rel="stylesheet" href="css/account.css">
+<script src="js/account.js"></script>
 </head>
 <body>
 <h2>猫球串门大厅</h2>
@@ -1127,6 +1129,7 @@ function awardMathPrize(gameId, prize) {
     economy.inventory = {};
   }
   if (!writeStorage(ECONOMY_KEY, JSON.stringify(economy))) return false;
+  if (window.CatballAccount) window.CatballAccount.markDirty();
   paidMathGames.add(gameId);
   return true;
 }
@@ -1263,6 +1266,13 @@ window.addEventListener("beforeunload", () => {
   stopVisiting();
   if (goeasy) goeasy.disconnect({});
 });
+
+function refreshAccountProfile() {
+  loadCatName();
+  syncCosmetic();
+}
+window.addEventListener("catball:account-state", refreshAccountProfile);
+if (window.CatballAccount) window.CatballAccount.ready.then(refreshAccountProfile);
 
 loadCatName();
 updateCosmetics();

@@ -1,0 +1,305 @@
+#catballAccountRoot {
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #2d3748;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#catballAccountRoot *,
+#catballAccountRoot *::before,
+#catballAccountRoot *::after {
+  box-sizing: border-box;
+}
+
+.cb-account-launcher {
+  position: fixed;
+  z-index: 90000;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: min(240px, calc(100vw - 24px));
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid rgba(88, 73, 125, .18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 5px 20px rgba(31, 41, 55, .13);
+  color: #58497d;
+  font: 700 12px/1.2 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+}
+
+.cb-account-launcher:hover {
+  border-color: #8fb0ff;
+  background: #fff;
+}
+
+.cb-account-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a0aec0;
+}
+
+.cb-account-launcher.authenticated .cb-account-dot {
+  background: #38a169;
+  box-shadow: 0 0 0 3px rgba(56, 161, 105, .12);
+}
+
+.cb-account-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cb-account-overlay {
+  position: fixed;
+  z-index: 1000000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 25, 38, .52);
+  backdrop-filter: blur(5px);
+}
+
+.cb-account-overlay[hidden] {
+  display: none;
+}
+
+.cb-account-dialog {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 25px;
+  border: 1px solid rgba(255, 255, 255, .7);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, .28);
+}
+
+.cb-account-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 18px;
+}
+
+.cb-account-title {
+  margin: 0;
+  color: #332a4f;
+  font-size: 21px;
+  line-height: 1.3;
+}
+
+.cb-account-close {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f3f8;
+  color: #657184;
+  font-size: 21px;
+  cursor: pointer;
+}
+
+.cb-account-description {
+  margin: 0 0 17px;
+  color: #657184;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.cb-account-field {
+  display: block;
+  margin-bottom: 14px;
+  color: #404b5d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.cb-account-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.cb-account-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #d6dde8;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  color: #202636;
+  font: inherit;
+  font-size: 14px;
+}
+
+.cb-account-input-row .cb-account-input {
+  margin-top: 0;
+}
+
+.cb-account-input:focus {
+  border-color: #8fb0ff;
+  box-shadow: 0 0 0 3px rgba(143, 176, 255, .18);
+}
+
+.cb-account-send {
+  flex: 0 0 112px;
+  min-height: 43px;
+  padding: 7px;
+  border: 1px solid #ccd8f5;
+  border-radius: 9px;
+  background: #f2f6ff;
+  color: #526fa9;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cb-account-primary,
+.cb-account-secondary {
+  width: 100%;
+  min-height: 43px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cb-account-primary {
+  border: 0;
+  background: #8fb0ff;
+  color: #fff;
+}
+
+.cb-account-primary:hover {
+  background: #749bff;
+}
+
+.cb-account-secondary {
+  border: 1px solid #d6dde8;
+  background: #fff;
+  color: #4b5668;
+}
+
+.cb-account-primary:disabled,
+.cb-account-secondary:disabled,
+.cb-account-send:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.cb-account-message {
+  min-height: 21px;
+  margin: 12px 0 0;
+  color: #526fa9;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.cb-account-message.error {
+  color: #c53030;
+}
+
+.cb-account-email {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  color: #332a4f;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.cb-account-sync {
+  margin: 0 0 20px;
+  padding: 12px;
+  border-radius: 9px;
+  background: #f6f8fc;
+  color: #657184;
+  font-size: 12px;
+}
+
+.cb-account-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.cb-account-import-options {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.cb-account-import-summary {
+  margin: 12px 0;
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #4b5668;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.cb-account-cancel {
+  margin-top: 10px;
+  border: 0;
+  background: transparent;
+  color: #718096;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.cb-account-toast {
+  position: fixed;
+  z-index: 1000001;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: rgba(30, 37, 52, .94);
+  box-shadow: 0 8px 30px rgba(15, 23, 42, .25);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.cb-account-toast[hidden] {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .cb-account-launcher {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    min-height: 34px;
+    max-width: 150px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .cb-account-dialog {
+    padding: 21px 18px;
+  }
+}

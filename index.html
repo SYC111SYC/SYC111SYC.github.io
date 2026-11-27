@@ -1128,6 +1128,8 @@
         .win-code-item.copied { border-color: #38a169; background: #f0faf4; }
         .win-code-item.copied .win-code-copy { background: #38a169; border-color: #38a169; color: #fff; }
     </style>
+    <link rel="stylesheet" href="css/account.css">
+    <script src="js/account.js"></script>
 </head>
 <body>
     <!-- 安全锁定层 -->
@@ -1661,6 +1663,7 @@
                 return;
             }
             updatePetName(name);
+            if (window.CatballAccount) window.CatballAccount.markDirty();
         });
 
         petNameInput.addEventListener('keydown', function(event) {
@@ -2101,6 +2104,7 @@
             storeInventory = nextInventory;
             updateFoodUI();
             if (typeof renderEconomy === 'function') renderEconomy();
+            if (window.CatballAccount) window.CatballAccount.markDirty();
             return true;
         }
 
@@ -2148,7 +2152,9 @@
 
         function setFoodCount(n) {
             const safe = Math.max(0, Math.floor(Number(n) || 0));
-            safeSet(FOOD_KEY, String(safe));
+            if (safeSet(FOOD_KEY, String(safe)) && window.CatballAccount) {
+                window.CatballAccount.markDirty();
+            }
             updateFoodUI();
         }
 
@@ -2965,7 +2971,20 @@
             return persistEconomy(pointsBalance + delta, storeInventory);
         }
 
-        function buyProduct(product, cost) {
+        async function buyProduct(product, cost) {
+            if (buyProduct.loginPending) return;
+            buyProduct.loginPending = true;
+            let loggedIn = false;
+            try {
+                loggedIn = Boolean(window.CatballAccount) &&
+                    await window.CatballAccount.ensureLogin('登录后才能使用积分购买商品。');
+            } finally {
+                buyProduct.loginPending = false;
+            }
+            if (!loggedIn) {
+                setEconomyMessage('登录并完成云存档加载后，才能使用积分购买。', true);
+                return;
+            }
             if (cost > pointsBalance) {
                 setEconomyMessage('积分不足，完成任务获取积分吧。', true);
                 return;
@@ -3630,26 +3649,45 @@
             renderFortune();
 
             if (didReset) {
+                if (window.CatballAccount) window.CatballAccount.markDirty();
                 setTimeout(function() {
                     say(mode === 'all' ? '全部数据已重置喵~' : '喂食记录已重置喵~', 2400);
                 }, 800);
             }
         })();
 
+        function refreshCatballAccountView() {
+            const latest = readEconomy();
+            economyData.points = latest.points;
+            economyData.inventory = latest.inventory;
+            pointsBalance = latest.points;
+            storeInventory = latest.inventory;
+            updatePetName(safeGet(CAT_NAME_KEY) || '猫球');
+            updateFoodUI();
+            renderEconomy();
+        }
+
+        window.addEventListener('catball:account-state', refreshCatballAccountView);
+        if (window.CatballAccount) window.CatballAccount.ready.then(refreshCatballAccountView);
+
         (function handleNewPointsParam() {
             const params = new URLSearchParams(location.search);
             if (!params.has('newpoints')) return;
 
-            const amount = Number(params.get('newpoints'));
-            if (!Number.isSafeInteger(amount) || amount <= 0 ||
-                amount > Number.MAX_SAFE_INTEGER - pointsBalance) {
-                setEconomyMessage('newpoints 参数必须是正整数，且不能超过积分上限。', true);
-                console.error('无效的 newpoints 参数。');
-            } else if (persistEconomy(pointsBalance + amount, storeInventory)) {
-                setEconomyPanel('shop');
-                setEconomyMessage(`作弊码生效：增加 ${amount} 积分。`);
+            if (window.CatballAccount && window.CatballAccount.hasSession()) {
+                setEconomyMessage('已登录账号不能使用 newpoints 调试加分。', true);
             } else {
-                setEconomyMessage('积分保存失败，newpoints 未生效。', true);
+                const amount = Number(params.get('newpoints'));
+                if (!Number.isSafeInteger(amount) || amount <= 0 ||
+                    amount > Number.MAX_SAFE_INTEGER - pointsBalance) {
+                    setEconomyMessage('newpoints 参数必须是正整数，且不能超过积分上限。', true);
+                    console.error('无效的 newpoints 参数。');
+                } else if (persistEconomy(pointsBalance + amount, storeInventory)) {
+                    setEconomyPanel('shop');
+                    setEconomyMessage(`作弊码生效：增加 ${amount} 积分。`);
+                } else {
+                    setEconomyMessage('积分保存失败，newpoints 未生效。', true);
+                }
             }
 
             params.delete('newpoints');
@@ -3666,7 +3704,7 @@
             var STREAK_KEY = 'catball_fortune_streak_v1';   // 签到连续天数（复用签到存档）
             var CLAIMED_KEY = 'catball_sign_code_claims_v1'; // 已领取档位数量
             var CODES_KEY = 'catball_sign_codes_v1';      // 本机已生成的礼品码记录
-            var CREATE_API = 'https://rnrppmyrvauogudyjekq.supabase.co/functions/v1/createcode';
+            var CREATE_API = 'https://sshcmvydvckqkbmvdjvj.supabase.co/functions/v1/send-verify-code';
 
             var DAYS_PER_CODE = 7;
             var POINTS_MIN = 15;
@@ -3861,12 +3899,12 @@
                     var res = await fetch(CREATE_API, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ code: code, points: points, remark: remark })
+                        body: JSON.stringify({ type: 'create-code', code: code, points: points })
                     });
                     var data = await res.json().catch(function () { return {}; });
 
-                    if (!res.ok || !data.success) {
-                        throw new Error(data.message || '生成失败');
+                    if (!res.ok || !data.ok) {
+                        throw new Error(data.msg || '生成失败');
                     }
 
                     // 写本地记录（按时间排序由 renderCodes 负责）
