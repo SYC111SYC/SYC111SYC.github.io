@@ -300,7 +300,7 @@
               <button class="mode-button" type="button" data-mode="local"><strong>⚔️ 本地 2 人</strong><span>P1：WASD + 空格　·　P2：方向键 + M</span></button>
               <button class="mode-button" type="button" data-mode="large"><strong>🗺️ 大战场</strong><span>组队对战 · 大混战 · 生存赛 · 多人联机</span></button>
               <button class="mode-button" type="button" data-mode="cards"><strong>👑 皇室战争</strong><span>卡牌对战 · 能量部署 · 摧毁敌方大本营</span></button>
-              <button class="mode-button" type="button" data-mode="online"><strong>🌐 联机双人</strong><span>GoEasy 自动匹配在线玩家</span></button>
+              <button class="mode-button" type="button" data-mode="online"><strong>🌐 联机双人</strong><span>Supabase 自动匹配在线玩家</span></button>
             </div>
             <section id="difficultyPanel" hidden>
               <p class="setup-note">选择训练对手的难度。</p>
@@ -322,7 +322,7 @@
                   <option value="teams">人机组队对抗</option>
                   <option value="brawl">大混战</option>
                   <option value="survival">生存赛</option>
-                  <option value="online">GoEasy 多人联机</option>
+                  <option value="online">Supabase 多人联机</option>
                 </select>
               </label>
               <label class="large-setting" id="largeTeamSetting">每队人数
@@ -408,7 +408,191 @@
     </section>
     <footer class="footer"><span>人机胜利 +20 积分 · 联机可设置战利品</span><span>触屏：十字移动，点场地瞄准，可使用攻击、投粮和珍珠按钮</span></footer>
   </main>
-  <script src="https://cdn.jsdelivr.net/npm/goeasy-lite@2.13.24/goeasy-lite.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ================================================================
+    // Supabase Realtime 适配层
+    // 把 Supabase 的 channel / broadcast / presence 包装成与 GoEasy
+    // 相同的调用形式（connect / pubsub.subscribe / pubsub.publish /
+    // pubsub.hereNow / disconnect），两个游戏模块无需改动调用方式。
+    // ================================================================
+    (function () {
+      const KEY_STORAGE = "catball_supabase_anon_v1";
+
+      window.readSupabaseKey = function (promptIfMissing) {
+        let key = "";
+        try { key = (localStorage.getItem(KEY_STORAGE) || "").trim(); } catch (error) {}
+        if (!key && promptIfMissing) {
+          const input = window.prompt(
+            "首次联机需要 Supabase 的 anon public key\n" +
+            "打开 Supabase 控制台 → Project Settings → API Keys → 复制 anon public / publishable key\n" +
+            "（这个 key 本来就是公开的，粘贴后只保存在本机浏览器）",
+            ""
+          );
+          if (input && input.trim()) {
+            key = input.trim();
+            try { localStorage.setItem(KEY_STORAGE, key); } catch (error) {}
+          }
+        }
+        return key;
+      };
+
+      window.createSbBus = function (url, key, meta) {
+        const bus = {
+          client: null,
+          id: "",
+          meta: meta || {},
+          channels: new Map(),
+          pubsub: {}
+        };
+
+        function openChannel(topic, options) {
+          const existing = bus.channels.get(topic);
+          if (existing) {
+            if (options && options.onMessage) existing.onMessage = options.onMessage;
+            if (options && options.onPresence) existing.onPresence = options.onPresence;
+            return existing;
+          }
+          const wantPresence = Boolean(options && options.presence);
+          const entry = {
+            topic, ref: null, joined: false, failed: null, error: null,
+            onMessage: (options && options.onMessage) || null,
+            onPresence: (options && options.onPresence) || null,
+            presence: wantPresence, members: new Map(), outbox: []
+          };
+          const config = { broadcast: { self: false } };
+          if (wantPresence) config.presence = { key: bus.id || undefined };
+          const ref = bus.client.channel(topic, { config });
+          entry.ref = ref;
+          ref.on("broadcast", { event: "msg" }, message => {
+            const content = message && message.payload ? message.payload.content : null;
+            if (content != null && entry.onMessage) entry.onMessage({ content });
+          });
+          ref.on("presence", { event: "sync" }, () => {
+            const state = ref.presenceState() || {};
+            const ids = Object.keys(state);
+            ids.forEach(id => {
+              if (id === bus.id) return;
+              const data = (state[id] && state[id][0]) || {};
+              if (!entry.members.has(id)) {
+                entry.members.set(id, data);
+                if (entry.onPresence) entry.onPresence({ action: "join", member: { id, data } });
+              } else {
+                entry.members.set(id, data);
+              }
+            });
+            [...entry.members.keys()].forEach(id => {
+              if (ids.includes(id)) return;
+              entry.members.delete(id);
+              if (entry.onPresence) entry.onPresence({ action: "leave", member: { id } });
+            });
+          });
+          entry.joinedPromise = new Promise((resolve, reject) => {
+            ref.subscribe(async (status, error) => {
+              if (status === "SUBSCRIBED") {
+                entry.joined = true;
+                if (wantPresence) {
+                  try { await ref.track(bus.meta || {}); } catch (trackError) { console.warn("Supabase presence 上报失败：", trackError); }
+                }
+                const queued = entry.outbox.splice(0, entry.outbox.length);
+                queued.forEach(task => task());
+                resolve();
+              } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+                entry.error = new Error("Supabase Realtime 订阅失败：" + status + (error && error.message ? "（" + error.message + "）" : ""));
+                reject(entry.error);
+              }
+            });
+          });
+          entry.joinedPromise.catch(() => {});
+          bus.channels.set(topic, entry);
+          return entry;
+        }
+
+        function sender(topic) {
+          const entry = openChannel(topic, {});
+          return entry;
+        }
+
+        bus.connect = function (options) {
+          try {
+            if (!window.supabase || typeof window.supabase.createClient !== "function") {
+              throw new Error("Supabase SDK 未加载");
+            }
+            bus.client = window.supabase.createClient(url, key, {
+              realtime: { params: { eventsPerSecond: 80 } },
+              auth: { persistSession: false, autoRefreshToken: false }
+            });
+            bus.id = String((options && options.id) || "");
+            if (options && options.data) bus.meta = options.data;
+            if (options && options.onSuccess) options.onSuccess();
+          } catch (error) {
+            if (options && options.onFailed) options.onFailed(error);
+          }
+        };
+
+        bus.disconnect = function () {
+          try {
+            if (bus.client && typeof bus.client.removeAllChannels === "function") bus.client.removeAllChannels();
+          } catch (error) { console.warn("关闭 Supabase 连接失败：", error); }
+          bus.channels.clear();
+        };
+
+        bus.pubsub.subscribe = function (options) {
+          const entry = openChannel(options.channel, {
+            presence: Boolean(options.presence && options.presence.enable),
+            onMessage: options.onMessage || null,
+            onPresence: options.onPresence || null
+          });
+          entry.joinedPromise.then(() => { if (options.onSuccess) options.onSuccess(); })
+            .catch(error => { if (options.onFailed) options.onFailed(error); });
+        };
+
+        bus.pubsub.subscribePresence = function (options) {
+          const entry = openChannel(options.channel, {
+            presence: true,
+            onPresence: options.onPresence || null
+          });
+          if (!entry.presence) console.warn("presence 频道需先以 presence 模式订阅：", options.channel);
+          entry.joinedPromise.then(() => { if (options.onSuccess) options.onSuccess(); })
+            .catch(error => { if (options.onFailed) options.onFailed(error); });
+        };
+
+        bus.pubsub.hereNow = function (options) {
+          const entry = bus.channels.get(options.channel);
+          const members = entry ? [...entry.members.entries()].map(([id, data]) => ({ id, data })) : [];
+          if (options.onSuccess) options.onSuccess({ content: { members } });
+        };
+
+        bus.pubsub.publish = function (options) {
+          const send = () => {
+            const task = entry.ref.send({
+              type: "broadcast",
+              event: "msg",
+              payload: { content: options.message }
+            });
+            if (task && typeof task.then === "function") {
+              task.then(result => {
+                if (result && result.error && options.onFailed) options.onFailed(result.error);
+              }).catch(error => { if (options.onFailed) options.onFailed(error); });
+            }
+            if (options.onSuccess) options.onSuccess();
+          };
+          let entry;
+          try {
+            entry = bus.channels.get(options.channel) || sender(options.channel);
+          } catch (error) {
+            if (options.onFailed) options.onFailed(error);
+            return;
+          }
+          if (entry.error) { if (options.onFailed) options.onFailed(entry.error); return; }
+          if (entry.joined) send();
+          else entry.outbox.push(send);
+        };
+
+        return bus;
+      };
+    })();
+  </script>
   <script>
     (() => {
       "use strict";
@@ -417,9 +601,10 @@
       const NAME_KEY = "catball_pet_name_v1", GOEASY_KEY = "BC-6c13f16b458f45548f069666edacbd91";
       const BIG_GO_EASY_KEY = "BC-cca123fa205040bdb2ec3d9c18682250";
       const GOEASY_HOST = "hangzhou.goeasy.io", LOBBY = "catball-pvp-lobby-syc111syc-v1";
-      const INBOX = "catball-pvp-inbox-";
+      const SB_URL = "https://rnrppmyrvauogudyjekq.supabase.co";
+      const INBOX = "cbpvp-in-";
       const BIG_LOBBY = "catball-pvp-big-lobby-syc111syc-v1";
-      const BIG_INBOX = "catball-pvp-big-inbox-";
+      const BIG_INBOX = "cbpvp-big-in-";
       const canvas = document.getElementById("arenaCanvas");
       const ctx = canvas.getContext("2d");
       const minimapCanvas = document.getElementById("minimapCanvas");
@@ -2639,7 +2824,7 @@
         if (mode === "online" && state.running) {
           snapshotTimer += dt;
           // 本机直连时 30Hz，画面更跟手；走云端时 10Hz，减少被限流丢弃的概率
-          const interval = localLinkReady ? .033 : .1;
+          const interval = localLinkReady ? .033 : (bigOnline ? .083 : .066);
           if (snapshotTimer >= interval) {
             snapshotTimer = 0;
             broadcast({ type: "state", state: serializableState() });
@@ -3145,23 +3330,30 @@
         peers.clear();
         activeLobby = bigOnline ? BIG_LOBBY : LOBBY;
         activeInbox = bigOnline ? BIG_INBOX : INBOX;
-        showWaiting("正在连接 GoEasy…");
-        if (!window.GoEasy || typeof window.GoEasy.getInstance !== "function") {
+        showWaiting("正在连接 Supabase…");
+        if (typeof window.createSbBus !== "function") {
           refundStake();
           showMenu("联机服务加载失败", "请检查网络后刷新页面，或选择人机/本地双人模式。");
-          $("overlayStatus").textContent = "GoEasy SDK 未能加载。";
+          $("overlayStatus").textContent = "Supabase SDK 未能加载。";
+          return;
+        }
+        const sbKey = window.readSupabaseKey(true);
+        if (!sbKey) {
+          refundStake();
+          showMenu("缺少 Supabase Key", "联机需要 Supabase 的 anon public key：控制台 → Project Settings → API Keys 复制一次粘贴即可，之后会自动记住。");
+          $("overlayStatus").textContent = "未配置 Supabase anon key。";
           return;
         }
         try {
-          const client = window.GoEasy.getInstance({
-            host: GOEASY_HOST, appkey: bigOnline ? BIG_GO_EASY_KEY : GOEASY_KEY, modules: ["pubsub"]
+          const client = window.createSbBus(SB_URL, sbKey, {
+            nickname: catName, catName, cosmetic, profession: selectedProfession
           });
           goeasy = client;
           const stillWaiting = () => onlineAttemptId === attemptId && mode === "online" && overlayState === "waiting";
           const stopCancelledAttempt = () => {
             if (goeasy === client) {
               try { client.disconnect({}); }
-              catch (error) { console.error("关闭已取消的 GoEasy 连接失败：", error); }
+              catch (error) { console.error("关闭已取消的 Supabase 连接失败：", error); }
               goeasy = null;
               connected = false;
             }
@@ -3189,7 +3381,7 @@
           await goEasyOperation(callbacks => client.pubsub.hereNow({
             channel: activeLobby, limit: 100, onSuccess: response => {
               const members = response && response.content && response.content.members;
-              if (!Array.isArray(members)) { callbacks.onFailed(new Error("GoEasy 在线成员数据格式异常")); return; }
+              if (!Array.isArray(members)) { callbacks.onFailed(new Error("在线成员数据格式异常")); return; }
               members.forEach(addPeer);
               callbacks.onSuccess();
             }, onFailed: callbacks.onFailed
@@ -3206,10 +3398,13 @@
           $("overlayStatus").textContent = peers.size ? `找到 ${peers.size} 位在线玩家，正在匹配…` : "已连接，正在等待对手加入…";
         } catch (error) {
           if (onlineAttemptId !== attemptId) return;
-          console.error("GoEasy 联机失败：", error);
+          console.error("Supabase 联机失败：", error);
           refundStake();
           closeOnline();
-          showMenu("暂时无法联机", "请确认网络连接和 GoEasy 服务状态。");
+          const reason = String((error && error.message) || "");
+          showMenu("暂时无法联机", /401|unauthorized|api key|apikey|forbidden/i.test(reason)
+            ? "Supabase 拒绝了连接：请确认 anon public key 正确，且项目 Realtime 允许公共频道（Realtime → Settings）。"
+            : "请确认网络连接和 Supabase 项目状态（Realtime 是否开启）。");
           $("overlayStatus").textContent = error.message || "连接失败，请稍后重试。";
         }
       }
@@ -3254,7 +3449,7 @@
         if (!connected || !goeasy) return;
         goeasy.pubsub.publish({
           channel: activeLobby, message: JSON.stringify(data),
-          onSuccess: () => {}, onFailed: error => console.error("GoEasy 匹配消息发送失败：", error)
+          onSuccess: () => {}, onFailed: error => console.error("Supabase 匹配消息发送失败：", error)
         });
       }
       function onLobbyMessage(message) {
@@ -3392,7 +3587,7 @@
         goeasy.pubsub.publish({
           channel: `${activeInbox}${to}`,
           message: JSON.stringify({ from: peerId, to, data }),
-          onSuccess: () => {}, onFailed: error => console.error("GoEasy 对战消息发送失败：", error)
+          onSuccess: () => {}, onFailed: error => console.error("Supabase 对战消息发送失败：", error)
         });
       }
       function sendBigStart(to) {
@@ -3561,7 +3756,7 @@
         if (!connected || !opponentId || !state || state.host || !state.running) return;
         const now = performance.now();
         // 本机直连时几乎每帧都发（约 60Hz），云端时保守一点（约 20Hz）
-        const throttle = localLinkReady ? 16 : 45;
+        const throttle = localLinkReady ? 16 : (bigOnline ? 55 : 33);
         if (!pulse && now - lastInputSend < throttle) return;
         lastInputSend = now;
         const player = controlledPlayer();
@@ -3589,7 +3784,7 @@
         }
         if (goeasy) {
           try { goeasy.disconnect({}); }
-          catch (error) { console.error("关闭 GoEasy 连接失败：", error); }
+          catch (error) { console.error("关闭 Supabase 连接失败：", error); }
         }
         goeasy = null; connected = false; peerId = ""; opponentId = "";
         opponentProfile = null; peers.clear(); onlineRoster = [];
@@ -3907,7 +4102,7 @@
         </header>
         <div class="cb-netbar" id="cbNetBar" hidden>
           <span class="cb-net-dot"></span>
-          <span id="cbNetStatus">正在连接 GoEasy…</span>
+          <span id="cbNetStatus">正在连接 Supabase…</span>
           <button class="cb-btn ghost" type="button" id="cbNetCancel">取消联机</button>
         </div>
         <div class="cb-main">
@@ -3966,11 +4161,12 @@
     let lastTs = 0;
     let myTeam = 0;          // 本地玩家阵营：0 蓝方（主机）/ 1 红方（客机）
 
-    // ---------- 联机配置（GoEasy）----------
+    // ---------- 联机配置（Supabase Realtime）----------
     const NET_HOST = "hangzhou.goeasy.io";
     const NET_KEY = "BC-98335ad497924a1e9b8d730919ae0472";
+    const SB_URL_ROYALE = "https://rnrppmyrvauogudyjekq.supabase.co";
     const NET_LOBBY = "catball-royale-lobby-syc111syc-v1";
-    const NET_INBOX = "catball-royale-inbox-";
+    const NET_INBOX = "cbroyal-in-";
     const SPRITE_KEYS = ["cat", "dog", "elephant"];
     const PROJ_KEYS = ["fireball", "lightning", "ice", "charm"];
     let net = null;          // 当前联机会话
@@ -5219,7 +5415,7 @@
       }
     });
 
-    // ---------- 联机对战（GoEasy，主机权威同步）----------
+    // ---------- 联机对战（Supabase，主机权威同步）----------
     function isOnline() { return !!(net && net.matched); }
     function isNetHost() { return !!(net && net.matched && net.role === "host"); }
     function isNetGuest() { return !!(net && net.matched && net.role === "guest"); }
@@ -5329,18 +5525,24 @@
 
     function startNet() {
       if (net) return;
-      if (!window.GoEasy || typeof window.GoEasy.getInstance !== "function") {
-        hint("GoEasy SDK 未加载，无法联机。");
-        netStatus("GoEasy SDK 未加载，无法联机", "error");
+      if (typeof window.createSbBus !== "function") {
+        hint("Supabase SDK 未加载，无法联机。");
+        netStatus("Supabase SDK 未加载，无法联机", "error");
+        return;
+      }
+      const key = window.readSupabaseKey(true);
+      if (!key) {
+        hint("缺少 Supabase anon key：控制台 → Project Settings → API Keys 复制一次粘贴即可。");
+        netStatus("未配置 Supabase anon key", "error");
         return;
       }
       const session = { client: null, id: netRandomId(), role: "", opponent: "", matched: false, timer: 0 };
       net = session;
-      netStatus("正在连接 GoEasy…", "waiting");
+      netStatus("正在连接 Supabase…", "waiting");
       el("#cbOnline").textContent = "🌐 联机中…";
       (async () => {
         try {
-          const client = window.GoEasy.getInstance({ host: NET_HOST, appkey: NET_KEY, modules: ["pubsub"] });
+          const client = window.createSbBus(SB_URL_ROYALE, key, { name: cbName });
           session.client = client;
           if (net !== session) { try { client.disconnect({}); } catch (error) {} return; }
           await netOp(cb => client.connect({ id: session.id, data: { name: cbName }, ...cb }));
@@ -5379,7 +5581,7 @@
       net = null;
       if (session.timer) clearInterval(session.timer);
       if (session.matched && session.opponent) {
-        netPublish(session.client, NET_INBOX + session.opponent, { type: "bye", from: session.id });
+        netPublish(session.client, NET_LOBBY, { type: "bye", from: session.id, to: session.opponent });
       }
       if (session.client) {
         try { session.client.disconnect({}); } catch (error) { console.warn("关闭皇室战争联机连接失败：", error); }
@@ -5403,7 +5605,18 @@
     function onNetLobby(message) {
       try {
         const data = typeof message.content === "string" ? JSON.parse(message.content) : message.content;
-        if (!data || data.type !== "ready" || typeof data.from !== "string") return;
+        if (!data || typeof data.from !== "string") return;
+        if (data.type === "bye") {
+          if (!net || !net.matched || data.to !== net.id || data.from !== net.opponent) return;
+          if (G && G.running) {
+            G.running = false;
+            showResult(true);
+            hint("对手已退出，本局判你获胜。");
+          }
+          netStatus("对手已退出", "error");
+          return;
+        }
+        if (data.type !== "ready") return;
         if (!net || net.matched || data.from === net.id) return;
         if (net.id < data.from) {
           net.role = "host";
@@ -5509,7 +5722,7 @@
       if (!G || !G.running) return;
       netSyncClock += dt;
       // 直连时提到 50Hz，画面更跟手；走云端时 10Hz，减少被限流丢弃的概率
-      const interval = cbLinkReady ? 0.02 : 0.1;
+      const interval = cbLinkReady ? 0.02 : 0.066;
       if (netSyncClock < interval) return;
       netSyncClock = 0;
       if (!net || !net.opponent) return;
