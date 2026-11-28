@@ -439,6 +439,13 @@
       let goeasy = null, connected = false, peerId = "", opponentId = "", opponentProfile = null, onlineAttemptId = 0;
       let activeLobby = LOBBY, activeInbox = INBOX, onlineRoster = [];
       let peers = new Map(), queueTimer = null, snapshotTimer = 0, lastInputSend = 0, inputSeq = 0;
+      // ===== 本机直连通道（同一浏览器多窗口时绕过 GoEasy，解决观战方丢帧/血条不动） =====
+      const LOCAL_LINK_CHANNEL = "catball-pvp-local-syc111syc-v1";
+      const LOCAL_LINK_KEY = "catball_pvp_local_bus_v1";
+      let linkTransport = null;   // "bc"（BroadcastChannel）或 "ls"（localStorage 兜底）
+      let localLinkReady = false; // 是否已确认对手就在同一浏览器
+      let linkProbeTimer = null;
+      let linkSeq = 0;
       let overlayState = "menu", resultMessage = "", rewardedGameIds = new Set();
       let overviewTimer = 0;
       let aiDifficulty = 2;
@@ -1082,6 +1089,8 @@
           // 否则相机会停在默认地图中心，看不到两侧的角色，只剩空白战场。
           const localPlayer = state.players.find(player => player.id === state.localPlayerId);
           if (localPlayer) camera = { x: localPlayer.x, y: localPlayer.y };
+          // 开始探测对手是否也在同一浏览器，能直连就走本机通道（不走云端，避免状态帧被丢弃）
+          startLinkProbe();
         }
         updateNames();
         $("gameStatus").textContent = gameMode === "ai"
@@ -2629,7 +2638,8 @@
         }
         if (mode === "online" && state.running) {
           snapshotTimer += dt;
-          if (snapshotTimer >= .05) {
+          // 10Hz 足够顺滑，同时把云端的消息数量和体积降到一半以下
+          if (snapshotTimer >= .1) {
             snapshotTimer = 0;
             broadcast({ type: "state", state: serializableState() });
           }
@@ -2640,7 +2650,21 @@
         const copy = JSON.parse(JSON.stringify(state));
         delete copy.host;
         copy.particles = [];
-        copy.players.forEach(player => { delete player.remoteInput; });
+        // 只保留渲染和判定真正需要的字段，把单帧体积压小，避免云端因消息过大而丢弃
+        const droppedPlayerKeys = [
+          "remoteInput", "navPath", "navKey", "navIndex", "navTimer", "stuckFor", "lastX", "lastY",
+          "vx", "vy", "attackCooldown", "meleeCooldown",
+          "professionRegenTimer", "fireWasDown", "lightningHits"
+        ];
+        copy.players.forEach(player => {
+          droppedPlayerKeys.forEach(key => { delete player[key]; });
+          if (Array.isArray(player.pets)) {
+            player.pets.forEach(pet => {
+              ["cd", "targetId", "angle", "wander", "thinkTimer", "owner"].forEach(key => { delete pet[key]; });
+            });
+          }
+        });
+        if (!copy.bigOnline) delete copy.arenaTerrain;
         return copy;
       }
 
@@ -3257,8 +3281,91 @@
         });
         $("overlayStatus").textContent = `正在与 ${profile.name} 握手…`;
       }
+      // ================= 本机直连传输（同一浏览器多窗口） =================
+      function initLinkTransport() {
+        if (linkTransport) return linkTransport;
+        if (typeof window.BroadcastChannel === "function") {
+          try {
+            const channel = new BroadcastChannel(LOCAL_LINK_CHANNEL);
+            channel.onmessage = event => onLinkPacket(event.data);
+            window.__catballLocalChannel = channel;
+            linkTransport = "bc";
+          } catch (error) {
+            console.warn("BroadcastChannel 不可用，改用 localStorage 直连：", error);
+          }
+        }
+        if (!linkTransport) {
+          linkTransport = "ls";
+          window.addEventListener("storage", event => {
+            if (event.key !== LOCAL_LINK_KEY || !event.newValue) return;
+            let packet = null;
+            try { packet = JSON.parse(event.newValue); } catch (error) { return; }
+            onLinkPacket(packet);
+          });
+        }
+        return linkTransport;
+      }
+      let lastLinkSeq = 0;
+      function postLink(to, data) {
+        if (!to || !initLinkTransport()) return;
+        const body = { from: peerId, to, data, seq: ++linkSeq, t: Date.now() };
+        try {
+          if (linkTransport === "bc") window.__catballLocalChannel.postMessage(body);
+          else localStorage.setItem(LOCAL_LINK_KEY, JSON.stringify(body));
+        } catch (error) {}
+      }
+      function isLinkedPeer(id) {
+        return bigOnline ? onlineRoster.some(profile => profile.peerId === id) : id === opponentId;
+      }
+      function enableLocalLink() {
+        if (localLinkReady) return;
+        localLinkReady = true;
+        clearInterval(linkProbeTimer);
+        linkProbeTimer = null;
+        if (state && state.running) $("gameStatus").textContent = "本机直连已建立 · 双方实时同步";
+        if ($("overlayStatus")) $("overlayStatus").textContent = "已与本机另一个窗口建立直连。";
+        // 通知对手也切换到直连，否则只有在收到 ping 的一方才算建立
+        if (opponentId) postLink(opponentId, { type: "linked" });
+      }
+      function onLinkPacket(packet) {
+        if (!packet || packet.to !== peerId || typeof packet.from !== "string" || !packet.data) return;
+        if (packet.data.type === "ping") { postLink(packet.from, { type: "pong" }); return; }
+        if (packet.data.type === "linked") { if (isLinkedPeer(packet.from)) enableLocalLink(); return; }
+        if (packet.data.type === "pong") { if (isLinkedPeer(packet.from)) enableLocalLink(); return; }
+        if (!isLinkedPeer(packet.from)) return;
+        if (packet.seq && packet.seq <= lastLinkSeq) return;
+        lastLinkSeq = packet.seq || 0;
+        handleDirect(packet.from, packet.data);
+      }
+      function startLinkProbe() {
+        if (bigOnline) return;
+        initLinkTransport();
+        if (linkProbeTimer) return;
+        linkProbeTimer = setInterval(() => {
+          if (!opponentId) return;
+          if (localLinkReady) {
+            clearInterval(linkProbeTimer);
+            linkProbeTimer = null;
+            return;
+          }
+          postLink(opponentId, { type: "ping" });
+        }, 300);
+      }
+      function stopLink() {
+        localLinkReady = false;
+        clearInterval(linkProbeTimer);
+        linkProbeTimer = null;
+        if (window.__catballLocalChannel) {
+          try { window.__catballLocalChannel.close(); } catch (error) {}
+          window.__catballLocalChannel = null;
+        }
+        linkTransport = null;
+      }
       function publishDirect(to, data) {
-        if (!connected || !goeasy || !to) return;
+        if (!to) return;
+        // 同一浏览器内先用直连通道，避免云端消息过大/频率过高被丢弃
+        if (localLinkReady && linkTransport && !bigOnline) { postLink(to, data); return; }
+        if (!connected || !goeasy) return;
         goeasy.pubsub.publish({
           channel: `${activeInbox}${to}`,
           message: JSON.stringify({ from: peerId, to, data }),
@@ -3276,7 +3383,10 @@
         try { envelope = typeof message.content === "string" ? JSON.parse(message.content) : message.content; }
         catch (error) { console.warn("忽略无法解析的联机消息：", error); return; }
         if (!envelope || envelope.to !== peerId || typeof envelope.from !== "string" || !envelope.data) return;
-        const { from, data } = envelope;
+        handleDirect(envelope.from, envelope.data);
+      }
+      function handleDirect(from, data) {
+        if (!data || typeof data !== "object") return;
         if (data.type === "bigStart" && bigOnline && !state && typeof data.hostId === "string" &&
             from === data.hostId && Array.isArray(data.roster) && data.state &&
             data.state.bigOnline && Array.isArray(data.state.players)) {
@@ -3438,6 +3548,7 @@
         goeasy = null; connected = false; peerId = ""; opponentId = "";
         opponentProfile = null; peers.clear(); onlineRoster = [];
         activeLobby = LOBBY; activeInbox = INBOX;
+        stopLink();
       }
       function returnToMenu() {
         if (mode === "online") {
@@ -3818,6 +3929,10 @@
     const PROJ_KEYS = ["fireball", "lightning", "ice", "charm"];
     let net = null;          // 当前联机会话
     let netSyncClock = 0;
+    // ===== 本机直连（同一浏览器多窗口，绕过 GoEasy，解决客机看不到移动/血条） =====
+    const CB_LINK_CHANNEL = "catball-royale-local-syc111syc-v1";
+    const CB_LINK_KEY = "catball_royale_local_bus_v1";
+    let cbLinkTransport = null, cbLinkReady = false, cbLinkProbeTimer = null, cbLinkSeq = 0, cbLinkLastSeq = 0, cbChannel = null;
     let cbName = (() => {
       try { return (localStorage.getItem("catball_pet_name_v1") || "猫球玩家").slice(0, 12); }
       catch (error) { return "猫球玩家"; }
@@ -5088,8 +5203,80 @@
       });
     }
 
+    // ===== 本机直连传输 =====
+    function initCbLink() {
+      if (cbLinkTransport) return cbLinkTransport;
+      if (typeof window.BroadcastChannel === "function") {
+        try {
+          cbChannel = new BroadcastChannel(CB_LINK_CHANNEL);
+          cbChannel.onmessage = event => onCbLinkPacket(event.data);
+          cbLinkTransport = "bc";
+        } catch (error) {
+          console.warn("皇室战争联机：BroadcastChannel 不可用，改用 localStorage 直连：", error);
+        }
+      }
+      if (!cbLinkTransport) {
+        cbLinkTransport = "ls";
+        window.addEventListener("storage", event => {
+          if (event.key !== CB_LINK_KEY || !event.newValue) return;
+          let packet = null;
+          try { packet = JSON.parse(event.newValue); } catch (error) { return; }
+          onCbLinkPacket(packet);
+        });
+      }
+      return cbLinkTransport;
+    }
+
+    function postCbLink(to, data) {
+      if (!to || !net || !initCbLink()) return;
+      const body = { from: net.id, to, data, seq: ++cbLinkSeq };
+      try {
+        if (cbLinkTransport === "bc") cbChannel.postMessage(body);
+        else localStorage.setItem(CB_LINK_KEY, JSON.stringify(body));
+      } catch (error) {}
+    }
+
+    function enableCbLink() {
+      if (cbLinkReady) return;
+      cbLinkReady = true;
+      if (cbLinkProbeTimer) { clearInterval(cbLinkProbeTimer); cbLinkProbeTimer = 0; }
+      netStatus("本机直连已建立 · 双方实时同步", "playing");
+      if (net && net.opponent) postCbLink(net.opponent, { type: "linked" });
+    }
+
+    function onCbLinkPacket(packet) {
+      if (!packet || !net || packet.to !== net.id || typeof packet.from !== "string" || !packet.data) return;
+      if (packet.from !== net.opponent) return;
+      if (packet.data.type === "ping") { postCbLink(packet.from, { type: "pong" }); return; }
+      if (packet.data.type === "pong" || packet.data.type === "linked") { enableCbLink(); return; }
+      if (cbLinkLastSeq && packet.seq && packet.seq <= cbLinkLastSeq) return;
+      cbLinkLastSeq = packet.seq || 0;
+      onNetDirect({ content: JSON.stringify({ ...packet.data, from: packet.from }) });
+    }
+
+    function startCbLinkProbe() {
+      if (!net || net.role !== "host" && net.role !== "guest") return;
+      initCbLink();
+      if (cbLinkProbeTimer) return;
+      cbLinkProbeTimer = setInterval(() => {
+        if (!net || !net.matched || !net.opponent) return;
+        if (cbLinkReady) { clearInterval(cbLinkProbeTimer); cbLinkProbeTimer = 0; return; }
+        postCbLink(net.opponent, { type: "ping" });
+      }, 300);
+    }
+
+    function stopCbLink() {
+      cbLinkReady = false;
+      cbLinkLastSeq = 0;
+      if (cbLinkProbeTimer) { clearInterval(cbLinkProbeTimer); cbLinkProbeTimer = 0; }
+      if (cbChannel) { try { cbChannel.close(); } catch (error) {} cbChannel = null; }
+      cbLinkTransport = null;
+    }
+
     function sendNet(payload, to) {
-      if (!net || !net.client || !to) return;
+      if (!to || !net) return;
+      if (cbLinkReady && cbLinkTransport) { postCbLink(to, payload); return; }
+      if (!net.client) return;
       netPublish(net.client, NET_INBOX + to, { ...payload, from: net.id });
     }
 
@@ -5153,6 +5340,7 @@
       netBar.hidden = true;
       el("#cbOnline").textContent = "🌐 联机对战";
       myTeam = 0;
+      stopCbLink();
       if (!silent) {
         newGame();
         hint("已退出联机，恢复人机对战。");
@@ -5212,6 +5400,7 @@
         sendNet({ type: "ack" }, data.from);
         newGame();
         hint("已连接主机，正在等待战场同步…");
+        startCbLinkProbe();
         return;
       }
 
@@ -5224,6 +5413,7 @@
         el("#cbOnline").textContent = "🌐 联机中";
         newGame();
         hint("联机对战开始：你是蓝方，选中卡牌后点击下方半场部署。");
+        startCbLinkProbe();
         return;
       }
 
@@ -5260,8 +5450,11 @@
     function netSyncTick(dt) {
       if (!G || !G.running) return;
       netSyncClock += dt;
-      if (netSyncClock < 0.08) return;
+      // 直连时 20Hz 更顺滑；走云端时降到 10Hz，减少被限流丢弃的概率
+      const interval = cbLinkReady ? 0.05 : 0.1;
+      if (netSyncClock < interval) return;
       netSyncClock = 0;
+      if (!net || !net.opponent) return;
       sendNet({ type: "sync", s: packSnapshot() }, net.opponent);
     }
 
