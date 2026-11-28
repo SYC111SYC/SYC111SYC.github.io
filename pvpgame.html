@@ -419,12 +419,15 @@
     (function () {
       const KEY_STORAGE = "catball_supabase_anon_v1";
       // 项目自带的 publishable（anon）key：本身就是公开的，放在客户端是安全的
-      const DEFAULT_KEY = "sb_publishable_QXHlWFccKu1kPx2GosJ1rQ_QfhBR12r";
+      const DEFAULT_KEY = "sb_publishable_E3lIVbflOH-XoaAlEYtjjA_IYRRmGYT";
 
       window.readSupabaseKey = function (promptIfMissing) {
-        let key = "";
-        try { key = (localStorage.getItem(KEY_STORAGE) || "").trim(); } catch (error) {}
-        if (!key) key = DEFAULT_KEY;
+        // 内置 key 优先，避免之前粘错的旧 key 残留在 localStorage 里继续生效
+        let key = DEFAULT_KEY;
+        try {
+          if (!key) key = (localStorage.getItem(KEY_STORAGE) || "").trim();
+          if (key) localStorage.setItem(KEY_STORAGE, key);
+        } catch (error) {}
         if (!key && promptIfMissing) {
           const input = window.prompt(
             "首次联机需要 Supabase 的 anon public key\n" +
@@ -3404,10 +3407,15 @@
           console.error("Supabase 联机失败：", error);
           refundStake();
           closeOnline();
-          const reason = String((error && error.message) || "");
-          showMenu("暂时无法联机", /401|unauthorized|api key|apikey|forbidden/i.test(reason)
-            ? "Supabase 拒绝了连接：请确认 anon public key 正确，且项目 Realtime 允许公共频道（Realtime → Settings）。"
-            : "请确认网络连接和 Supabase 项目状态（Realtime 是否开启）。");
+          const reason = String((error && error.message) || "").trim();
+          const hint = /privateonly/i.test(reason)
+            ? "项目把频道设成了「仅私有」：到 Project Settings → Realtime Settings 打开 Allow public access to channels。"
+            : /realtime was disabled|403/i.test(reason)
+              ? "Realtime 服务被关闭了：Project Settings → Realtime Settings 打开 Enable Realtime。"
+              : /401|unauthorized|api key|apikey|forbidden|invalid/i.test(reason)
+                ? "Key 不对或属于别的项目：复制本项目 anon / publishable key 填进 DEFAULT_KEY。"
+                : "请确认项目没有被暂停（Dashboard 顶部 Pulse / Restore），并检查 Realtime 设置。";
+          showMenu("暂时无法联机", (reason ? "原因：" + reason.slice(0, 120) + " " : "") + hint);
           $("overlayStatus").textContent = error.message || "连接失败，请稍后重试。";
         }
       }
