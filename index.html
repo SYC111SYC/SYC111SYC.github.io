@@ -950,6 +950,55 @@
         .fortune-sign-btn:hover { background: #6f97ff; }
         .fortune-sign-btn:active { transform: scale(0.96); }
 
+        .fortune-gift {
+            flex: 1 1 100%;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            margin-top: 2px;
+            padding: 12px 14px;
+            background: linear-gradient(135deg, #fff6ea, #fdeaf4);
+            border: 1px dashed #ffb08a;
+            border-radius: 12px;
+        }
+
+        .fortune-gift[hidden] { display: none; }
+
+        .fortune-gift-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #b5462a;
+            white-space: nowrap;
+        }
+
+        .fortune-gift-text {
+            flex: 1 1 200px;
+            min-width: 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #8a6b58;
+        }
+
+        .fortune-gift-btn {
+            margin-left: auto;
+            padding: 7px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #ff8f6b;
+            color: #fff;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .fortune-gift-btn:hover { background: #f5764f; }
+        .fortune-gift-btn:active { transform: scale(0.96); }
+        .fortune-gift-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .fortune-gift-btn[hidden] { display: none; }
+
         @media (max-width: 500px) {
             .daily-fortune-card { gap: 10px; }
             .fortune-level { min-width: 72px; font-size: 20px; padding: 8px 10px; }
@@ -1294,6 +1343,11 @@
             </div>
         </div>
         <button class="fortune-sign-btn" id="fortuneSignBtn" type="button">签到抽运势</button>
+        <div class="fortune-gift" id="fortuneGift" hidden>
+            <div class="fortune-gift-title" id="fortuneGiftTitle">🎁 今日吉运奖励</div>
+            <div class="fortune-gift-text" id="fortuneGiftText"></div>
+            <button class="fortune-gift-btn" id="fortuneGiftBtn" type="button">领取礼品码</button>
+        </div>
     </div>
 
     <div class="search-container">
@@ -3519,6 +3573,164 @@
             return 0;
         }
 
+        /* =========================================================
+           吉运礼品码：抽到 小吉 / 中吉 / 大吉 时，后端摇号并发送邮件礼品码
+           ========================================================= */
+        const FORTUNE_GIFT_KEY = 'catball_fortune_gift_v1';
+        const FORTUNE_GIFT_API = 'https://sshcmvydvckqkbmvdjvj.supabase.co/functions/v1/fortune-gift';
+        const FORTUNE_GIFT_RULES = {
+            '小吉': { rate: 5, range: '5~20' },
+            '中吉': { rate: 20, range: '15~40' },
+            '大吉': { rate: 50, range: '25~70' }
+        };
+
+        const fortuneGiftEl    = document.getElementById('fortuneGift');
+        const fortuneGiftTitle = document.getElementById('fortuneGiftTitle');
+        const fortuneGiftText  = document.getElementById('fortuneGiftText');
+        const fortuneGiftBtn   = document.getElementById('fortuneGiftBtn');
+
+        function readFortuneGiftState(date) {
+            try {
+                const st = JSON.parse(safeGet(FORTUNE_GIFT_KEY) || 'null');
+                return st && st.date === date ? st : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function writeFortuneGiftState(st) {
+            return safeSet(FORTUNE_GIFT_KEY, JSON.stringify(st));
+        }
+
+        // 从 CatballAccount / 本地存储里找出账号 token（兼容几种常见写法）
+        function getAccountToken() {
+            const acc = window.CatballAccount;
+            if (acc) {
+                if (typeof acc.getToken === 'function') {
+                    try {
+                        const t = acc.getToken();
+                        if (typeof t === 'string' && t) return t;
+                    } catch (e) { /* 忽略 */ }
+                }
+                if (typeof acc.token === 'string' && acc.token) return acc.token;
+                const sess = acc.session;
+                if (sess && typeof sess === 'object') {
+                    if (typeof sess.token === 'string') return sess.token;
+                    if (typeof sess.access_token === 'string') return sess.access_token;
+                }
+            }
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (!key || !/token|session|account/i.test(key)) continue;
+                    const raw = localStorage.getItem(key);
+                    if (!raw) continue;
+                    if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw.trim())) return raw.trim();
+                    try {
+                        const obj = JSON.parse(raw);
+                        const t = obj && (obj.token || obj.access_token || (obj.session && (obj.session.token || obj.session.access_token)));
+                        if (typeof t === 'string' && t) return t;
+                    } catch (e) { /* 忽略 */ }
+                }
+            } catch (e) { /* 忽略 */ }
+            return '';
+        }
+
+        function renderFortuneGift(f) {
+            if (!fortuneGiftEl) return;
+            const rule = f && FORTUNE_GIFT_RULES[f.level];
+            if (!rule) {
+                fortuneGiftEl.hidden = true;
+                return;
+            }
+
+            fortuneGiftEl.hidden = false;
+            fortuneGiftTitle.textContent = '🎁 今日吉运奖励 · ' + f.level;
+            fortuneGiftBtn.disabled = false;
+            fortuneGiftBtn.hidden = false;
+            fortuneGiftBtn.textContent = '领取礼品码';
+
+            const st = readFortuneGiftState(todayStr());
+            if (st && st.level === f.level) {
+                if (st.status === 'sent') {
+                    fortuneGiftText.textContent = `已发送至 ${st.email || '你的登录邮箱'}，价值 ${st.points} 积分，去邮箱查收喵~`;
+                } else if (st.status === 'missed') {
+                    fortuneGiftText.textContent = '今天的机会已经用掉了，这次没摇中喵……明天再来~';
+                } else {
+                    fortuneGiftText.textContent = st.msg || '今天已经领取过啦~';
+                }
+                fortuneGiftBtn.hidden = true;
+                return;
+            }
+
+            fortuneGiftText.textContent =
+                `今日【${f.level}】有 ${rule.rate}% 概率获得 ${rule.range} 积分的 QIUQIU 礼品码，本喵会发到你的登录邮箱喵~`;
+        }
+
+        async function claimFortuneGift() {
+            const f = getTodayFortune();
+            if (!f || !FORTUNE_GIFT_RULES[f.level]) {
+                renderFortuneGift(f);
+                return;
+            }
+            if (readFortuneGiftState(todayStr())) {
+                renderFortuneGift(f);
+                return;
+            }
+
+            fortuneGiftBtn.disabled = true;
+            fortuneGiftBtn.textContent = '领取中...';
+            try {
+                let token = getAccountToken();
+                if (!token && window.CatballAccount && typeof window.CatballAccount.ensureLogin === 'function') {
+                    const logged = await window.CatballAccount.ensureLogin('登录后才能把礼品码发到你的邮箱喵~');
+                    if (!logged) {
+                        fortuneGiftBtn.disabled = false;
+                        fortuneGiftBtn.textContent = '领取礼品码';
+                        return;
+                    }
+                    token = getAccountToken();
+                }
+                if (!token) {
+                    say('请先登录账号再领取喵~', 2000);
+                    fortuneGiftBtn.disabled = false;
+                    fortuneGiftBtn.textContent = '领取礼品码';
+                    return;
+                }
+
+                const res = await fetch(FORTUNE_GIFT_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: token, level: f.level, date: todayStr() })
+                });
+                const data = await res.json().catch(function () { return {}; });
+
+                if (!res.ok || (data.ok === false && data.code === 'UNAUTHORIZED')) {
+                    say(data.msg || '领取失败，请稍后再试喵~', 2200);
+                } else if (data.awarded) {
+                    writeFortuneGiftState({
+                        date: todayStr(), level: f.level, status: 'sent',
+                        points: data.points, email: data.email, msg: data.msg
+                    });
+                    say(`喵！${data.points} 积分的礼品码已发到 ${data.email} 喵~`, 3000);
+                } else {
+                    writeFortuneGiftState({
+                        date: todayStr(), level: f.level, status: 'missed', msg: data.msg
+                    });
+                    say(data.msg || '这次没摇中喵……', 2600);
+                }
+            } catch (e) {
+                console.error(e);
+                say('网络请求失败，稍后再试喵~', 2200);
+            } finally {
+                fortuneGiftBtn.disabled = false;
+                fortuneGiftBtn.textContent = '领取礼品码';
+                renderFortuneGift(getTodayFortune());
+            }
+        }
+
+        fortuneGiftBtn.addEventListener('click', claimFortuneGift);
+
         function renderFortune() {
             const today = todayStr();
             const f = getTodayFortune();
@@ -3532,6 +3744,7 @@
 
                 fortuneSignBtn.style.display = '';
                 fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 已连续签到 ${streakDisplay} 天` : '';
+                renderFortuneGift(null);
                 return;
             }
 
@@ -3539,6 +3752,7 @@
             fortuneLevelEl.className = 'fortune-level ' + f.cls;
             fortuneSignBtn.style.display = 'none';
             fortuneStreakEl.textContent = streakDisplay > 0 ? `🔥 连续签到 ${streakDisplay} 天` : '';
+            renderFortuneGift(f);
         }
 
         function signFortune() {
