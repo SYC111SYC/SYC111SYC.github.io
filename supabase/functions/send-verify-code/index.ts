@@ -481,7 +481,8 @@ Deno.serve(async (req) => {
       if (!/^[A-Z0-9_-]{4,64}$/.test(code) || !Number.isSafeInteger(points) || points < 15 || points > 40) {
         return respond(req, { ok: false, msg: "礼品码或积分档位无效" });
       }
-      const { error } = await db().from("gift_codes").insert({ code, points });
+      // 必须写入兑换函数读取的同一张表，否则生成的码永远查不到
+      const { error } = await db().from("catball_redemptions").insert({ code, points });
       if (error) {
         if (error.code === "23505") return respond(req, { ok: false, msg: "礼品码重复，请重新生成" });
         throw error;

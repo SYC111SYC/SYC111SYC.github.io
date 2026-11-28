@@ -3704,7 +3704,7 @@
             var STREAK_KEY = 'catball_fortune_streak_v1';   // 签到连续天数（复用签到存档）
             var CLAIMED_KEY = 'catball_sign_code_claims_v1'; // 已领取档位数量
             var CODES_KEY = 'catball_sign_codes_v1';      // 本机已生成的礼品码记录
-            var CREATE_API = 'https://sshcmvydvckqkbmvdjvj.supabase.co/functions/v1/send-verify-code';
+            var CREATE_API = 'https://sshcmvydvckqkbmvdjvj.supabase.co/functions/v1/createcode';
 
             var DAYS_PER_CODE = 7;
             var POINTS_MIN = 15;
@@ -3871,12 +3871,6 @@
             function randomPoints() {
                 return POINTS_MIN + Math.floor(Math.random() * (POINTS_MAX - POINTS_MIN + 1));
             }
-            function genCode() {
-                var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-                var s = 'DQ';
-                for (var i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
-                return s;
-            }
 
             claimBtn.addEventListener('click', async function () {
                 // 双重校验：没有可领档位就直接返回，不发请求
@@ -3889,7 +3883,6 @@
                 var totalDays = readStreak();
                 var claimed = readInt(CLAIMED_KEY, 0);
                 var points = randomPoints();
-                var code = genCode();
                 var remark = '连续签到礼包（第 ' + (claimed + 1) + ' 档）';
 
                 claimBtn.disabled = true;
@@ -3899,26 +3892,28 @@
                     var res = await fetch(CREATE_API, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ type: 'create-code', code: code, points: points })
+                        body: JSON.stringify({ points: points })
                     });
                     var data = await res.json().catch(function () { return {}; });
 
-                    if (!res.ok || !data.ok) {
-                        throw new Error(data.msg || '生成失败');
+                    if (!res.ok || !data.success || !data.code) {
+                        throw new Error(data.message || '生成失败');
                     }
 
+                    var newCode = data.code;
+                    var newPoints = Number(data.points) || points;
                     // 写本地记录（按时间排序由 renderCodes 负责）
                     var codes = readCodes();
                     // 防重复：同一码已存在则不再重复添加
-                    var exists = codes.some(function (c) { return c.code === (data.code || code); });
+                    var exists = codes.some(function (c) { return c.code === newCode; });
                     if (!exists) {
-                        codes.push({ code: data.code || code, points: data.points || points, desc: remark, at: Date.now() });
+                        codes.push({ code: newCode, points: newPoints, desc: remark, at: Date.now() });
                         writeCodes(codes);
                     }
                     // 已领取档位 +1，不会超过总档位
                     safeSet(CLAIMED_KEY, String(Math.min(claimed + 1, Math.floor(totalDays / DAYS_PER_CODE))));
 
-                    setStatus('ok', '礼品码已生成：' + (data.code || code) + '，可在兑换页兑换。');
+                    setStatus('ok', '礼品码已生成：' + newCode + '，可在兑换页兑换。');
                     refresh();
                 } catch (e) {
                     console.error('生成礼品码失败：', e);
