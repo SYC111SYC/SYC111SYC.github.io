@@ -3793,6 +3793,24 @@
         }
 
         fortuneSignBtn.addEventListener('click', signFortune);
+        // 调试后门：网址后加 ?resetfortune=1 可重置今日运势，重新签到（连续签到天数保留）
+        (function applyResetFortuneParam() {
+            let params;
+            try { params = new URLSearchParams(location.search); } catch (e) { return; }
+            if (!params.has('resetfortune')) return;
+            const val = params.get('resetfortune');
+            if (val && val !== '0' && val !== 'false') {
+                try { localStorage.removeItem(FORTUNE_KEY); } catch (e) { /* 忽略 */ }
+                try { localStorage.removeItem(FORTUNE_GIFT_KEY); } catch (e) { /* 忽略 */ }
+                renderFortune();
+                say('已重置今日运势，可以重新签到啦喵~', 2200);
+                console.log('[debug] 今日运势已重置，连续签到天数保持不变。');
+            }
+            params.delete('resetfortune');
+            const query = params.toString();
+            history.replaceState(null, '', location.pathname + (query ? '?' + query : '') + location.hash);
+        })();
+
 
         let lastFortuneDate = todayStr();
         setInterval(function () {
