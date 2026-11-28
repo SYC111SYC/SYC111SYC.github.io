@@ -13,6 +13,7 @@ input{width:100%;padding:14px 16px;border-radius:10px;border:none;font-size:16px
 button{width:100%;padding:14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:16px;font-weight:bold;cursor:pointer}
 button:disabled{opacity:0.6;cursor:not-allowed}
 #msg{margin-top:16px;text-align:center;font-size:15px}
+#pending{margin-top:10px;text-align:center;font-size:13px;line-height:1.6;min-height:18px}
 </style>
 <link rel="stylesheet" href="css/account.css">
 <script src="js/account.js"></script>
@@ -23,11 +24,22 @@ button:disabled{opacity:0.6;cursor:not-allowed}
   <input id="codeInput" placeholder="输入礼品码" />
   <button id="submitBtn">立即兑换</button>
   <div id="msg"></div>
+  <div id="pending"></div>
 </div>
 <script>
 const input = document.getElementById("codeInput");
 const btn = document.getElementById("submitBtn");
 const msg = document.getElementById("msg");
+const pending = document.getElementById("pending");
+
+function renderPending(){
+  const count = window.CatballAccount && window.CatballAccount.getPendingGiftCount
+    ? window.CatballAccount.getPendingGiftCount()
+    : 0;
+  pending.innerText = count ? `本机有 ${count} 个礼品码待同步，登录后会自动入账` : "";
+}
+window.addEventListener("catball:account-state", renderPending);
+renderPending();
 
 btn.onclick = async ()=>{
   const code = input.value.trim().toUpperCase();
@@ -37,20 +49,21 @@ btn.onclick = async ()=>{
     return;
   }
   btn.disabled=true;
-  msg.innerText="等待登录并读取云存档...";
+  msg.innerText="兑换中...";
   msg.style.color="#aaa";
   try{
-    const loggedIn = await window.CatballAccount.ensureLogin("登录后才能兑换礼品码。");
-    if(!loggedIn){
-      msg.innerText="请先登录后再兑换";
-      msg.style.color="#f87171";
-      return;
-    }
-    msg.innerText="兑换中...";
     const data = await window.CatballAccount.redeem(code);
-    msg.innerText = data.ok && data.points > 0 ? `${data.msg}（+${data.points} 积分）` : (data.msg || "兑换失败");
-    msg.style.color = data.ok ? "#4ade80" : "#f87171";
-    if(data.ok) input.value="";
+    if(data.queued){
+      // 未登录：先存本机，等登录后自动同步，不强制立即登录
+      msg.innerText = data.msg;
+      msg.style.color = "#fbbf24";
+      input.value="";
+    }else{
+      msg.innerText = data.ok && data.points > 0 ? `${data.msg}（+${data.points} 积分）` : (data.msg || "兑换失败");
+      msg.style.color = data.ok ? "#4ade80" : "#f87171";
+      if(data.ok) input.value="";
+    }
+    renderPending();
   }catch(e){
     console.error(e);
     msg.innerText="网络请求失败";

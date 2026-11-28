@@ -4,6 +4,7 @@
   const API_URL = "https://sshcmvydvckqkbmvdjvj.supabase.co/functions/v1/send-verify-code";
   const SESSION_KEY = "catball_account_session_v1";
   const GUEST_BACKUP_KEY = "catball_account_guest_backup_v1";
+  const PENDING_GIFTS_KEY = "catball_pending_gifts_v1";
   const ECONOMY_KEY = "catball_economy_v1";
   const FOOD_KEY = "catball_food_v1";
   const NAME_KEY = "catball_pet_name_v1";
@@ -401,14 +402,12 @@
     ui.importCancel.addEventListener("click", () => finishImport("cancel"));
     window.addEventListener("online", () => {
       if (session && hydrated) {
-        if (dirty) syncNow();
-        else refresh();
+        (dirty ? syncNow() : refresh()).then(() => flushPendingGifts());
       }
     });
     window.addEventListener("focus", () => {
       if (session && hydrated) {
-        if (dirty) syncNow();
-        else refresh();
+        (dirty ? syncNow() : refresh()).then(() => flushPendingGifts());
       }
     });
     window.addEventListener("storage", event => {
@@ -610,6 +609,7 @@
     ui.loginPassword.value = "";
     ui.overlay.hidden = true;
     notify("登录成功，猫球数据已同步");
+    await flushPendingGifts();
     finishLogin(true);
     return true;
   }
@@ -982,14 +982,90 @@
     return true;
   }
 
-  async function redeem(code) {
-    if (!await ensureLogin("登录后才能兑换礼品码。")) return { ok: false, msg: "请先登录后再兑换" };
-    if (dirty && !await syncNow()) return { ok: false, msg: "请先让当前修改同步到云端，再兑换礼品码" };
-    const requestId = window.crypto && crypto.randomUUID
+  // ---------- 未登录礼品码：先存本机，登录后自动同步 ----------
+  function makeRequestId() {
+    return window.crypto && crypto.randomUUID
       ? crypto.randomUUID()
       : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  function readPendingGifts() {
     try {
-      const data = await request("redeem", { token: session.token, code, requestId });
+      const list = JSON.parse(storageGet(PENDING_GIFTS_KEY) || "[]");
+      return Array.isArray(list) ? list.filter(item => item && typeof item.code === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writePendingGifts(list) {
+    if (list.length) storageSet(PENDING_GIFTS_KEY, JSON.stringify(list.slice(0, 50)));
+    else storageRemove(PENDING_GIFTS_KEY);
+  }
+
+  function getPendingGiftCount() {
+    return readPendingGifts().length;
+  }
+
+  function queueGift(code) {
+    const list = readPendingGifts();
+    if (list.some(item => item.code === code)) return false;
+    list.push({ code, requestId: makeRequestId(), savedAt: Date.now() });
+    writePendingGifts(list);
+    emit("pending-gift-queued");
+    return true;
+  }
+
+  // 登录后把本机暂存的礼品码逐个交给服务端校验并入账
+  async function flushPendingGifts() {
+    if (!session) return 0;
+    const list = readPendingGifts();
+    if (!list.length) return 0;
+    const remain = [];
+    const failed = [];
+    let credited = 0;
+    for (const item of list) {
+      try {
+        const data = await request("redeem", { token: session.token, code: item.code, requestId: item.requestId });
+        if (data.code === "UNAUTHORIZED") {
+          remain.push(item);
+          expireSession();
+          break;
+        }
+        if (data.ok) {
+          if (data.state) applyRemoteState(data.state, data.revision, "redeemed");
+          credited += Number(data.points) || 0;
+        } else {
+          // 无效、已使用或过期的礼品码不再重试，只提示用户
+          failed.push(`${item.code}（${data.msg || "无法兑换"}）`);
+        }
+      } catch (error) {
+        remain.push(item);
+      }
+    }
+    writePendingGifts(remain);
+    if (failed.length) notify(`礼品码同步失败：${failed.join("；")}`);
+    else if (credited > 0) notify(`本机礼品码已同步，共 +${credited} 积分`);
+    else if (remain.length) notify(`还有 ${remain.length} 个礼品码等待同步`);
+    return credited;
+  }
+
+  async function redeem(code) {
+    const normalized = String(code || "").trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{1,64}$/.test(normalized)) return { ok: false, msg: "礼品码格式无效" };
+    // 未登录也能兑换：先存在本机，登录后自动同步入账
+    if (!session) {
+      const added = queueGift(normalized);
+      return {
+        ok: true,
+        queued: true,
+        msg: added ? "礼品码已保存到本机，登录后会自动同步到账号" : "这个礼品码已在待同步列表，登录后会自动入账",
+        pending: getPendingGiftCount()
+      };
+    }
+    if (dirty && !await syncNow()) return { ok: false, msg: "请先让当前修改同步到云端，再兑换礼品码" };
+    try {
+      const data = await request("redeem", { token: session.token, code: normalized, requestId: makeRequestId() });
       if (data.code === "UNAUTHORIZED") {
         expireSession();
         return { ok: false, msg: "登录已过期，请重新登录" };
@@ -1023,6 +1099,7 @@
       updateUi();
       const loaded = await hydrate(true);
       if (loaded) await loadNickname();
+      if (loaded) await flushPendingGifts();
       emit("ready");
       readyResolve(loaded);
     } catch (error) {
@@ -1043,6 +1120,7 @@
     refresh,
     signOut,
     redeem,
+    getPendingGiftCount,
     hasSession: () => Boolean(session && session.token)
   };
 
