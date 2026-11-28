@@ -3825,7 +3825,7 @@
         running: true, time: 0, energy: [5, 5], cd: [{}, {}],
         units: [], buildings: [], towers: [], projectiles: [], effects: [],
         selected: null, pointer: { x: W / 2, y: H * 0.75, inside: false },
-        aiTimer: 2.5, hudClock: 0
+        aiTimer: 2.5, aiGoal: null, hudClock: 0
       };
       CARD_ORDER.forEach(id => { G.cd[0][id] = 0; G.cd[1][id] = 0; });
       const tower = (team, kind, x, y, hp) => ({
@@ -4054,40 +4054,136 @@
       });
     }
 
-    // ---------- 简单 AI ----------
+    // ---------- AI 出牌策略 ----------
+    // 高费核心卡：AI 会为这些卡攒能量，而不是把能量随手花在低费卡上
+    const AI_BIG_CARDS = ["tank", "flyingelephant", "legion", "elephantrider"];
+    const AI_VALUE = {
+      tank: 100, flyingelephant: 92, legion: 85, elephantrider: 78,
+      charm: 62, elephant: 56, lightning: 52, ice: 51, grenadecat: 48,
+      flamedog: 47, doghouse: 46, dog: 44, cat: 40, minis: 20, arrows: 10
+    };
+    const AI_DEFENDERS = ["cat", "grenadecat", "flamedog", "lightning", "ice", "dog", "minis", "charm"];
+
+    function aiAffordable(id) {
+      return G.energy[1] >= CARD_DEFS[id].cost && (G.cd[1][id] || 0) <= 0;
+    }
+
+    // 统计已经压进 AI 半场的敌方单位
+    function aiThreats() {
+      return G.units.filter(unit => !unit.dead && unit.team === 0 && unit.y < H * 0.56);
+    }
+
+    // 找出敌方最密集的一小片单位，用于万箭齐发
+    function aiCluster() {
+      const enemies = G.units.filter(unit => !unit.dead && unit.team === 0 && unit.y < H * 0.66);
+      let best = null;
+      enemies.forEach(anchor => {
+        const near = enemies.filter(unit => dist(unit, anchor) <= 130);
+        if (!best || near.length > best.near.length) best = { x: anchor.x, y: anchor.y, near };
+      });
+      return best;
+    }
+
+    // 选择本轮的攒能量目标：优先瞄准最强的高费卡，能量太低时先挑近期能攒到的
+    function aiPickGoal() {
+      const available = AI_BIG_CARDS.filter(id => (G.cd[1][id] || 0) <= 0);
+      if (!available.length) return null;
+      const byValue = available.slice().sort((a, b) => AI_VALUE[b] - AI_VALUE[a]);
+      const top = byValue[0];
+      if (G.energy[1] < 9 && Math.random() > 0.35) {
+        return byValue.find(id => CARD_DEFS[id].cost - G.energy[1] <= 6) || top;
+      }
+      return top;
+    }
+
+    // 返回 { id, x?, y? } 表示出牌，返回 { wait: true } 表示继续攒能量
+    function aiChooseCard() {
+      const ready = CARD_ORDER.filter(aiAffordable);
+      if (!ready.length) return { wait: true };
+      const threats = aiThreats();
+      const cluster = aiCluster();
+      // 只有真正有威胁时才放弃攒能量（多个单位、高血量单位或已经压到塔前）
+      const urgent = threats.length >= 2 ||
+        threats.some(unit => unit.hp >= 900 || unit.y < H * 0.32);
+
+      // 1) 敌方推进时优先防守，避免被一路推平
+      if (urgent) {
+        if (ready.includes("arrows") && cluster && cluster.near.length >= 3) {
+          return { id: "arrows", x: clamp(cluster.x, 30, W - 30), y: clamp(cluster.y, 30, H - 30) };
+        }
+        const defenders = ready.filter(id => AI_DEFENDERS.includes(id));
+        if (defenders.length) {
+          const id = defenders.sort((a, b) => AI_VALUE[b] - AI_VALUE[a])[0];
+          let x = 360;
+          let y = 330;
+          if (cluster) {
+            x = clamp(cluster.x, 70, W - 70);
+            y = clamp(cluster.y + 90, 90, 430);
+          }
+          return { id, x, y };
+        }
+      }
+
+      // 2) 选定并坚持攒能量目标，攒够再出，不再把能量随手花掉
+      if (!G.aiGoal || (G.cd[1][G.aiGoal] || 0) > 0) G.aiGoal = aiPickGoal();
+      const goal = G.aiGoal;
+      if (goal) {
+        if (aiAffordable(goal)) {
+          G.aiGoal = null;
+          return { id: goal };
+        }
+        if (G.energy[1] < MAX_ENERGY - 0.5) return { wait: true };
+      }
+
+      // 3) 能量快溢出或核心卡都在冷却时，打出当前性价比最高的可用卡
+      const candidates = ready.filter(id => id !== "arrows" || (cluster && cluster.near.length >= 3));
+      if (!candidates.length) return { wait: true };
+      const id = candidates.sort((a, b) => AI_VALUE[b] - AI_VALUE[a])[0];
+      if (id === "arrows" && cluster) {
+        return { id, x: clamp(cluster.x, 30, W - 30), y: clamp(cluster.y, 30, H - 30) };
+      }
+      return { id };
+    }
+
     function aiThink(dt) {
       if (!G.running) return;
       G.aiTimer -= dt;
       if (G.aiTimer > 0) return;
-      G.aiTimer = 1.1 + Math.random() * 1.2;
-      const ready = CARD_ORDER.filter(id => G.energy[1] >= CARD_DEFS[id].cost && (G.cd[1][id] || 0) <= 0);
-      if (!ready.length) return;
-      const playerUnits = G.units.filter(unit => !unit.dead && unit.team === 0);
-      if (ready.includes("arrows") && playerUnits.length >= 3) {
-        const cx = playerUnits.reduce((sum, unit) => sum + unit.x, 0) / playerUnits.length;
-        const cy = playerUnits.reduce((sum, unit) => sum + unit.y, 0) / playerUnits.length;
-        castCard(1, "arrows", clamp(cx, 30, W - 30), clamp(cy, 30, H - 30));
+      const choice = aiChooseCard();
+      if (!choice || choice.wait) {
+        G.aiTimer = 0.35; // 攒能量期间快速复查，能量到位立刻出牌
         return;
       }
-      const id = ready[Math.floor(Math.random() * ready.length)];
-      const def = CARD_DEFS[id];
-      let x = [200, 360, 520][Math.floor(Math.random() * 3)] + rand(-26, 26);
-      let y = rand(150, 410);
-      if (def.type !== "spell" && playerUnits.length && Math.random() < 0.55) {
-        const closest = playerUnits.slice().sort((a, b) => a.y - b.y)[0];
-        if (closest.y < H * 0.6) {
-          x = clamp(closest.x + rand(-36, 36), 70, W - 70);
-          y = clamp(closest.y - rand(70, 120), 80, H * 0.47);
+      G.aiTimer = 1.1 + Math.random() * 1.2;
+      const def = CARD_DEFS[choice.id];
+      let x = choice.x;
+      let y = choice.y;
+      if (x === undefined || y === undefined) {
+        // 优先攻击血量更低的敌方皇家塔所在路线
+        const royal = G.towers.filter(tower => tower.team === 0 && tower.kind === "royal")
+          .sort((a, b) => a.hp - b.hp)[0];
+        const lane = royal ? royal.x : [190, 360, 530][Math.floor(Math.random() * 3)];
+        x = clamp(lane + rand(-30, 30), 60, W - 60);
+        y = rand(220, 400);
+        const playerUnits = G.units.filter(unit => !unit.dead && unit.team === 0);
+        if (def.type !== "spell" && playerUnits.length && Math.random() < 0.6) {
+          const closest = playerUnits.slice().sort((a, b) => a.y - b.y)[0];
+          if (closest.y < H * 0.65) {
+            x = clamp(closest.x + rand(-40, 40), 70, W - 70);
+            y = clamp(closest.y - rand(70, 130), 80, H * 0.47);
+          }
         }
       }
-      castCard(1, id, clamp(x, 40, W - 40), clamp(y, 50, H - 50));
+      castCard(1, choice.id, clamp(x, 40, W - 40), clamp(y, 50, H - 50));
     }
     // ---------- 战斗更新 ----------
     function step(dt) {
       if (!G || !G.running) return;
       G.time += dt;
       for (let team = 0; team < 2; team++) {
-        G.energy[team] = Math.min(MAX_ENERGY, G.energy[team] + dt / 2);
+        // AI（离线的红方）回复更快：每 1.8 秒 1 点；玩家与联机保持每 2 秒 1 点
+        const regenSeconds = (!isOnline() && team === 1) ? 1.8 : 2;
+        G.energy[team] = Math.min(MAX_ENERGY, G.energy[team] + dt / regenSeconds);
         CARD_ORDER.forEach(id => {
           G.cd[team][id] = Math.max(0, (G.cd[team][id] || 0) - dt);
         });
