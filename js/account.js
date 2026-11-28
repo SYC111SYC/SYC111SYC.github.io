@@ -28,6 +28,11 @@
   let syncTimer = null;
   let syncPromise = null;
   let hydrationPromise = null;
+  let nickname = "";
+  let authMode = "code";
+  let resetOrigin = "login";
+  let resetCountdown = 0;
+  let resetCountdownTimer = null;
   let syncStatus = session ? "正在检查登录状态" : "未登录";
   let loginPromise = null;
   let resolveLogin = null;
@@ -132,7 +137,7 @@
   }
 
   function getUser() {
-    return session ? { email: session.email } : null;
+    return session ? { email: session.email, nickname: nickname || "" } : null;
   }
 
   function getSnapshot() {
@@ -155,9 +160,16 @@
 
   function updateUi() {
     if (!ui.launcher) return;
+    const displayName = session ? (nickname || session.email) : "登录 / 注册";
+    const avatarSource = session ? (nickname || session.email) : "猫";
+    const avatarText = Array.from(avatarSource)[0] || "猫";
     ui.launcher.classList.toggle("authenticated", Boolean(session));
-    ui.label.textContent = session ? session.email : "登录 / 注册";
+    ui.label.textContent = displayName;
+    ui.avatar.textContent = avatarText.toUpperCase();
+    ui.profileAvatar.textContent = avatarText.toUpperCase();
+    ui.profileNickname.textContent = session ? (nickname || "未设置昵称") : "";
     ui.accountEmail.textContent = session ? session.email : "";
+    if (ui.nicknameInput && document.activeElement !== ui.nicknameInput) ui.nicknameInput.value = nickname;
     ui.sync.textContent = syncStatus;
   }
 
@@ -165,8 +177,8 @@
     const root = document.createElement("div");
     root.id = "catballAccountRoot";
     root.innerHTML = `
-      <button class="cb-account-launcher" type="button" aria-haspopup="dialog">
-        <span class="cb-account-dot" aria-hidden="true"></span>
+      <button class="cb-account-launcher" type="button" aria-haspopup="dialog" aria-label="账号与个人中心">
+        <span class="cb-account-avatar" aria-hidden="true">猫</span>
         <span class="cb-account-label">登录 / 注册</span>
       </button>
       <div class="cb-account-overlay" hidden>
@@ -176,28 +188,93 @@
             <button class="cb-account-close" type="button" aria-label="关闭">×</button>
           </div>
           <form class="cb-account-login" novalidate>
+            <div class="cb-account-tabs" role="tablist" aria-label="登录方式">
+              <button class="cb-account-tab active" type="button" data-auth-mode="code" role="tab">验证码登录</button>
+              <button class="cb-account-tab" type="button" data-auth-mode="password" role="tab">密码登录</button>
+            </div>
             <p class="cb-account-description cb-account-reason">邮箱验证码即可注册或登录，猫球数据会同步到云端。</p>
-            <label class="cb-account-field">邮箱
-              <span class="cb-account-input-row">
-                <input class="cb-account-input" name="email" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="name@example.com" required>
-                <button class="cb-account-send" type="button">获取验证码</button>
-              </span>
-            </label>
-            <label class="cb-account-field">6 位数字验证码
-              <input class="cb-account-input" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required>
-            </label>
-            <button class="cb-account-primary" type="submit">验证并登录</button>
+            <div class="cb-account-code-mode">
+              <label class="cb-account-field">邮箱
+                <span class="cb-account-input-row">
+                  <input class="cb-account-input" name="email" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="name@example.com">
+                  <button class="cb-account-send" type="button">获取验证码</button>
+                </span>
+              </label>
+              <label class="cb-account-field">6 位数字验证码
+                <input class="cb-account-input" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000">
+              </label>
+            </div>
+            <div class="cb-account-password-mode" hidden>
+              <label class="cb-account-field">邮箱
+                <input class="cb-account-input" name="passwordEmail" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="name@example.com">
+              </label>
+              <label class="cb-account-field">密码
+                <input class="cb-account-input" name="loginPassword" type="password" autocomplete="current-password" minlength="6" maxlength="72" placeholder="输入密码">
+              </label>
+              <button class="cb-account-link cb-account-forgot" type="button">忘记密码？</button>
+              <p class="cb-account-hint">还没有密码？先用验证码登录，再点击头像设置。</p>
+            </div>
+            <button class="cb-account-primary cb-account-login-submit" type="submit">验证并登录</button>
             <p class="cb-account-message" role="status"></p>
           </form>
           <div class="cb-account-profile" hidden>
-            <p class="cb-account-email"></p>
+            <div class="cb-account-profile-head">
+              <span class="cb-account-avatar cb-account-avatar-large" aria-hidden="true">猫</span>
+              <div class="cb-account-profile-identity">
+                <strong class="cb-account-profile-nickname">未设置昵称</strong>
+                <p class="cb-account-email"></p>
+              </div>
+            </div>
+            <form class="cb-account-nickname-form" novalidate>
+              <label class="cb-account-field">账号昵称（与猫球名字分开）
+                <span class="cb-account-input-row">
+                  <input class="cb-account-input" name="nickname" type="text" maxlength="16" placeholder="输入 1~16 个字符">
+                  <button class="cb-account-send" type="submit">保存昵称</button>
+                </span>
+              </label>
+            </form>
             <p class="cb-account-sync"></p>
             <div class="cb-account-actions">
               <button class="cb-account-secondary cb-account-refresh" type="button">刷新云端</button>
               <button class="cb-account-primary cb-account-logout" type="button">退出登录</button>
             </div>
+            <button class="cb-account-secondary cb-account-wide-action cb-account-open-set-password" type="button">设置 / 修改密码</button>
             <p class="cb-account-message cb-account-profile-message" role="status"></p>
           </div>
+          <form class="cb-account-reset" novalidate hidden>
+            <p class="cb-account-description">通过邮箱验证码重置密码，验证码 5 分钟内有效。</p>
+            <label class="cb-account-field">邮箱
+              <span class="cb-account-input-row">
+                <input class="cb-account-input" name="resetEmail" type="email" inputmode="email" autocomplete="email" maxlength="254" placeholder="name@example.com">
+                <button class="cb-account-send cb-account-reset-send" type="button">获取重置码</button>
+              </span>
+            </label>
+            <label class="cb-account-field">6 位重置验证码
+              <input class="cb-account-input" name="resetCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+            </label>
+            <label class="cb-account-field">新密码
+              <input class="cb-account-input" name="newPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="6~72 位密码">
+            </label>
+            <label class="cb-account-field">确认新密码
+              <input class="cb-account-input" name="confirmNewPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="再次输入新密码">
+            </label>
+            <button class="cb-account-primary" type="submit">确认重置密码</button>
+            <button class="cb-account-secondary cb-account-wide-action cb-account-reset-back" type="button">返回</button>
+            <p class="cb-account-message cb-account-reset-message" role="status"></p>
+          </form>
+          <form class="cb-account-set-password" novalidate hidden>
+            <p class="cb-account-description">验证码注册的账号可以直接设置密码。已经设置过密码的账号，请使用邮箱验证码修改。</p>
+            <label class="cb-account-field">新密码
+              <input class="cb-account-input" name="setPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="6~72 位密码">
+            </label>
+            <label class="cb-account-field">确认新密码
+              <input class="cb-account-input" name="setPasswordConfirm" type="password" autocomplete="new-password" minlength="6" maxlength="72" placeholder="再次输入新密码">
+            </label>
+            <button class="cb-account-primary" type="submit">保存密码</button>
+            <button class="cb-account-link cb-account-set-to-reset" type="button">已设置过密码？用邮箱验证码修改</button>
+            <button class="cb-account-secondary cb-account-wide-action cb-account-set-back" type="button">返回个人中心</button>
+            <p class="cb-account-message cb-account-set-message" role="status"></p>
+          </form>
           <div class="cb-account-import" hidden>
             <p class="cb-account-description">这个邮箱还没有云端存档。是否把当前浏览器的猫球数据作为初始存档？不会与云端数据相加。</p>
             <div class="cb-account-import-summary"></div>
@@ -214,21 +291,48 @@
     ui = {
       launcher: root.querySelector(".cb-account-launcher"),
       label: root.querySelector(".cb-account-label"),
+      avatar: root.querySelector(".cb-account-launcher .cb-account-avatar"),
+      profileAvatar: root.querySelector(".cb-account-avatar-large"),
+      profileNickname: root.querySelector(".cb-account-profile-nickname"),
       overlay: root.querySelector(".cb-account-overlay"),
       close: root.querySelector(".cb-account-close"),
       title: root.querySelector(".cb-account-title"),
       login: root.querySelector(".cb-account-login"),
+      tabs: [...root.querySelectorAll("[data-auth-mode]")],
+      codeMode: root.querySelector(".cb-account-code-mode"),
+      passwordMode: root.querySelector(".cb-account-password-mode"),
       email: root.querySelector("input[name=email]"),
       code: root.querySelector("input[name=code]"),
-      send: root.querySelector(".cb-account-send"),
+      send: root.querySelector(".cb-account-code-mode .cb-account-send"),
+      passwordEmail: root.querySelector("input[name=passwordEmail]"),
+      loginPassword: root.querySelector("input[name=loginPassword]"),
+      loginSubmit: root.querySelector(".cb-account-login-submit"),
+      forgot: root.querySelector(".cb-account-forgot"),
       reason: root.querySelector(".cb-account-reason"),
       message: root.querySelector(".cb-account-login .cb-account-message"),
       profile: root.querySelector(".cb-account-profile"),
       accountEmail: root.querySelector(".cb-account-email"),
+      nicknameForm: root.querySelector(".cb-account-nickname-form"),
+      nicknameInput: root.querySelector("input[name=nickname]"),
       sync: root.querySelector(".cb-account-sync"),
       refresh: root.querySelector(".cb-account-refresh"),
       logout: root.querySelector(".cb-account-logout"),
+      openSetPassword: root.querySelector(".cb-account-open-set-password"),
       profileMessage: root.querySelector(".cb-account-profile-message"),
+      reset: root.querySelector(".cb-account-reset"),
+      resetEmail: root.querySelector("input[name=resetEmail]"),
+      resetCode: root.querySelector("input[name=resetCode]"),
+      resetSend: root.querySelector(".cb-account-reset-send"),
+      newPassword: root.querySelector("input[name=newPassword]"),
+      confirmNewPassword: root.querySelector("input[name=confirmNewPassword]"),
+      resetBack: root.querySelector(".cb-account-reset-back"),
+      resetMessage: root.querySelector(".cb-account-reset-message"),
+      setPassword: root.querySelector(".cb-account-set-password"),
+      setPasswordInput: root.querySelector("input[name=setPassword]"),
+      setPasswordConfirm: root.querySelector("input[name=setPasswordConfirm]"),
+      setToReset: root.querySelector(".cb-account-set-to-reset"),
+      setBack: root.querySelector(".cb-account-set-back"),
+      setMessage: root.querySelector(".cb-account-set-message"),
       importPanel: root.querySelector(".cb-account-import"),
       importSummary: root.querySelector(".cb-account-import-summary"),
       importLocal: root.querySelector(".cb-account-import-local"),
@@ -242,8 +346,12 @@
 
   function bindUi() {
     ui.launcher.addEventListener("click", () => {
-      if (session) openPanel("profile");
-      else ensureLogin("登录后可同步猫球装扮、猫粮、积分与 PVP 背包。");
+      if (session) {
+        openPanel("profile");
+        loadNickname();
+      } else {
+        ensureLogin("登录后可同步猫球装扮、猫粮、积分与 PVP 背包。");
+      }
     });
     ui.close.addEventListener("click", closeModal);
     ui.overlay.addEventListener("click", event => {
@@ -255,8 +363,25 @@
     ui.code.addEventListener("input", () => {
       ui.code.value = ui.code.value.replace(/\D/g, "").slice(0, 6);
     });
+    ui.resetCode.addEventListener("input", () => {
+      ui.resetCode.value = ui.resetCode.value.replace(/\D/g, "").slice(0, 6);
+    });
+    ui.tabs.forEach(tab => tab.addEventListener("click", () => setAuthMode(tab.dataset.authMode)));
     ui.send.addEventListener("click", sendCode);
     ui.login.addEventListener("submit", verifyLogin);
+    ui.forgot.addEventListener("click", () => openResetPanel("login"));
+    ui.resetSend.addEventListener("click", sendResetCode);
+    ui.reset.addEventListener("submit", resetPassword);
+    ui.resetBack.addEventListener("click", () => {
+      if (resetOrigin === "set") openPanel("set-password");
+      else if (resetOrigin === "profile") openPanel("profile");
+      else openPanel("login");
+    });
+    ui.nicknameForm.addEventListener("submit", saveNickname);
+    ui.openSetPassword.addEventListener("click", () => openPanel("set-password"));
+    ui.setPassword.addEventListener("submit", setAccountPassword);
+    ui.setToReset.addEventListener("click", () => openResetPanel("set"));
+    ui.setBack.addEventListener("click", () => openPanel("profile"));
     ui.refresh.addEventListener("click", async () => {
       ui.refresh.disabled = true;
       ui.profileMessage.textContent = "正在读取云端存档…";
@@ -291,17 +416,56 @@
     });
   }
 
+  function setAuthMode(mode) {
+    authMode = mode === "password" ? "password" : "code";
+    if (authMode === "password" && !ui.passwordEmail.value) ui.passwordEmail.value = ui.email.value;
+    if (authMode === "code" && !ui.email.value) ui.email.value = ui.passwordEmail.value;
+    ui.codeMode.hidden = authMode !== "code";
+    ui.passwordMode.hidden = authMode !== "password";
+    ui.loginSubmit.textContent = authMode === "password" ? "使用密码登录" : "验证并登录";
+    ui.tabs.forEach(tab => {
+      const active = tab.dataset.authMode === authMode;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+    });
+  }
+
+  function openResetPanel(origin) {
+    resetOrigin = origin;
+    const currentEmail = session && origin !== "login" ? session.email : ui.passwordEmail.value || ui.email.value;
+    ui.resetEmail.value = currentEmail.trim();
+    ui.resetEmail.readOnly = Boolean(session && origin !== "login");
+    ui.resetCode.value = "";
+    ui.newPassword.value = "";
+    ui.confirmNewPassword.value = "";
+    openPanel("reset");
+  }
+
   function openPanel(panel, reason) {
     ui.login.hidden = panel !== "login";
     ui.profile.hidden = panel !== "profile";
+    ui.reset.hidden = panel !== "reset";
+    ui.setPassword.hidden = panel !== "set-password";
     ui.importPanel.hidden = panel !== "import";
-    ui.title.textContent = panel === "profile" ? "账号与云存档" : panel === "import" ? "初始化云存档" : "登录 / 注册";
+    const titles = {
+      profile: "个人中心",
+      import: "初始化云存档",
+      reset: "重置密码",
+      "set-password": "设置密码",
+      login: "登录 / 注册"
+    };
+    ui.title.textContent = titles[panel] || "猫球账号";
     if (reason) ui.reason.textContent = reason;
     ui.message.textContent = "";
     ui.profileMessage.textContent = "";
+    ui.resetMessage.textContent = "";
+    ui.setMessage.textContent = "";
     ui.overlay.hidden = false;
     updateUi();
-    if (panel === "login") setTimeout(() => ui.email.focus(), 0);
+    setAuthMode(authMode);
+    if (panel === "login") setTimeout(() => (authMode === "password" ? ui.passwordEmail : ui.email).focus(), 0);
+    if (panel === "reset") setTimeout(() => ui.resetEmail.focus(), 0);
+    if (panel === "set-password") setTimeout(() => ui.setPasswordInput.focus(), 0);
   }
 
   function closeModal() {
@@ -394,43 +558,224 @@
 
   async function verifyLogin(event) {
     event.preventDefault();
-    const email = ui.email.value.trim().toLowerCase();
+    const passwordLogin = authMode === "password";
+    const email = (passwordLogin ? ui.passwordEmail.value : ui.email.value).trim().toLowerCase();
     const code = ui.code.value.trim();
+    const password = ui.loginPassword.value;
     if (!validEmail(email)) return setLoginMessage("请输入正确的邮箱地址。", true);
-    if (!/^\d{6}$/.test(code)) return setLoginMessage("验证码必须是 6 位数字。", true);
-    const submit = ui.login.querySelector("button[type=submit]");
-    submit.disabled = true;
-    setLoginMessage("正在验证…");
+    if (passwordLogin && (password.length < 6 || password.length > 72)) {
+      return setLoginMessage("密码长度需为 6~72 位。", true);
+    }
+    if (!passwordLogin && !/^\d{6}$/.test(code)) return setLoginMessage("验证码必须是 6 位数字。", true);
+    ui.loginSubmit.disabled = true;
+    setLoginMessage(passwordLogin ? "正在使用密码登录…" : "正在验证…");
     try {
-      const data = await request("verify", { email, code });
-      if (!data.ok || !data.token) {
-        setLoginMessage(data.msg || "验证失败", true);
-        return;
-      }
-      captureGuestState();
-      session = { token: data.token, email: data.email || email };
-      saveSession();
-      hydrated = false;
-      updateUi();
-      setLoginMessage("验证成功，正在读取云存档…");
-      const loaded = await hydrate(true);
-      if (!loaded) {
-        session = null;
-        hydrated = false;
-        saveSession();
-        restoreGuestState();
-        emit("login-cancelled");
-        setLoginMessage("已取消登录。", true);
-        updateUi();
-        finishLogin(false);
-        return;
-      }
-      ui.overlay.hidden = true;
-      notify("登录成功，猫球数据已同步");
-      finishLogin(true);
+      const data = await request(passwordLogin ? "login-password" : "verify", passwordLogin
+        ? { email, password }
+        : { email, code });
+      await completeAuthentication(data, email);
     } catch (error) {
       console.error("登录或云存档读取失败", error);
       setLoginMessage(error.message === "UNAUTHORIZED" ? "登录状态无效，请重新验证" : networkMessage(error), true);
+    } finally {
+      ui.loginSubmit.disabled = false;
+    }
+  }
+
+  async function completeAuthentication(data, email) {
+    if (!data.ok || !data.token) {
+      setLoginMessage(data.msg || "登录失败", true);
+      return false;
+    }
+    captureGuestState();
+    session = { token: data.token, email: data.email || email };
+    nickname = "";
+    saveSession();
+    hydrated = false;
+    updateUi();
+    setLoginMessage("登录成功，正在读取云存档…");
+    const loaded = await hydrate(true);
+    if (!loaded) {
+      session = null;
+      hydrated = false;
+      saveSession();
+      restoreGuestState();
+      emit("login-cancelled");
+      setLoginMessage("已取消登录。", true);
+      updateUi();
+      finishLogin(false);
+      return false;
+    }
+    await loadNickname();
+    ui.loginPassword.value = "";
+    ui.overlay.hidden = true;
+    notify("登录成功，猫球数据已同步");
+    finishLogin(true);
+    return true;
+  }
+
+  function showResetMessage(message, error = false) {
+    ui.resetMessage.textContent = message || "";
+    ui.resetMessage.classList.toggle("error", error);
+  }
+
+  function startResetCountdown() {
+    clearInterval(resetCountdownTimer);
+    resetCountdown = 60;
+    ui.resetSend.disabled = true;
+    ui.resetSend.textContent = `${resetCountdown}s 后重发`;
+    resetCountdownTimer = setInterval(() => {
+      resetCountdown -= 1;
+      ui.resetSend.textContent = resetCountdown > 0 ? `${resetCountdown}s 后重发` : "获取重置码";
+      if (resetCountdown <= 0) {
+        clearInterval(resetCountdownTimer);
+        ui.resetSend.disabled = false;
+      }
+    }, 1000);
+  }
+
+  async function sendResetCode() {
+    const email = ui.resetEmail.value.trim().toLowerCase();
+    if (!validEmail(email)) return showResetMessage("请输入正确的邮箱地址。", true);
+    if (resetCountdown > 0) return;
+    ui.resetSend.disabled = true;
+    showResetMessage("正在发送重置验证码…");
+    try {
+      const data = await request("send-reset-code", { email });
+      showResetMessage(data.msg || "重置验证码已发送，请查收", !data.ok);
+      if (data.ok) startResetCountdown();
+    } catch (error) {
+      showResetMessage(networkMessage(error), true);
+    } finally {
+      ui.resetSend.disabled = resetCountdown > 0;
+    }
+  }
+
+  async function resetPassword(event) {
+    event.preventDefault();
+    const email = ui.resetEmail.value.trim().toLowerCase();
+    const code = ui.resetCode.value.trim();
+    const newPassword = ui.newPassword.value;
+    if (!validEmail(email) || !/^\d{6}$/.test(code)) {
+      return showResetMessage("请输入正确邮箱和 6 位重置验证码。", true);
+    }
+    if (newPassword.length < 6 || newPassword.length > 72) {
+      return showResetMessage("新密码长度需为 6~72 位。", true);
+    }
+    if (newPassword !== ui.confirmNewPassword.value) return showResetMessage("两次输入的新密码不一致。", true);
+    const submit = ui.reset.querySelector("button[type=submit]");
+    submit.disabled = true;
+    showResetMessage("正在重置密码…");
+    try {
+      const data = await request("reset-password", { email, code, newPassword });
+      showResetMessage(data.msg || "密码重置失败", !data.ok);
+      if (data.ok) {
+        ui.newPassword.value = "";
+        ui.confirmNewPassword.value = "";
+        ui.resetCode.value = "";
+        notify(data.msg || "密码重置成功");
+        if (session) {
+          openPanel("profile");
+        } else {
+          ui.passwordEmail.value = email;
+          setAuthMode("password");
+          openPanel("login");
+        }
+      }
+    } catch (error) {
+      showResetMessage(networkMessage(error), true);
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  async function setAccountPassword(event) {
+    event.preventDefault();
+    if (!session) {
+      openPanel("login");
+      return;
+    }
+    const password = ui.setPasswordInput.value;
+    if (password.length < 6 || password.length > 72) {
+      ui.setMessage.textContent = "密码长度需为 6~72 位。";
+      ui.setMessage.classList.add("error");
+      return;
+    }
+    if (password !== ui.setPasswordConfirm.value) {
+      ui.setMessage.textContent = "两次输入的密码不一致。";
+      ui.setMessage.classList.add("error");
+      return;
+    }
+    const submit = ui.setPassword.querySelector("button[type=submit]");
+    submit.disabled = true;
+    ui.setMessage.textContent = "正在保存密码…";
+    ui.setMessage.classList.remove("error");
+    try {
+      const data = await request("register", { email: session.email, password });
+      ui.setMessage.textContent = data.msg || "密码保存失败";
+      ui.setMessage.classList.toggle("error", !data.ok);
+      if (data.ok) {
+        ui.setPasswordInput.value = "";
+        ui.setPasswordConfirm.value = "";
+        notify("密码设置成功，下次可以使用邮箱和密码登录");
+        openPanel("profile");
+      }
+    } catch (error) {
+      ui.setMessage.textContent = networkMessage(error);
+      ui.setMessage.classList.add("error");
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  async function loadNickname() {
+    if (!session) return false;
+    try {
+      const data = await request("get-nickname", { token: session.token });
+      if (data.code === "UNAUTHORIZED") {
+        expireSession();
+        return false;
+      }
+      if (!data.ok) return false;
+      nickname = typeof data.nickname === "string" ? data.nickname : "";
+      updateUi();
+      return true;
+    } catch (error) {
+      console.error("账号昵称读取失败", error);
+      return false;
+    }
+  }
+
+  async function saveNickname(event) {
+    event.preventDefault();
+    if (!session) return;
+    const value = ui.nicknameInput.value.trim();
+    if (!value || Array.from(value).length > 16) {
+      ui.profileMessage.textContent = "昵称需为 1~16 个字符。";
+      ui.profileMessage.classList.add("error");
+      return;
+    }
+    const submit = ui.nicknameForm.querySelector("button[type=submit]");
+    submit.disabled = true;
+    ui.profileMessage.textContent = "正在保存昵称…";
+    ui.profileMessage.classList.remove("error");
+    try {
+      const data = await request("set-nickname", { token: session.token, nickname: value });
+      if (data.code === "UNAUTHORIZED") {
+        expireSession();
+        return;
+      }
+      ui.profileMessage.textContent = data.msg || "昵称保存失败";
+      ui.profileMessage.classList.toggle("error", !data.ok);
+      if (data.ok) {
+        nickname = data.nickname || value;
+        updateUi();
+        emit("nickname-updated");
+        notify("账号昵称已同步");
+      }
+    } catch (error) {
+      ui.profileMessage.textContent = networkMessage(error);
+      ui.profileMessage.classList.add("error");
     } finally {
       submit.disabled = false;
     }
@@ -501,6 +846,7 @@
     revision = 0;
     hydrated = false;
     dirty = false;
+    nickname = "";
     saveSession();
     restoreGuestState();
     setSyncStatus("登录已过期");
@@ -590,7 +936,11 @@
   async function refresh() {
     if (!session) return false;
     if (!hydrated) {
-      try { return await hydrate(true); } catch { return false; }
+      try {
+        const loaded = await hydrate(true);
+        if (loaded) await loadNickname();
+        return loaded;
+      } catch { return false; }
     }
     if (dirty && !await syncNow()) return false;
     try {
@@ -601,6 +951,7 @@
       }
       if (!data.ok) throw new Error(data.msg || "读取失败");
       if (data.state) applyRemoteState(data.state, data.revision, "cloud-refreshed");
+      await loadNickname();
       return Boolean(data.state);
     } catch (error) {
       console.error("猫球云存档刷新失败", error);
@@ -620,6 +971,7 @@
     revision = 0;
     hydrated = false;
     dirty = false;
+    nickname = "";
     saveSession();
     restoreGuestState();
     setSyncStatus("未登录");
@@ -670,6 +1022,7 @@
       setSyncStatus("正在读取云存档…");
       updateUi();
       const loaded = await hydrate(true);
+      if (loaded) await loadNickname();
       emit("ready");
       readyResolve(loaded);
     } catch (error) {

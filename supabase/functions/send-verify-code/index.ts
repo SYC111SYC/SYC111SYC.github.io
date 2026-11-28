@@ -1,11 +1,14 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer";
+import * as bcrypt from "npm:bcrypt@5";
 
-// 部署时保持公开访问（--no-verify-jwt），账户身份由本函数签发的 HS256 JWT 校验。
 const DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60;
+const RESET_CODE_TTL_MS = 5 * 60 * 1000; // 重置码5分钟
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 let supabase: ReturnType<typeof createClient> | undefined;
 let signingKey: Promise<CryptoKey> | undefined;
+let smtpTransport: nodemailer.Transporter | undefined;
 
 function allowedOrigin(origin: string | null): string {
   if (!origin) return "*";
@@ -47,12 +50,33 @@ function db() {
   return supabase;
 }
 
+function getSmtpTransport() {
+  if (!smtpTransport) {
+    const host = Deno.env.get("SMTP_HOST");
+    const port = Number(Deno.env.get("SMTP_PORT"));
+    const user = Deno.env.get("SMTP_USER");
+    const pass = Deno.env.get("SMTP_PASS");
+    if (!host || !port || !user || !pass) throw new Error("SMTP 环境变量缺失");
+    smtpTransport = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    });
+  }
+  return smtpTransport;
+}
+
 function normalizeEmail(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 function validEmail(email: string): boolean {
   return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function validPassword(pw: string): boolean {
+  return pw.length >= 6 && pw.length <= 72;
 }
 
 function base64UrlEncode(bytes: Uint8Array): string {
@@ -131,25 +155,46 @@ async function authenticate(token: unknown): Promise<string> {
   }
 }
 
-async function sendEmail(email: string, code: string) {
-  const apiKey = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("RESEND_FROM") || "猫球小站 <onboarding@resend.dev>";
-  if (!apiKey) throw new Error("RESEND_API_KEY 未配置");
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      from,
-      to: [email],
-      subject: "猫球小站登录验证码",
-      html: `<div style="font-family:system-ui,sans-serif"><h2>猫球小站</h2><p>你的登录验证码是：</p><p style="font-size:32px;font-weight:700;letter-spacing:8px">${code}</p><p>验证码 5 分钟内有效。若非本人操作，请忽略本邮件。</p></div>`,
-      text: `你的猫球小站登录验证码是 ${code}，5 分钟内有效。`,
-    }),
+// 登录验证码邮件
+async function sendLoginEmail(email: string, code: string) {
+  const transport = getSmtpTransport();
+  const from = Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!;
+  await transport.sendMail({
+    from,
+    to: email,
+    subject: "喵！猫球来信！",
+    html: `<div style="font-family:system-ui,sans-serif;font-size:16px;line-height:1.6;">
+<p>喵！猫球来信！</p>
+<p>你的验证码是【${code}】喵~</p>
+<p>欢迎使用猫球小站喵~</p>
+<p style="font-size:13px;color:#666;margin-top:20px;">验证码5分钟内有效，若非本人操作，请忽略本邮件。</p>
+</div>`,
+    text: `喵！猫球来信！
+你的验证码是【${code}】喵~
+欢迎使用猫球小站喵~
+验证码5分钟内有效，若非本人操作，请忽略本邮件。`,
   });
-  if (!response.ok) {
-    console.error("Resend 发送失败", response.status, await response.text());
-    throw new Error("验证码邮件发送失败，请稍后重试");
-  }
+}
+
+// 重置密码验证码邮件
+async function sendResetEmail(email: string, code: string) {
+  const transport = getSmtpTransport();
+  const from = Deno.env.get("SMTP_FROM") || Deno.env.get("SMTP_USER")!;
+  await transport.sendMail({
+    from,
+    to: email,
+    subject: "喵！猫球来信~",
+    html: `<div style="font-family:system-ui,sans-serif;font-size:16px;line-height:1.6;">
+<p>喵！猫球来信~</p>
+<p>你的账户密码重置验证码是【${code}】喵~</p>
+<p>下次别再忘掉密码了喵！</p>
+<p style="font-size:13px;color:#666;margin-top:20px;">验证码5分钟内有效，若非本人操作，请忽略本邮件。</p>
+</div>`,
+    text: `喵！猫球来信~
+你的账户密码重置验证码是【${code}】喵~
+下次别再忘掉密码了喵！
+验证码5分钟内有效，若非本人操作，请忽略本邮件。`,
+  });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -302,17 +347,22 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json() as Record<string, unknown>;
     const type = body.type;
+
+    // ========== 原邮箱验证码登录 ==========
     if (type === "send") {
       const email = normalizeEmail(body.email);
       if (!validEmail(email)) return respond(req, { ok: false, msg: "邮箱格式不正确" });
       const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
-      const { error } = await db().from("verify_code").upsert({
-        email,
-        code,
-        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-      });
-      if (error) throw error;
-      await sendEmail(email, code);
+      console.log(`[send] email=${email}, code=${code}`);
+      const { error } = await db().from("verify_code").upsert(
+        { email, code, expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() },
+        { onConflict: "email" }
+      );
+      if (error) {
+        console.error("[send upsert error]", error);
+        throw error;
+      }
+      await sendLoginEmail(email, code);
       return respond(req, { ok: true, msg: "验证码已发送，请查收（垃圾箱也看一下）" });
     }
     if (type === "verify") {
@@ -321,8 +371,16 @@ Deno.serve(async (req) => {
       if (!validEmail(email) || !/^\d{6}$/.test(code)) {
         return respond(req, { ok: false, msg: "邮箱或验证码格式不正确" });
       }
-      const { data, error } = await db().from("verify_code").select("code,expires_at").eq("email", email).maybeSingle();
-      if (error) throw error;
+      console.log(`[verify] email=${email}, inputCode=${code}`);
+      const { data, error } = await db()
+        .from("verify_code")
+        .select("code,expires_at")
+        .eq("email", email)
+        .maybeSingle();
+      if (error) {
+        console.error("[verify query error]", error);
+        throw error;
+      }
       if (!data || !data.expires_at || new Date(data.expires_at).getTime() <= Date.now()) {
         return respond(req, { ok: false, msg: "验证码不存在或已过期" });
       }
@@ -330,13 +388,100 @@ Deno.serve(async (req) => {
       await db().from("verify_code").delete().eq("email", email);
       return respond(req, { ok: true, msg: "✅ 验证成功", token: await signToken(email), email });
     }
+
+    // ========== 新增：注册 邮箱+密码 ==========
+    if (type === "register") {
+      const email = normalizeEmail(body.email);
+      const password = typeof body.password === "string" ? body.password : "";
+      if (!validEmail(email)) return respond(req, { ok: false, msg: "邮箱格式不正确" });
+      if (!validPassword(password)) return respond(req, { ok: false, msg: "密码长度6~72位" });
+      const hash = await bcrypt.hash(password, 10);
+      const { error } = await db().from("user_passwords").insert({ email, password_hash: hash });
+      if (error) {
+        if (error.code === "23505") return respond(req, { ok: false, msg: "该邮箱已注册" });
+        throw error;
+      }
+      return respond(req, { ok: true, msg: "注册成功，可以登录啦" });
+    }
+    // ========== 新增：邮箱密码登录 ==========
+    if (type === "login-password") {
+      const email = normalizeEmail(body.email);
+      const password = typeof body.password === "string" ? body.password : "";
+      if (!validEmail(email)) return respond(req, { ok: false, msg: "邮箱格式不正确" });
+      const { data, error } = await db().from("user_passwords").select("password_hash").eq("email", email).maybeSingle();
+      if (error) throw error;
+      if (!data) return respond(req, { ok: false, msg: "该邮箱尚未注册" });
+      const ok = await bcrypt.compare(password, data.password_hash);
+      if (!ok) return respond(req, { ok: false, msg: "密码错误" });
+      return respond(req, { ok: true, msg: "登录成功", token: await signToken(email), email });
+    }
+    // ========== 新增：发送重置密码验证码 ==========
+    if (type === "send-reset-code") {
+      const email = normalizeEmail(body.email);
+      if (!validEmail(email)) return respond(req, { ok: false, msg: "邮箱格式不正确" });
+      // 先判断账号是否存在
+      const { data: user } = await db().from("user_passwords").select("email").eq("email", email).maybeSingle();
+      if (!user) return respond(req, { ok: false, msg: "该邮箱未注册" });
+      const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+      const { error } = await db().from("password_reset").upsert(
+        { email, code, expires_at: new Date(Date.now() + RESET_CODE_TTL_MS).toISOString() },
+        { onConflict: "email" }
+      );
+      if (error) throw error;
+      await sendResetEmail(email, code);
+      return respond(req, { ok: true, msg: "重置验证码已发送，请查收" });
+    }
+    // ========== 新增：提交重置密码 ==========
+    if (type === "reset-password") {
+      const email = normalizeEmail(body.email);
+      const code = typeof body.code === "string" ? body.code.trim() : "";
+      const newPw = typeof body.newPassword === "string" ? body.newPassword : "";
+      if (!validEmail(email) || !/^\d{6}$/.test(code)) return respond(req, { ok: false, msg: "邮箱或验证码格式错误" });
+      if (!validPassword(newPw)) return respond(req, { ok: false, msg: "新密码长度6~72位" });
+      const { data, error } = await db().from("password_reset").select("code,expires_at").eq("email", email).maybeSingle();
+      if (error) throw error;
+      if (!data || new Date(data.expires_at).getTime() <= Date.now()) return respond(req, { ok: false, msg: "重置码不存在或已过期" });
+      if (String(data.code) !== code) return respond(req, { ok: false, msg: "重置验证码错误" });
+      // 更新密码
+      const hash = await bcrypt.hash(newPw,10);
+      const { error: updateErr } = await db().from("user_passwords").update({ password_hash: hash }).eq("email", email);
+      if (updateErr) throw updateErr;
+      // 删除重置码
+      await db().from("password_reset").delete().eq("email", email);
+      return respond(req, { ok: true, msg: "密码重置成功，请使用新密码登录" });
+    }
+
+    // ========== 新增：账号昵称读取与同步 ==========
+    if (type === "get-nickname" || type === "set-nickname") {
+      let email: string;
+      try {
+        email = await authenticate(body.token);
+      } catch {
+        return respond(req, { ok: false, code: "UNAUTHORIZED", msg: "登录已过期，请重新登录" }, 401);
+      }
+      if (type === "get-nickname") {
+        const { data, error } = await db().from("catball_profiles").select("nickname").eq("email", email).maybeSingle();
+        if (error) throw error;
+        return respond(req, { ok: true, nickname: data?.nickname || "" });
+      }
+      const nickname = typeof body.nickname === "string" ? body.nickname.trim() : "";
+      if (!nickname || Array.from(nickname).length > 16) {
+        return respond(req, { ok: false, msg: "昵称需为 1~16 个字符" });
+      }
+      const { data, error } = await db().from("catball_profiles").update({ nickname })
+        .eq("email", email).select("nickname").maybeSingle();
+      if (error) throw error;
+      if (!data) return respond(req, { ok: false, msg: "云端存档尚未建立，请刷新后重试" });
+      return respond(req, { ok: true, msg: "昵称已保存", nickname: data.nickname });
+    }
+
     if (type === "create-code") {
       const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
       const points = Number(body.points);
       if (!/^[A-Z0-9_-]{4,64}$/.test(code) || !Number.isSafeInteger(points) || points < 15 || points > 40) {
         return respond(req, { ok: false, msg: "礼品码或积分档位无效" });
       }
-      const { error } = await db().from("catball_redemptions").insert({ code, points });
+      const { error } = await db().from("gift_codes").insert({ code, points });
       if (error) {
         if (error.code === "23505") return respond(req, { ok: false, msg: "礼品码重复，请重新生成" });
         throw error;
@@ -374,7 +519,7 @@ Deno.serve(async (req) => {
     }
     return respond(req, { ok: false, msg: "不支持的请求类型" }, 400);
   } catch (error) {
-    console.error("send-verify-code", error);
+    console.error("main function error", error);
     return respond(req, { ok: false, msg: error instanceof Error ? error.message : "服务器暂时不可用" }, 500);
   }
 });
