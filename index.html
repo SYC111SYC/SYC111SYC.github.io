@@ -3669,7 +3669,7 @@
                 if (st.status === 'sent') {
                     fortuneGiftText.textContent = `已发送至 ${st.email || '你的登录邮箱'}，价值 ${st.points} 积分，去邮箱查收喵~`;
                 } else if (st.status === 'missed') {
-                    fortuneGiftText.textContent = '今天的机会已经用掉了，这次没摇中喵……明天再来~';
+                    fortuneGiftText.textContent = st.msg || '今天已经摇过了，这次没中喵……明天再来~';
                 } else {
                     fortuneGiftText.textContent = st.msg || '今天已经领取过啦~';
                 }
@@ -3819,7 +3819,11 @@
                 try { localStorage.removeItem(FORTUNE_GIFT_KEY); } catch (e) { /* 忽略 */ }
                 // 运势由 uid+日期 确定性算出，只删记录还会抽到同一签，所以换个随机种子
                 try { safeSet(FORTUNE_REROLL_KEY, String(getFortuneReroll() + 1)); } catch (e) { /* 忽略 */ }
-                try { safeSet(FORTUNE_FORCE_KEY, 'daji'); } catch (e) { /* 忽略 */ }
+                // resetfortune=1 → 下次签到必出大吉；resetfortune=2 → 下次签到正常随机
+                try {
+                    if (val === '1') safeSet(FORTUNE_FORCE_KEY, 'daji');
+                    else localStorage.removeItem(FORTUNE_FORCE_KEY);
+                } catch (e) { /* 忽略 */ }
                 renderFortune();
                 say('已重置今日运势，可以重新签到啦喵~', 2200);
                 console.log('[debug] 今日运势已重置，连续签到天数保持不变。');
