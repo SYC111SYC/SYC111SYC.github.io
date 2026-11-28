@@ -1076,8 +1076,12 @@
           stakes: gameMode === "online" ? (onlineGuest ? { p1: otherStake, p2: localStake } : { p1: localStake, p2: otherStake }) : { p1: 0, p2: 0 }
         };
         if (gameMode === "online") {
-          if (remote && remote.host) state.host = true;
-          else state.host = false;
+          state.host = Boolean(remote && remote.host);
+          state.localPlayerId = state.host ? "p1" : "p2";
+          // 联机访客端不会跑本地模拟，必须在开局时把相机放到自己的角色上，
+          // 否则相机会停在默认地图中心，看不到两侧的角色，只剩空白战场。
+          const localPlayer = state.players.find(player => player.id === state.localPlayerId);
+          if (localPlayer) camera = { x: localPlayer.x, y: localPlayer.y };
         }
         updateNames();
         $("gameStatus").textContent = gameMode === "ai"
@@ -2961,12 +2965,15 @@
           localPlayer.aim = Math.atan2(targetY - localPlayer.y, targetX - localPlayer.x);
         }
         updateGame(dt);
-        if (state && mode === "online" && state.bigOnline && !state.host) {
+        if (state && mode === "online" && !state.host) {
+          // 访客端完全依赖服务端快照，自己不做本地模拟，因此相机需要在这里跟随
           const player = viewTarget() || controlledPlayer();
-          camera.x += (player.x - camera.x) * Math.min(1, dt * 7);
-          camera.y += (player.y - camera.y) * Math.min(1, dt * 7);
-          camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
-          camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
+          if (player) {
+            camera.x += (player.x - camera.x) * Math.min(1, dt * 7);
+            camera.y += (player.y - camera.y) * Math.min(1, dt * 7);
+            camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
+            camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
+          }
         }
         if (mode === "online" && state && !state.host && state.running) sendInput();
         draw();
