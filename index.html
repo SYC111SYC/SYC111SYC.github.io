@@ -3529,6 +3529,7 @@
         }
 
         const FORTUNE_REROLL_KEY = 'catball_fortune_reroll_v1';
+        const FORTUNE_FORCE_KEY  = 'catball_fortune_force_v1';   // 下次签到强制大吉（调试用）
 
         function getFortuneReroll() {
             const n = Number(safeGet(FORTUNE_REROLL_KEY));
@@ -3536,6 +3537,11 @@
         }
 
         function generateFortune(dateStr) {
+            // 调试后门留下的「必出大吉」标记，用一次就清掉
+            if (safeGet(FORTUNE_FORCE_KEY) === 'daji') {
+                try { localStorage.removeItem(FORTUNE_FORCE_KEY); } catch (e) { /* 忽略 */ }
+                return { date: dateStr, level: '大吉', cls: 'lv-daji' };
+            }
             const uid = getFortuneUid();
             const reroll = getFortuneReroll();
             const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr + (reroll ? '::r' + reroll : '')));
@@ -3587,9 +3593,9 @@
         const FORTUNE_GIFT_KEY = 'catball_fortune_gift_v1';
         const FORTUNE_GIFT_API = 'https://sshcmvydvckqkbmvdjvj.supabase.co/functions/v1/fortune-gift';
         const FORTUNE_GIFT_RULES = {
-            '小吉': { rate: 5, range: '5~20' },
-            '中吉': { rate: 20, range: '15~40' },
-            '大吉': { rate: 50, range: '25~70' }
+            '小吉': { rate: 45, range: '5~20' },
+            '中吉': { rate: 60, range: '15~40' },
+            '大吉': { rate: 95, range: '25~70' }
         };
 
         const fortuneGiftEl    = document.getElementById('fortuneGift');
@@ -3812,6 +3818,7 @@
                 try { localStorage.removeItem(FORTUNE_GIFT_KEY); } catch (e) { /* 忽略 */ }
                 // 运势由 uid+日期 确定性算出，只删记录还会抽到同一签，所以换个随机种子
                 try { safeSet(FORTUNE_REROLL_KEY, String(getFortuneReroll() + 1)); } catch (e) { /* 忽略 */ }
+                try { safeSet(FORTUNE_FORCE_KEY, 'daji'); } catch (e) { /* 忽略 */ }
                 renderFortune();
                 say('已重置今日运势，可以重新签到啦喵~', 2200);
                 console.log('[debug] 今日运势已重置，连续签到天数保持不变。');
