@@ -2638,12 +2638,29 @@
         }
         if (mode === "online" && state.running) {
           snapshotTimer += dt;
-          // 10Hz 足够顺滑，同时把云端的消息数量和体积降到一半以下
-          if (snapshotTimer >= .1) {
+          // 本机直连时 30Hz，画面更跟手；走云端时 10Hz，减少被限流丢弃的概率
+          const interval = localLinkReady ? .033 : .1;
+          if (snapshotTimer >= interval) {
             snapshotTimer = 0;
             broadcast({ type: "state", state: serializableState() });
           }
         }
+      }
+
+      function smoothRemoteVisuals(dt) {
+        if (!state || mode !== "online" || state.host) return;
+        const k = Math.min(1, dt * 16);
+        state.players.forEach(player => {
+          if (typeof player.tx === "number") {
+            player.x += (player.tx - player.x) * k;
+            player.y += (player.ty - player.y) * k;
+          }
+          if (Array.isArray(player.pets)) player.pets.forEach(pet => {
+            if (typeof pet.tx !== "number") return;
+            pet.x += (pet.tx - pet.x) * k;
+            pet.y += (pet.ty - pet.y) * k;
+          });
+        });
       }
 
       function serializableState() {
@@ -2660,7 +2677,9 @@
           droppedPlayerKeys.forEach(key => { delete player[key]; });
           if (Array.isArray(player.pets)) {
             player.pets.forEach(pet => {
-              ["cd", "targetId", "angle", "wander", "thinkTimer", "owner"].forEach(key => { delete pet[key]; });
+              ["cd", "targetId", "angle", "wander", "thinkTimer", "owner", "navPath", "navIndex",
+                "navKey", "navTimer", "navPoint", "stuckFor", "cooldown", "age", "input", "damage", "speed"]
+                .forEach(key => { delete pet[key]; });
             });
           }
         });
@@ -2989,12 +3008,16 @@
           localPlayer.aim = Math.atan2(targetY - localPlayer.y, targetX - localPlayer.x);
         }
         updateGame(dt);
+        smoothRemoteVisuals(dt);
         if (state && mode === "online" && !state.host) {
           // 访客端完全依赖服务端快照，自己不做本地模拟，因此相机需要在这里跟随
           const player = viewTarget() || controlledPlayer();
           if (player) {
-            camera.x += (player.x - camera.x) * Math.min(1, dt * 7);
-            camera.y += (player.y - camera.y) * Math.min(1, dt * 7);
+            // 相机跟的是"目标位置"而不是插帧后的显示位置，避免二次平滑叠加造成拖沓
+            const focusX = typeof player.tx === "number" ? player.tx : player.x;
+            const focusY = typeof player.ty === "number" ? player.ty : player.y;
+            camera.x += (focusX - camera.x) * Math.min(1, dt * 12);
+            camera.y += (focusY - camera.y) * Math.min(1, dt * 12);
             camera.x = clamp(camera.x, VIEW_W / 2, W - VIEW_W / 2);
             camera.y = clamp(camera.y, VIEW_H / 2, H - VIEW_H / 2);
           }
@@ -3487,7 +3510,28 @@
           if (owner) owner.pets = data.pets.map(pet => ({ ...pet }));
         } else if (data.type === "state" && from === opponentId && state && !state.host && data.state && data.state.id === state.id) {
           const localPlayerId = state.localPlayerId;
-          state = { ...data.state, host: false, localPlayerId };
+          const previous = state;
+          const next = { ...data.state, host: false, localPlayerId };
+          // 快照只记录"目标位置"，渲染位置先停在上一帧，再由每帧的平滑函数追赶过去
+          next.players.forEach(player => {
+            const before = previous.players.find(item => item.id === player.id);
+            if (!before) return;
+            player.tx = player.x;
+            player.ty = player.y;
+            player.x = before.x;
+            player.y = before.y;
+            if (Array.isArray(player.pets) && Array.isArray(before.pets)) {
+              player.pets.forEach(pet => {
+                const oldPet = before.pets.find(item => item.id === pet.id);
+                if (!oldPet || oldPet.type !== pet.type) return;
+                pet.tx = pet.x;
+                pet.ty = pet.y;
+                pet.x = oldPet.x;
+                pet.y = oldPet.y;
+              });
+            }
+          });
+          state = next;
           updateNames();
         } else if (data.type === "finish" && from === opponentId && state && !state.host) {
           const winner = state.players.find(player => player.id === data.winner) || null;
@@ -3516,7 +3560,9 @@
       function sendInput(pulse = false) {
         if (!connected || !opponentId || !state || state.host || !state.running) return;
         const now = performance.now();
-        if (!pulse && now - lastInputSend < 45) return;
+        // 本机直连时几乎每帧都发（约 60Hz），云端时保守一点（约 20Hz）
+        const throttle = localLinkReady ? 16 : 45;
+        if (!pulse && now - lastInputSend < throttle) return;
         lastInputSend = now;
         const player = controlledPlayer();
         const x = (keys.has("KeyD") || touchInput.right ? 1 : 0) - (keys.has("KeyA") || touchInput.left ? 1 : 0);
@@ -5103,6 +5149,7 @@
       lastTs = timestamp;
       if (G) {
         if (!isNetGuest()) step(dt);
+        else smoothNetUnits(dt);
         if (isNetHost()) netSyncTick(dt);
         draw();
         G.hudClock += dt;
@@ -5447,11 +5494,22 @@
       }
     }
 
+    // 客机插帧：快照只给目标位置，渲染位置每帧向目标收敛
+    function smoothNetUnits(dt) {
+      if (!G || !G.units) return;
+      const k = Math.min(1, dt * 14);
+      for (const unit of G.units) {
+        if (typeof unit.tx !== "number") continue;
+        unit.x += (unit.tx - unit.x) * k;
+        unit.y += (unit.ty - unit.y) * k;
+      }
+    }
+
     function netSyncTick(dt) {
       if (!G || !G.running) return;
       netSyncClock += dt;
-      // 直连时 20Hz 更顺滑；走云端时降到 10Hz，减少被限流丢弃的概率
-      const interval = cbLinkReady ? 0.05 : 0.1;
+      // 直连时提到 50Hz，画面更跟手；走云端时 10Hz，减少被限流丢弃的概率
+      const interval = cbLinkReady ? 0.02 : 0.1;
       if (netSyncClock < interval) return;
       netSyncClock = 0;
       if (!net || !net.opponent) return;
@@ -5515,6 +5573,7 @@
       G.time = snapshot.t;
       G.energy = [snapshot.e[0], snapshot.e[1]];
       G.cd = [unpackCd(snapshot.c[0]), unpackCd(snapshot.c[1])];
+      const previousUnits = G.units;
       G.units = (snapshot.u || []).map(row => {
         const flags = row[8];
         return {
@@ -5530,6 +5589,24 @@
           hitFlash: 0, dead: false
         };
       });
+      // 插帧：新快照只当作"目标位置"，渲染位置沿用上一帧最近的同名单位，再由每帧平滑追赶
+      if (previousUnits && previousUnits.length) {
+        const used = new Set();
+        G.units.forEach(unit => {
+          let best = null, bestDistance = 90;
+          previousUnits.forEach(old => {
+            if (used.has(old) || old.team !== unit.team || old.sprite !== unit.sprite) return;
+            const distance = Math.hypot(old.x - unit.x, old.y - unit.y);
+            if (distance < bestDistance) { bestDistance = distance; best = old; }
+          });
+          if (!best) return;
+          used.add(best);
+          unit.tx = unit.x;
+          unit.ty = unit.y;
+          unit.x = best.x;
+          unit.y = best.y;
+        });
+      }
       G.buildings = (snapshot.b || []).map(row => ({
         type: "building", team: row[0], x: row[1], y: row[2], r: row[3],
         hp: row[4], maxHp: row[5], duration: row[6]
