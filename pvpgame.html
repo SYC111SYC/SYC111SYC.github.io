@@ -418,10 +418,13 @@
     // ================================================================
     (function () {
       const KEY_STORAGE = "catball_supabase_anon_v1";
+      // 项目自带的 publishable（anon）key：本身就是公开的，放在客户端是安全的
+      const DEFAULT_KEY = "sb_publishable_QXHlWFccKu1kPx2GosJ1rQ_QfhBR12r";
 
       window.readSupabaseKey = function (promptIfMissing) {
         let key = "";
         try { key = (localStorage.getItem(KEY_STORAGE) || "").trim(); } catch (error) {}
+        if (!key) key = DEFAULT_KEY;
         if (!key && promptIfMissing) {
           const input = window.prompt(
             "首次联机需要 Supabase 的 anon public key\n" +
