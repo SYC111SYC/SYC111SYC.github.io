@@ -3718,6 +3718,7 @@
                     body: JSON.stringify({ token: token, level: f.level, date: todayStr() })
                 });
                 const data = await res.json().catch(function () { return {}; });
+                console.log('[fortune-gift] 后端返回', res.status, data);  // 调试：确认 ver / rate 是否是新版
 
                 if (!res.ok || (data.ok === false && data.code === 'UNAUTHORIZED')) {
                     say(data.msg || '领取失败，请稍后再试喵~', 2200);
