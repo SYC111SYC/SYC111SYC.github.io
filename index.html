@@ -3528,9 +3528,17 @@
             return levels[levels.length - 1];
         }
 
+        const FORTUNE_REROLL_KEY = 'catball_fortune_reroll_v1';
+
+        function getFortuneReroll() {
+            const n = Number(safeGet(FORTUNE_REROLL_KEY));
+            return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+        }
+
         function generateFortune(dateStr) {
             const uid = getFortuneUid();
-            const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr));
+            const reroll = getFortuneReroll();
+            const rand = makeRand(fortuneSeed('catball::' + uid + '::' + dateStr + (reroll ? '::r' + reroll : '')));
             const lv = pickFortuneLevel(rand, isIngotActive());
             return { date: dateStr, level: lv.name, cls: lv.cls };
         }
@@ -3802,6 +3810,8 @@
             if (val && val !== '0' && val !== 'false') {
                 try { localStorage.removeItem(FORTUNE_KEY); } catch (e) { /* 忽略 */ }
                 try { localStorage.removeItem(FORTUNE_GIFT_KEY); } catch (e) { /* 忽略 */ }
+                // 运势由 uid+日期 确定性算出，只删记录还会抽到同一签，所以换个随机种子
+                try { safeSet(FORTUNE_REROLL_KEY, String(getFortuneReroll() + 1)); } catch (e) { /* 忽略 */ }
                 renderFortune();
                 say('已重置今日运势，可以重新签到啦喵~', 2200);
                 console.log('[debug] 今日运势已重置，连续签到天数保持不变。');
